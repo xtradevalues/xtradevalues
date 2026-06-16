@@ -271,14 +271,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
 .share-player-stats span{color:var(--text-primary);font-weight:500}
 .share-bars{margin:8px 0;display:flex;flex-direction:column;gap:4px}
 .share-bar-lbl{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:2px}
-.share-bar-track{position:relative;height:11px;background:var(--bg-light);border-radius:6px;overflow:hidden}
+.share-bar-track{position:relative;height:11px;background:var(--bg-light);border-radius:6px;overflow:visible}
 .share-bar-l{position:absolute;left:0;top:0;bottom:0;border-radius:6px 0 0 6px}
 .share-bar-r{position:absolute;right:0;top:0;bottom:0;border-radius:0 6px 6px 0}
 .share-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:700;color:#fff;border:2px solid var(--bg-mid);z-index:2}
 .share-footer{text-align:center;font-size:10px;color:var(--text-muted);letter-spacing:1px;margin-bottom:8px}
-.share-copy-btn{display:block;width:100%;margin-top:5px;background:none;border:1px solid var(--red-dark);border-radius:6px;padding:7px;color:var(--red-dark);font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
-.share-save-btn{display:block;width:100%;margin-top:5px;background:var(--red-dark);border:none;border-radius:6px;padding:7px;color:#fff;font-size:10px;font-weight:500;letter-spacing:1px;text-transform:uppercase;cursor:pointer}
-
 /* SCORE MODAL */
 .score-desc{font-size:11px;color:var(--text-secondary);line-height:1.7;margin-bottom:12px}
 .score-defs{border-top:1px solid var(--border-light);padding-top:10px;display:flex;flex-direction:column;gap:8px}
@@ -599,8 +596,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
     <div class="share-grid" id="shareGrid"></div>
     <div class="share-bars" id="shareBars"></div>
     <div class="share-footer">valuesavant.com</div>
-    <button class="share-save-btn" onclick="savePhoto()">📸 Save as Photo</button>
-    <button class="share-copy-btn" onclick="copyTrade()">Copy Trade Summary</button>
   </div>
 </div>
 
@@ -633,10 +628,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
 </div>
 
 <script>
-var h2c=document.createElement('script');
-h2c.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-document.head.appendChild(h2c);
-
 // ===== CONFIG =====
 const SHEET_ID = '1rLvqMAQilfOd7Dp3hBQV9A0Sv2h8In2czOaHOj6CA7A';
 const TEAMS = ['ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CHW', 'CIN', 'CLE', 'COL', 'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY', 'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSN'];
@@ -1060,7 +1051,7 @@ function updateVerdict(v26A,v26B,totA,totB){
   const p26A=tot26>0?(v26A/tot26)*100:50;
   // Edge case: if either side's total 2026 value is under 0.5, use flat 0.5 point comparison
   const lowValue=v26A<0.5||v26B<0.5;
-  const fair=lowValue?Math.abs(v26A-v26B)<=0.5:(p26A>=45&&p26A<=55);
+  const fair=lowValue?Math.abs(v26A-v26B)<=0.5:(p26A>44&&p26A<56);
   const tDiff=Math.abs(totA-totB), tMax=Math.max(totA,totB);
   const tPct=tMax>0?(tDiff/tMax)*100:0;
   const v26Win=v26A<v26B-0.01?tA:v26B<v26A-0.01?tB:null;
@@ -1202,98 +1193,9 @@ function openShareModal(){
     document.getElementById('shareBars').innerHTML='';
   }
   document.getElementById('shareModal').classList.add('open');
-  // Pre-render the screenshot in the background so the share button can fire
-  // navigator.share() synchronously within the click event (preserves user gesture on iOS)
-  setTimeout(prerenderSharePhoto, 150);
 }
-
-let pendingShareBlob = null;
-let pendingShareFile = null;
-function prerenderSharePhoto(){
-  pendingShareBlob = null;
-  pendingShareFile = null;
-  const el=document.querySelector('#shareModal .modal-box');
-  if(!el || typeof html2canvas==='undefined') return;
-  const closeBtn=el.querySelector('.modal-close');
-  const origDisplay=closeBtn?closeBtn.style.display:'';
-  if(closeBtn) closeBtn.style.display='none';
-  const bg=getComputedStyle(document.body).getPropertyValue('--bg-mid').trim()||'#e8e0d8';
-  html2canvas(el,{backgroundColor:bg,scale:2,useCORS:true}).then(canvas=>{
-    if(closeBtn) closeBtn.style.display=origDisplay;
-    canvas.toBlob(function(blob){
-      if(!blob) return;
-      pendingShareBlob = blob;
-      const fileName = 'valuesavant-trade-' + Date.now() + '.png';
-      pendingShareFile = new File([blob], fileName, { type: 'image/png', lastModified: Date.now() });
-    }, 'image/png', 1.0);
-  }).catch(()=>{ if(closeBtn) closeBtn.style.display=origDisplay; });
-}
-function closeShare(){document.getElementById('shareModal').classList.remove('open');pendingShareBlob=null;pendingShareFile=null;}
+function closeShare(){document.getElementById('shareModal').classList.remove('open');}
 function closeShareOut(e){if(e.target.id==='shareModal')closeShare();}
-function copyTrade(){
-  const tA=document.getElementById('teamA').value||'Side A',tB=document.getElementById('teamB').value||'Side B';
-  const s=(list,lbl)=>list.length?lbl+' gives: '+list.map(p=>`${p.name} (${fmt(p.val2026)}/26, ${fmt(p.avgVal)} avg, ${p.totalVal!==null?p.totalVal.toFixed(1):'—'} tot)`).join(', '):'';
-  const txt=`Trade via ValueSavant.com
-${s(selectedA,tA)}
-${s(selectedB,tB)}`.trim();
-  navigator.clipboard.writeText(txt).then(()=>alert('Copied!')).catch(()=>alert('Copy failed'));
-}
-function savePhoto(){
-  // CRITICAL: navigator.share() must be called synchronously within the click handler
-  // to preserve iOS "user activation" - any await/async delay before calling it causes
-  // Safari to silently block the native share sheet. We use a pre-rendered file when available.
-  if (pendingShareFile && typeof navigator.share === 'function') {
-    const canShareFiles = typeof navigator.canShare === 'function' && navigator.canShare({ files: [pendingShareFile] });
-    if (canShareFiles) {
-      navigator.share({ files: [pendingShareFile] }).catch(err=>{
-        if (!err || err.name !== 'AbortError') {
-          // share failed for some other reason - fall back to download
-          downloadBlob(pendingShareBlob, pendingShareFile.name);
-        }
-      });
-      return;
-    }
-  }
-  // Pre-render not ready yet, or share API unsupported - render now and download
-  renderAndDownloadShare();
-}
-
-function downloadBlob(blob, fileName){
-  if(!blob) return;
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = fileName || 'valuesavant-trade.png';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
-}
-
-async function renderAndDownloadShare(){
-  const el=document.querySelector('#shareModal .modal-box');
-  if(!el || typeof html2canvas==='undefined'){ alert('Still loading, try again.'); return; }
-  const closeBtn=el.querySelector('.modal-close');
-  const saveBtn=document.querySelector('.share-save-btn');
-  const origCloseDisplay=closeBtn?closeBtn.style.display:'';
-  const origBtnText=saveBtn?saveBtn.innerHTML:'';
-  if(closeBtn) closeBtn.style.display='none';
-  if(saveBtn) saveBtn.innerHTML='Preparing...';
-  const bg=getComputedStyle(document.body).getPropertyValue('--bg-mid').trim()||'#e8e0d8';
-  try {
-    const canvas = await html2canvas(el,{backgroundColor:bg,scale:2,useCORS:true});
-    if(closeBtn) closeBtn.style.display=origCloseDisplay;
-    if(saveBtn) saveBtn.innerHTML=origBtnText;
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-    if(!blob){ alert('Could not generate image.'); return; }
-    downloadBlob(blob, 'valuesavant-trade-' + Date.now() + '.png');
-  } catch(err) {
-    if(closeBtn) closeBtn.style.display=origCloseDisplay;
-    if(saveBtn) saveBtn.innerHTML=origBtnText;
-    console.error('renderAndDownloadShare error:', err);
-    alert('Screenshot failed. Please try again.');
-  }
-}
 
 // ===== SCORE MODAL =====
 function openScoreModal(){document.getElementById('scoreModal').classList.add('open');}
