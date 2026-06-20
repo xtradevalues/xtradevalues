@@ -880,20 +880,6 @@ function matchesPos(p, pos) {
 async function loadData() {
   try {
     setProgress(5, 'Loading player data...');
-
-// Add skeleton screen
-const loadingContainer = document.createElement('div');
-loadingContainer.id = 'skeleton-loader';
-loadingContainer.innerHTML = `
-  <div style="text-align:center; padding:60px 20px;">
-    <div style="width:80px;height:80px;margin:0 auto 30px;border-radius:9999px;background:linear-gradient(90deg,#27272a 25%,#3f3f46 50%,#27272a 75%);background-size:200% 100%;animation:loading 1.5s infinite;"></div>
-    <div style="width:240px;height:28px;margin:0 auto 14px;border-radius:8px;background:linear-gradient(90deg,#27272a 25%,#3f3f46 50%,#27272a 75%);background-size:200% 100%;animation:loading 1.5s infinite;"></div>
-    <div style="width:300px;height:18px;margin:0 auto;border-radius:8px;background:linear-gradient(90deg,#27272a 25%,#3f3f46 50%,#27272a 75%);background-size:200% 100%;animation:loading 1.5s infinite;"></div>
-    <p style="margin-top:30px;color:#666;font-size:14px;">Pulling live 2026 projections...</p>
-  </div>
-  <style>@keyframes loading{0%{background-position:200% 0}100%{background-position:-200% 0}}</style>
-`;
-document.body.appendChild(loadingContainer);
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(DATA_TAB)}&_cb=${Date.now()}`;
     const r=await fetch(url, {cache: 'no-store'});
     if(!r.ok) throw new Error('Could not reach the data sheet (HTTP '+r.status+')');
@@ -970,14 +956,8 @@ document.body.appendChild(loadingContainer);
     buildPercentiles();
     document.getElementById('loadingScreen').style.display='none';
     document.getElementById('mainContent').style.display='flex';
-    
-    // Remove skeleton loader
-    const skel = document.getElementById('skeleton-loader');
-    if (skel) skel.remove();
   } catch(e){
     document.getElementById('loadingScreen').style.display='none';
-    const skel2 = document.getElementById('skeleton-loader');
-    if (skel2) skel2.remove();
     if(allPlayers.length > 0) {
       populateDDs();
       buildPercentiles();
