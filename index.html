@@ -860,11 +860,10 @@ function dotClass(status){
 }
 function matchesGroup(p, g) {
   if(!g) return true;
-  const st=p.status;
-  if(g==='mlb') return st==='mlb';
-  if(g==='minors') return st==='minors';
-  if(g==='prospects') return st==='org' || st==='top100';
-  if(g==='comppicks') return st==='comppick';
+  if(g==='mlb') return p.level==='mlb';
+  if(g==='minors') return p.level==='minors';
+  if(g==='prospects') return !!p.isProspect; // cross-cutting: findable here AND in MLB/Minors, never duplicated on the roster itself
+  if(g==='comppicks') return p.status==='comppick';
   if(g==='cash') return false; // cash handled separately via text input, not player list
   return true;
 }
@@ -935,10 +934,20 @@ async function loadData() {
         const injuredRaw=getS(25);// col Z
         const aaRaw=getS(26);     // col AA - status text (drives parseStatus, unchanged)
         const etaRaw=getS(27);    // col AB
-        const levelRaw=getS(28);  // col AC - MLB-level flag, trade-finder eligibility ONLY (not status)
+        const levelRaw=getS(28);  // col AC - MLB-level flag: primary MLB/Minors placement, and trade-finder eligibility
+        const obp=getV(29);      // col AD
+        const slg=getV(30);      // col AE
+        const wrcPlus=getV(31);  // col AF
+        const era=getV(32);      // col AG
+        const fip=getV(33);      // col AH
+        const k9=getV(34);       // col AI
         const status=parseStatus(aaRaw);
+        // level: every player is either 'mlb' or 'minors', driven purely by col AC
+        const level=levelRaw.trim().toUpperCase()==='MLB' ? 'mlb' : 'minors';
+        // isProspect: cross-cutting flag (independent of level) - true whenever col AA mentions "Prospect"
+        const isProspect=aaRaw.toLowerCase().includes('prospect');
         const fgUrl='', headshot='';
-        allPlayers.push({name,team:teamCol,pos,age,srvTime,val2026,ctrlYears,avgVal,perfVal,aaRaw,etaRaw,levelRaw,status,fgUrl,headshot,injuredRaw});
+        allPlayers.push({name,team:teamCol,pos,age,srvTime,val2026,ctrlYears,avgVal,perfVal,aaRaw,etaRaw,levelRaw,status,level,isProspect,obp,slg,wrcPlus,era,fip,k9,fgUrl,headshot,injuredRaw});
         if(ri%25===0) setProgress(Math.min(95, 5+Math.round((ri/rows.length)*90)), teamCol);
       }
     }
@@ -1081,7 +1090,7 @@ function finderTargetPlayerSearchInput(){
   const q=document.getElementById('finderTargetPlayerSearch').value.toLowerCase().trim();
   const drop=document.getElementById('finderTargetPlayerDrop');
   if(!q){ drop.classList.remove('open'); return; }
-  const pool=allPlayers.filter(p=>p.status==='mlb' && !finderIsInjured(p) && p.team!==finderState.team && p.name.toLowerCase().includes(q));
+  const pool=allPlayers.filter(p=>!finderIsInjured(p) && p.team!==finderState.team && p.name.toLowerCase().includes(q));
   const matches=pool.sort((a,b)=>(b.avgVal||0)-(a.avgVal||0)).slice(0,30);
   if(!matches.length){
     drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No players found</div></div>';
@@ -1096,7 +1105,10 @@ function finderRenderTargetPlayersSelected(){
   const list=finderState.targetPlayers;
   const el=document.getElementById('finderTargetPlayerSelected');
   if(!list.length){ el.innerHTML=''; return; }
-  el.innerHTML=list.map(p=>`<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div></div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`).join('');
+  el.innerHTML=list.map(p=>{
+    const warn=finderIsSellerAvailable(p)?'':'<div style="color:var(--red-dark);font-size:10px;font-weight:600;margin-top:2px">⚠ Likely not available — showing potential offers anyway</div>';
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+  }).join('');
 }
 
 function finderTargetPlayerChosen(name,team,pos){
@@ -1157,7 +1169,7 @@ function finderUntouchableSearchInput(){
   const drop=document.getElementById('finderUntouchableDrop');
   if(!q){ drop.classList.remove('open'); return; }
   const team=finderState.team;
-  const pool=allPlayers.filter(p=>p.team===team && (p.status==='org'||p.status==='top100') && p.name.toLowerCase().includes(q));
+  const pool=allPlayers.filter(p=>p.team===team && p.isProspect && p.name.toLowerCase().includes(q));
   const matches=pool.sort((a,b)=>(b.avgVal||0)-(a.avgVal||0)).slice(0,30);
   if(!matches.length){
     drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No prospects found</div></div>';
@@ -1212,9 +1224,9 @@ function finderPlayerSearchInput(){
   const drop=document.getElementById('finderPlayerDrop');
   const alreadyPicked=new Set(finderState.sellPlayers.map(p=>p.name));
   
-  // If empty query, show all eligible team MLB players sorted by value (default roster view)
+  // If empty query, show all of the team's players sorted by value (default roster view)
   if(!q){
-    const allTeamPlayers=allPlayers.filter(p=>p.team===team && p.status==='mlb' && !finderIsInjured(p) && !alreadyPicked.has(p.name))
+    const allTeamPlayers=allPlayers.filter(p=>p.team===team && !finderIsInjured(p) && !alreadyPicked.has(p.name))
       .sort((a,b)=>(b.avgVal||0)-(a.avgVal||0));
     if(!allTeamPlayers.length){ drop.classList.remove('open'); return; }
     drop.innerHTML=allTeamPlayers.slice(0,50).map(p=>`<div class="drop-item" onclick="finderPlayerChosen('${esc(p.name)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · Avg ${fmt(p.avgVal)}</div></div></div>`).join('');
@@ -1222,8 +1234,8 @@ function finderPlayerSearchInput(){
     return;
   }
   
-  // With query, filter roster
-  const pool=allPlayers.filter(p=>p.team===team && p.status==='mlb' && !finderIsInjured(p) && !alreadyPicked.has(p.name) && p.name.toLowerCase().includes(q));
+  // With query, search the ENTIRE team - MLB, Minors, and Prospects alike
+  const pool=allPlayers.filter(p=>p.team===team && !finderIsInjured(p) && !alreadyPicked.has(p.name) && p.name.toLowerCase().includes(q));
   const matches=pool.sort((a,b)=>(b.avgVal||0)-(a.avgVal||0)).slice(0,30);
   if(!matches.length){
     drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No players found</div></div>';
@@ -1239,7 +1251,10 @@ function finderRenderSellPlayersSelected(){
   const el=document.getElementById('finderPlayerSelected');
   if(!list.length){ el.innerHTML=''; return; }
   const note=list.length>1?'<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Offers may include any one of these, or combinations of them.</div>':'';
-  el.innerHTML=note+list.map(p=>`<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div></div><button class="remove-btn" onclick="finderRemoveSellPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`).join('');
+  el.innerHTML=note+list.map(p=>{
+    const warn=finderIsSellerAvailable(p)?'':'<div style="color:var(--red-dark);font-size:10px;font-weight:600;margin-top:2px">⚠ Likely not available — showing potential offers anyway</div>';
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveSellPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+  }).join('');
 }
 
 function finderPlayerChosen(name,pos){
@@ -1329,14 +1344,14 @@ function finderPosBucket(posStr){
 // Rank all MLB-tier players league-wide at a position bucket by 2026 Value, descending
 function finderLeagueRankAtPos(posBucket){
   return allPlayers
-    .filter(p=>p.status==='mlb' && finderPosBucket(p.pos)===posBucket && p.val2026!==null)
+    .filter(p=>p.level==='mlb' && finderPosBucket(p.pos)===posBucket && p.val2026!==null)
     .sort((a,b)=>b.val2026-a.val2026);
 }
 
 // Get the user's own current MLB players at a position bucket, ranked by 2026 Value desc
 function finderUserPosRank(team, posBucket){
   return allPlayers
-    .filter(p=>p.team===team && p.status==='mlb' && finderPosBucket(p.pos)===posBucket && p.val2026!==null)
+    .filter(p=>p.team===team && p.level==='mlb' && finderPosBucket(p.pos)===posBucket && p.val2026!==null)
     .sort((a,b)=>b.val2026-a.val2026);
 }
 
@@ -1347,7 +1362,7 @@ function finderIsSellerAvailable(player){
   const sellerTeam=player.team;
   const posBucket=finderPosBucket(player.pos);
   if(!posBucket) return false;
-  if(player.status==='mlb'){
+  if(player.level==='mlb'){
     const teamMlbAtPos=finderUserPosRank(sellerTeam,posBucket); // reused: ranks that team's own MLB players at position
     const isBestAtPos=teamMlbAtPos.length && teamMlbAtPos[0].name===player.name;
     if(isBestAtPos){
@@ -1357,10 +1372,10 @@ function finderIsSellerAvailable(player){
     }
     return true; // not the team's best at the position, always tradeable
   } else {
-    // Prospect tier (org/top100) - already-called-up "prospects" (col AC = MLB) are never offered
+    // Prospect tier (not yet called up to MLB level)
     if(finderIsCalledUp(player)) return false;
     // best prospect at position is NEVER tradeable for a seller
-    const teamProspectsAtPos=allPlayers.filter(p=>p.team===sellerTeam && (p.status==='org'||p.status==='top100') && finderPosBucket(p.pos)===posBucket && p.avgVal!==null).sort((a,b)=>b.avgVal-a.avgVal);
+    const teamProspectsAtPos=allPlayers.filter(p=>p.team===sellerTeam && p.isProspect && p.level==='minors' && finderPosBucket(p.pos)===posBucket && p.avgVal!==null).sort((a,b)=>b.avgVal-a.avgVal);
     const isBestProspectAtPos=teamProspectsAtPos.length && teamProspectsAtPos[0].name===player.name;
     return !isBestProspectAtPos;
   }
@@ -1379,7 +1394,7 @@ function finderIsUntouchableProspect(player){
 // - Already-called-up prospects (col AC = MLB) are never tradeable as a "prospect"
 // - The user's chosen untouchable prospect (if any) is never tradeable for this group of trades
 function finderIsBuyerProspectEligible(prospect, userTeam){
-  if(prospect.status!=='org' && prospect.status!=='top100') return false;
+  if(!prospect.isProspect || prospect.level!=='minors') return false;
   if(finderIsUntouchableProspect(prospect)) return false;
   if(playerIsOnIL(prospect)) return false; // IL = MLB 40-man roster guy, not a tradeable prospect
   if(finderFirstPos(prospect.pos)==='RP') return false;
@@ -1388,10 +1403,10 @@ function finderIsBuyerProspectEligible(prospect, userTeam){
 }
 
 // Determine if one of the USER's own minors players is eligible to be given up (Buyer side)
-// Must be: status==='minors', age<=27, ctrlYears>=4, val2026>1, avgVal>1, not RP
+// Must be: level==='minors' (and not prospect-tagged), age<=27, ctrlYears>=4, val2026>1, avgVal>1, not RP
 // Injured minors players CAN be included.
 function finderIsBuyerMinorsEligible(player, userTeam){
-  if(player.status!=='minors') return false;
+  if(player.isProspect || player.level!=='minors') return false;
   if(finderFirstPos(player.pos)==='RP') return false; // no RP minors
   if(player.age===null || player.age>27) return false; // must be 27 or younger
   if(player.ctrlYears===null || player.ctrlYears<4) return false; // must have at least 4 control years
@@ -1451,7 +1466,7 @@ function finderBuildGiveScenarios(targets, userTeam){
     // Absolute last resort: the team has nothing meeting normal eligibility thresholds at all.
     // Still always surface something — any non-RP minors player on the roster, ignoring the
     // usual age/control/value floors, so a buyer's specific request is never left empty.
-    const anyMinors=allPlayers.filter(p=>p.team===userTeam && p.status==='minors' && finderFirstPos(p.pos)!=='RP');
+    const anyMinors=allPlayers.filter(p=>p.team===userTeam && p.level==='minors' && finderFirstPos(p.pos)!=='RP');
     if(anyMinors.length){
       const scrub=anyMinors.reduce((cheapest,p)=>(p.avgVal||0)<(cheapest.avgVal||0)?p:cheapest, anyMinors[0]);
       return [{players:[scrub], label:'Scrub Throw-In', isInDivision:false, tax:0}];
@@ -1506,7 +1521,7 @@ function finderBuildGiveScenarios(targets, userTeam){
   // For 'any' caliber: no cap (all minors fine)
   function violatesMinorsCap(combo){
     if(!isHighCalibr) return false;
-    const minorsCount=combo.filter(p=>p.status==='minors').length;
+    const minorsCount=combo.filter(p=>!p.isProspect && p.level==='minors').length;
     const size=combo.length;
     if(size<=3) return minorsCount>1;
     if(size===4) return minorsCount>2;
@@ -1605,7 +1620,7 @@ function finderBuildGiveScenarios(targets, userTeam){
   // forcing the seller to add a matching MLB player on their side
   const protectedProspects=allPlayers.filter(p=>
     p.team===userTeam &&
-    (p.status==='org'||p.status==='top100') &&
+    p.isProspect &&
     finderFirstPos(p.pos)!=='RP' &&
     !usedNames.has(p.name) &&
     !finderIsUntouchableProspect(p) &&
@@ -1773,7 +1788,7 @@ function finderGetTopPiece(buyerTeam, haulType){
     if(p.team!==buyerTeam) return false;
     if(finderFirstPos(p.pos)==='RP') return false; // no RP prospects or minors
 
-    if(p.status==='org' || p.status==='top100'){
+    if(p.isProspect && p.level==='minors'){
       // Prospect: use ETA tiers
       const eta=parseInt(p.etaRaw);
       if(isNaN(eta)) return false;
@@ -1782,7 +1797,7 @@ function finderGetTopPiece(buyerTeam, haulType){
       return finderIsBuyerProspectEligible(p, buyerTeam);
     }
 
-    if(p.status==='minors'){
+    if(!p.isProspect && p.level==='minors'){
       // Minors: use age tiers instead of ETA
       if(p.age===null) return false;
       const matchesTier = isMlbReady ? (p.age>=22 && p.age<=27) : (p.age<=21);
@@ -1809,14 +1824,16 @@ function finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece){
     if(p.team!==buyerTeam) return false;
     if(p.name===topPiece.name) return false;
     if((p.avgVal||0)>=topPieceVal) return false; // must be lower-rated than top piece
-    if(p.status==='org' || p.status==='top100') return finderIsBuyerProspectEligible(p, buyerTeam);
-    if(p.status==='minors') return finderIsBuyerMinorsEligible(p, buyerTeam);
+    if(p.isProspect && p.level==='minors') return finderIsBuyerProspectEligible(p, buyerTeam);
+    if(!p.isProspect && p.level==='minors') return finderIsBuyerMinorsEligible(p, buyerTeam);
     return false;
   }).sort((a,b)=>(b.avgVal||0)-(a.avgVal||0));
 
   const scenarios=[];
   // Global used-names across ALL seller scenarios — no player appears in more than one offer
   const usedNames=new Set();
+  // Dedup signatures for combo-based scenarios (e.g. The Blockbuster)
+  const usedNameSets=new Set();
 
   // In-Division Tax
   const isInDivision = finderIsSameDivision(sellTeam, buyerTeam);
@@ -1932,7 +1949,7 @@ function finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece){
   // prospects, forcing the seller (user's team) to add a matching MLB player on their side
   const protectedProspects=allPlayers.filter(p=>
     p.team===buyerTeam &&
-    (p.status==='org'||p.status==='top100') &&
+    p.isProspect &&
     finderFirstPos(p.pos)!=='RP' &&
     !finderIsInjured(p) &&
     finderIsCalledUp(p)
@@ -1993,6 +2010,24 @@ function finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece){
     }
   }
 
+  // ===== 7: Guaranteed Scrub Throw-In =====
+  // A seller shopping a specific player should never come back empty-handed, even if nothing
+  // fit the fairness bands above (e.g. a very low-value or very high-value sell piece). Fall back
+  // to whichever eligible piece from this buyer is closest in value to what's being sold, with
+  // no band requirement at all - or, as a last resort, the cheapest eligible piece of any kind.
+  if(!scenarios.length){
+    const scrubPool=[topPiece, ...fillerPool].filter(p=>!usedNames.has(p.name));
+    if(scrubPool.length){
+      const scrub=scrubPool.reduce((best,p)=>{
+        const diff=Math.abs((p.avgVal||0)-sellAvg);
+        const bestDiff=Math.abs((best.avgVal||0)-sellAvg);
+        return diff<bestDiff?p:best;
+      }, scrubPool[0]);
+      markUsed([scrub]);
+      scenarios.push({players:[scrub], label:'Scrub Throw-In', isInDivision, tax});
+    }
+  }
+
   return scenarios;
 }
 
@@ -2014,16 +2049,18 @@ function finderGenerateSellerOffers(){
   if(!packages.length) return [];
   const offers=[];
   for(const sellPackage of packages){
+    const sellTeam=sellPackage[0].team;
     let suitors=finderGetBuyerSuitors(sellPackage);
     if(finderState.partnerTeam){
       suitors=suitors.filter(t=>t===finderState.partnerTeam);
     }
     console.log('Sell package:', sellPackage.map(p=>p.name).join(' + '), 'combined val2026:', sellPackage.reduce((s,p)=>s+(p.val2026||0),0));
     console.log('Suitors found:', suitors);
-    for(const buyerTeam of suitors){
-      const topPiece=finderGetTopPiece(buyerTeam, finderState.haulType);
+    const offersBefore=offers.length;
+    function tryTeam(buyerTeam, haulType){
+      const topPiece=finderGetTopPiece(buyerTeam, haulType);
       console.log('Buyer:', buyerTeam, 'topPiece:', topPiece?topPiece.name+' (avgVal:'+topPiece.avgVal+', eta:'+topPiece.etaRaw+')':'NONE FOUND');
-      if(!topPiece) continue;
+      if(!topPiece) return;
       const scenarios=finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece);
       console.log('Scenarios for', buyerTeam, ':', scenarios.length);
       for(const scenario of scenarios){
@@ -2036,6 +2073,30 @@ function finderGenerateSellerOffers(){
           isInDivision: scenario.isInDivision,
           tax: scenario.tax
         });
+      }
+    }
+    for(const buyerTeam of suitors){
+      tryTeam(buyerTeam, finderState.haulType);
+    }
+    // GUARANTEE: shopping a specific player must always surface at least one trade idea.
+    // If the normal "is this team an upgrade-seeking buyer at this position" filter found
+    // no suitors (common for replacement-level or duplicated-position pieces), broaden the
+    // search to any buyer/either-posture team, then - as an absolute last resort - every team
+    // in the league across both haul types.
+    if(offers.length===offersBefore){
+      let fallbackTeams = finderState.partnerTeam
+        ? [finderState.partnerTeam].filter(t=>t!==sellTeam)
+        : Object.keys(teamPosture).filter(t=>(teamPosture[t]==='buyer'||teamPosture[t]==='either') && t!==sellTeam);
+      for(const buyerTeam of fallbackTeams){
+        if(offers.length>offersBefore) break;
+        tryTeam(buyerTeam, finderState.haulType);
+      }
+      if(offers.length===offersBefore && !finderState.partnerTeam){
+        for(const buyerTeam of TEAMS.filter(t=>t!==sellTeam)){
+          if(offers.length>offersBefore) break;
+          tryTeam(buyerTeam, finderState.haulType);
+          if(offers.length===offersBefore) tryTeam(buyerTeam, finderState.haulType==='mlbready'?'dev':'mlbready');
+        }
       }
     }
   }
@@ -2665,33 +2726,38 @@ function showPM(name,team,pos){
   document.getElementById('pmStatus').textContent=p.aaRaw||'—';
   // Stats
   const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
-  const isProspect=p.aaRaw&&p.aaRaw.toLowerCase().includes('prospect');
-  const isPureMLB=!isProspect&&(p.status==='mlb');
-  const perfLabel=isProspect?'Pot Val':'Perf Val';
-  let row2col3Label='', row2col3Val='';
-  if(isPureMLB){
-    row2col3Label='Surplus Val';
-    const surp=(p.val2026!==null&&p.perfVal!==null&&!isNaN(p.perfVal))?(p.val2026-p.perfVal):null;
-    row2col3Val=surp!==null?surp.toFixed(2):'—';
-  } else {
-    row2col3Label='ETA';
-    const etaNum=parseInt(p.etaRaw);
-    row2col3Val=(finderIsCalledUp(p) && !isNaN(etaNum) && etaNum>=2027) ? '2026' : (p.etaRaw||'—');
-  }
   // Injury indicator - shown under status, not next to age
   const injBadge=playerHasInjury(p)?'<span style="color:#D72229;font-weight:700;font-size:11px"> ✚ '+injuredLabel(p.injuredRaw)+'</span>':'';
   document.getElementById('pmStatus').innerHTML=(p.aaRaw||'—')+injBadge;
+  // Bottom row: pitchers (SP/RP) show ERA/FIP/K9 (cols AG/AH/AI); everyone else shows OBP/SLG/wRC+ (cols AD/AE/AF)
+  const dash=v=>(v===null||v===undefined||isNaN(v))?'-':v;
+  const isPitcher=['SP','RP'].includes(finderFirstPos(p.pos));
+  let bottomRow;
+  if(isPitcher){
+    bottomRow=[
+      {lbl:'ERA', val:dash(p.era!==null&&!isNaN(p.era)?p.era.toFixed(2):null)},
+      {lbl:'FIP', val:dash(p.fip!==null&&!isNaN(p.fip)?p.fip.toFixed(2):null)},
+      {lbl:'K/9', val:dash(p.k9!==null&&!isNaN(p.k9)?p.k9.toFixed(1):null)}
+    ];
+  } else {
+    const pct=v=>(v===null||v===undefined||isNaN(v))?null:v.toFixed(3).replace(/^0\./,'.');
+    bottomRow=[
+      {lbl:'OBP', val:dash(pct(p.obp))},
+      {lbl:'SLG', val:dash(pct(p.slg))},
+      {lbl:'wRC+', val:dash(p.wrcPlus!==null&&!isNaN(p.wrcPlus)?Math.round(p.wrcPlus):null)}
+    ];
+  }
   document.getElementById('pmStatsWrap').innerHTML=`
     <div class="pm-stat-row">
       <div class="pm-stat-float"><div class="pm-stat-val">${age}</div><div class="pm-stat-lbl">Age</div></div>
-      <div class="pm-stat-float"><div class="pm-stat-val">${fmt(p.perfVal)}</div><div class="pm-stat-lbl">${perfLabel}</div></div>
-      <div class="pm-stat-float"><div class="pm-stat-val">${row2col3Val}</div><div class="pm-stat-lbl">${row2col3Label}</div></div>
+      <div class="pm-stat-float"><div class="pm-stat-val">${p.pos||'—'}</div><div class="pm-stat-lbl">Position</div></div>
+      <div class="pm-stat-float"><div class="pm-stat-val">${fmt(p.avgVal)}</div><div class="pm-stat-lbl">Avg Val</div></div>
     </div>
     <div class="pm-divider"></div>
     <div class="pm-stat-row">
-      <div class="pm-stat-float"><div class="pm-stat-val">${fmt(p.val2026)}</div><div class="pm-stat-lbl">2026 Val</div></div>
-      <div class="pm-stat-float"><div class="pm-stat-val">${fmt(p.avgVal)}</div><div class="pm-stat-lbl">Avg Val</div></div>
-      <div class="pm-stat-float"><div class="pm-stat-val">${ctrlYrsLabel(p)||'—'}</div><div class="pm-stat-lbl">Ctrl Yrs (-2031)</div></div>
+      <div class="pm-stat-float"><div class="pm-stat-val">${bottomRow[0].val}</div><div class="pm-stat-lbl">${bottomRow[0].lbl}</div></div>
+      <div class="pm-stat-float"><div class="pm-stat-val">${bottomRow[1].val}</div><div class="pm-stat-lbl">${bottomRow[1].lbl}</div></div>
+      <div class="pm-stat-float"><div class="pm-stat-val">${bottomRow[2].val}</div><div class="pm-stat-lbl">${bottomRow[2].lbl}</div></div>
     </div>
   `;
   // FanGraphs - direct link only, no search fallback
