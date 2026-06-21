@@ -778,11 +778,14 @@ function finderIsSameDivision(teamA, teamB){
 // Finds an MLB player on `otherTeam` matching the protected prospect's position, with a STRICTLY
 // HIGHER 2026 Value than the prospect, and satisfying the seller-untouchable exception
 // (<=3 ctrl years OR 31+ age). Used for the Blockbuster mechanic's mutual escalation requirement.
-function finderFindBlockbusterMatch(protectedProspect, otherTeam){
+// excludeNames: players who are already elsewhere in this same deal and must not be picked again.
+function finderFindBlockbusterMatch(protectedProspect, otherTeam, excludeNames){
+  const exclude = excludeNames instanceof Set ? excludeNames : new Set(excludeNames||[]);
   const posBucket=finderPosBucket(protectedProspect.pos);
   if(!posBucket) return null;
   const candidates=allPlayers.filter(p=>{
     if(p.team!==otherTeam) return false;
+    if(exclude.has(p.name)) return false; // never duplicate a player already in the deal
     if(p.level!=='mlb' || p.isProspect) return false; // must be a genuine established MLB player, not a prospect
     if(finderIsInjured(p)) return false;
     if(finderPosBucket(p.pos)!==posBucket) return false;
@@ -1648,7 +1651,7 @@ function finderBuildGiveScenarios(targets, userTeam){
 
   if(protectedProspects.length && sellerTeam){
     for(const protectedP of protectedProspects){
-      const matchingMlb=finderFindBlockbusterMatch(protectedP, sellerTeam);
+      const matchingMlb=finderFindBlockbusterMatch(protectedP, sellerTeam, targetList.map(t=>t.name));
       if(!matchingMlb) continue;
       let blockbusterGive = [protectedP];
       let giveV26=protectedP.val2026||0, giveAvg=protectedP.avgVal||0;
@@ -1737,31 +1740,49 @@ function finderBuildBlockbusterOnlyGiveScenarios(targets, userTeam){
   const calledUp=targets.filter(finderIsCalledUpProspect);
   const normal=targets.filter(p=>!finderIsCalledUpProspect(p));
   const sellerTeam=targets[0].team;
-  const usedMatchNames=new Set();
-  const matches=[];
-  for(const cu of calledUp){
-    const m=finderFindBlockbusterMatch(cu, userTeam);
-    if(!m || usedMatchNames.has(m.name)) return []; // can't complete the Blockbuster requirement
-    usedMatchNames.add(m.name);
-    matches.push(m);
-  }
   const isInDivision=finderIsSameDivision(userTeam, sellerTeam);
   const tax=isInDivision?5:0;
+
   if(!normal.length){
     // Pure called-up-prospect target(s): the give side IS the matching MLB player(s), nothing else
+    const usedMatchNames=new Set();
+    const matches=[];
+    for(const cu of calledUp){
+      const m=finderFindBlockbusterMatch(cu, userTeam, usedMatchNames);
+      if(!m) return []; // can't complete the Blockbuster requirement
+      usedMatchNames.add(m.name);
+      matches.push(m);
+    }
     return [{players:matches, label:'The Blockbuster', isInDivision, tax}];
   }
-  // Mixed stack: still need a normal value-matched give package for the non-prospect targets,
-  // plus the Blockbuster match(es) for the called-up prospect(s) layered on top.
+
+  // Mixed stack: build the normal value-matched give package for the non-prospect targets first,
+  // then find Blockbuster match(es) for the called-up prospect(s), excluding whatever the normal
+  // scenario is already giving so the same player can never appear twice in one offer.
   const normalScenarios=finderBuildGiveScenarios(normal, userTeam);
   if(!normalScenarios.length) return [];
-  return normalScenarios.map(s=>({
-    players:[...s.players, ...matches],
-    label: s.label+' + Blockbuster',
-    isInDivision: s.isInDivision,
-    tax: s.tax,
-    extraMlbAddOn: s.extraMlbAddOn
-  }));
+  const results=[];
+  for(const s of normalScenarios){
+    const exclude=new Set(s.players.map(p=>p.name));
+    if(s.extraMlbAddOn) exclude.add(s.extraMlbAddOn.name);
+    const matches=[];
+    let ok=true;
+    for(const cu of calledUp){
+      const m=finderFindBlockbusterMatch(cu, userTeam, exclude);
+      if(!m){ ok=false; break; }
+      exclude.add(m.name);
+      matches.push(m);
+    }
+    if(!ok) continue;
+    results.push({
+      players:[...s.players, ...matches],
+      label: s.label+' + Blockbuster',
+      isInDivision: s.isInDivision,
+      tax: s.tax,
+      extraMlbAddOn: s.extraMlbAddOn
+    });
+  }
+  return results;
 }
 
 function finderGenerateBuyerOffers(){
@@ -2013,7 +2034,7 @@ function finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece){
 
   if(protectedProspects.length){
     for(const protectedP of protectedProspects){
-      const matchingMlb=finderFindBlockbusterMatch(protectedP, sellTeam);
+      const matchingMlb=finderFindBlockbusterMatch(protectedP, sellTeam, sellPackage.map(p=>p.name));
       if(!matchingMlb) continue;
       let blockbusterGive=[protectedP];
       const giveV26=protectedP.val2026||0, giveAvg=protectedP.avgVal||0;
