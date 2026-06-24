@@ -275,7 +275,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
 
 /* PLAYER POPUP */
 .pm-header{display:flex;gap:12px;align-items:flex-start;margin-bottom:12px}
-.pm-photo{width:84px;height:96px;border-radius:8px;object-fit:cover;flex-shrink:0;background:var(--bg-light)}
+.pm-photo{width:84px;height:96px;object-fit:cover;flex-shrink:0;background:var(--bg-light)}
 .pm-header-right{flex:1;min-width:0}
 .pm-name-row{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px}
 .pm-name{font-size:15px;font-weight:500;color:var(--text-primary);line-height:1.2;word-break:break-word}
@@ -2902,13 +2902,12 @@ function buildJerseyMarkup(p){
   const nameText=lastNameUpper(p.name);
   const nameStroke=nameBorder?`stroke="${esc(nameBorder)}" stroke-width="1.5" paint-order="stroke"`:'';
   const numStroke=numberBorder?`stroke="${esc(numberBorder)}" stroke-width="2.5" paint-order="stroke"`:'';
-  const jerseyPath="M100,8 C108,8 116,14 122,20 L142,26 L182,44 L196,88 L168,104 L162,68 L162,208 C162,220 154,224 144,224 L56,224 C46,224 38,220 38,208 L38,68 L32,104 L4,88 L18,44 L58,26 L78,20 C84,14 92,8 100,8 Z";
-  const pinstripeFill=pinstripe?`<path d="${jerseyPath}" fill="url(#pmJerseyPins)"/>`:'';
+  const pinstripeFill=pinstripe?`<rect width="200" height="232" fill="url(#pmJerseyPins)"/>`:'';
   return `<svg viewBox="0 0 200 232" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
     <defs><pattern id="pmJerseyPins" patternUnits="userSpaceOnUse" width="7" height="7">
       <line x1="0" y1="0" x2="0" y2="7" stroke="${esc(pinstripe)}" stroke-width="1"/>
     </pattern></defs>
-    <path d="${jerseyPath}" fill="${esc(baseColor)}" stroke="rgba(0,0,0,0.25)" stroke-width="2"/>
+    <rect width="200" height="232" fill="${esc(baseColor)}"/>
     ${pinstripeFill}
     ${showNameSlot?`<text x="100" y="76" text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,26)}" fill="${esc(nameColor)}" ${nameStroke}>${esc(nameText)}</text>`:''}
     <text x="100" y="150" text-anchor="middle" font-family="'${esc(numberFont)}',sans-serif" font-size="${jerseyFitSize(mainText,80)}" fill="${esc(numberColor)}" ${numStroke}>${esc(mainText)}</text>
