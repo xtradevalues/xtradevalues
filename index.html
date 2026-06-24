@@ -1048,9 +1048,10 @@ async function loadStandings(){
 const jerseyStylesLight = {};
 const jerseyStylesDark = {};
 function normalizeHexColor(c){
-  // sheet cells often have the hex digits without a leading '#' (e.g. "0f1e35") -
-  // that's not a valid CSS color, so SVG silently falls back to black. Patch it up here.
   if(!c) return c;
+  // sheet cells are formatted like "#27251F (Black)" - take just the leading hex
+  // token and drop the descriptive "(Color Name)" suffix.
+  c=c.split(/\s/)[0];
   return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(c) ? '#'+c : c;
 }
 async function loadJerseyStyles(tabName, target){
