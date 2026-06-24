@@ -288,8 +288,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
 .pm-stat-val{font-size:15px;font-weight:500;color:var(--text-primary)}
 .pm-stat-lbl{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:400;margin-top:1px}
 .pm-divider{height:1px;background:var(--border-light);margin:8px 0}
-.pm-fangraphs{font-size:11px;color:var(--text-muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)}
-.pm-fangraphs a{color:var(--red-dark);text-decoration:none;font-weight:500}
 
 /* SHARE MODAL */
 .share-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
@@ -670,7 +668,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
   <div class="about-page">
     <div class="about-title">About ValueSavant</div>
     <p>A proprietary MLB trade value system analyzing player skill, age, contract surplus, and prospect potential across a 6-year projection window through 2031.</p>
-    <p style="margin-top:12px">Values are calculated using a multi-factor model incorporating future performance projections, salary arbitration tiers, age curves, and prospect ETA discounting. Data sourced from FanGraphs.</p>
+    <p style="margin-top:12px">Values are calculated using a multi-factor model incorporating future performance projections, salary arbitration tiers, age curves, and prospect ETA discounting. Data sourced from public sources.</p>
     <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-light)">
       <div style="color:var(--red-dark);font-size:13px;font-weight:500;margin-bottom:10px">Contact</div>
       <p>📧 <a href="mailto:info@valuesavant.com">info@valuesavant.com</a></p>
@@ -686,7 +684,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
     <a href="https://twitter.com/Value_Savant" target="_blank">@Value_Savant</a>
     <a href="#" onclick="openPrivacy();return false">Privacy Policy</a>
   </div>
-  © 2026 ValueSavant. Data sourced from FanGraphs. All rights reserved.
+  © 2026 ValueSavant. Data sourced from public sources. All rights reserved.
 </div>
 
 </div><!-- end page-wrap -->
@@ -703,7 +701,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
       </div>
     </div>
     <div class="pm-stats-wrap" id="pmStatsWrap"></div>
-    <div class="pm-fangraphs" id="pmFG"></div>
   </div>
 </div>
 
@@ -751,7 +748,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:11px}
     <div class="priv-section"><h3>Overview</h3><p>ValueSavant operates valuesavant.com. This policy explains how we handle information when you use our site.</p></div>
     <div class="priv-section"><h3>Data We Collect</h3><p>We do not directly collect personal information. Third-party services may collect anonymized usage data.</p></div>
     <div class="priv-section"><h3>Google Analytics</h3><p>We use Google Analytics for anonymized site usage. Opt out at <a href="https://tools.google.com/dlpage/gaoptout" target="_blank">tools.google.com/dlpage/gaoptout</a>.</p></div>
-    <div class="priv-section"><h3>Third-Party Data</h3><p>Player statistics are derived from FanGraphs. We do not sell user data.</p></div>
+    <div class="priv-section"><h3>Third-Party Data</h3><p>Player statistics are derived from public sources. We do not sell user data.</p></div>
     <div class="priv-section"><h3>Contact</h3><p><a href="mailto:info@valuesavant.com">info@valuesavant.com</a> · <a href="https://twitter.com/Value_Savant" target="_blank">@Value_Savant</a></p></div>
   </div>
 </div>
@@ -3011,13 +3008,6 @@ function showPM(name,team,pos){
       <div class="pm-stat-float"><div class="pm-stat-val">${bottomRow[2].val}</div><div class="pm-stat-lbl">${bottomRow[2].lbl}</div></div>
     </div>${ohtaniRow}
   `;
-  // FanGraphs - direct link only, no search fallback
-  const fgEl=document.getElementById('pmFG');
-  if(p.fgUrl && p.fgUrl.startsWith('http')){
-    fgEl.innerHTML=`See more on ${p.name} at <a href="${p.fgUrl}" target="_blank">FanGraphs</a>`;
-  } else {
-    fgEl.innerHTML='';
-  }
   document.getElementById('playerModal').classList.add('open');
 }
 function closePM(){document.getElementById('playerModal').classList.remove('open');}
