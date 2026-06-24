@@ -1048,9 +1048,10 @@ async function loadStandings(){
 const jerseyStylesLight = {};
 const jerseyStylesDark = {};
 function normalizeHexColor(c){
-  // sheet cells often have the hex digits without a leading '#' (e.g. "0f1e35") -
-  // that's not a valid CSS color, so SVG silently falls back to black. Patch it up here.
   if(!c) return c;
+  // sheet cells are formatted like "#27251F (Black)" - take just the leading hex
+  // token and drop the descriptive "(Color Name)" suffix.
+  c=c.split(/\s/)[0];
   return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(c) ? '#'+c : c;
 }
 async function loadJerseyStyles(tabName, target){
@@ -2887,17 +2888,26 @@ function jerseyFitSize(text,maxSize){
   if(len<=10) return maxSize*0.38;
   return maxSize*0.3;
 }
+function isValidCssColor(c){
+  if(!c) return false;
+  const opt=new Option();
+  opt.style.color=c;
+  return opt.style.color!=='';
+}
 function buildJerseyMarkup(p){
   const isDark=document.body.classList.contains('dark-mode');
   const st=(isDark?jerseyStylesDark:jerseyStylesLight)[p.team]||{};
-  const baseColor=st.baseColor||(isDark?'#0f1e35':'#dcdcdc');
-  const pinstripe=st.pinstripeColor||'';
+  // sheet values can come through corrupted (eg. Google Sheets silently converts an
+  // all-digit hex code like "000000" to the number 0, losing the leading zeros before
+  // we ever see it) - guard against rendering an invalid color as SVG's default black fill.
+  const baseColor=isValidCssColor(st.baseColor)?st.baseColor:(isDark?'#0f1e35':'#dcdcdc');
+  const pinstripe=isValidCssColor(st.pinstripeColor)?st.pinstripeColor:'';
   const numberFont=st.numberFont||'VarsityTeam-Bold';
   const nameFont=st.nameFont||'VarsityTeam-Bold';
-  const nameColor=st.nameColor||'#ffffff';
-  const numberColor=st.numberColor||'#ffffff';
-  const nameBorder=st.nameBorderColor||'';
-  const numberBorder=st.numberBorderColor||'';
+  const nameColor=isValidCssColor(st.nameColor)?st.nameColor:'#ffffff';
+  const numberColor=isValidCssColor(st.numberColor)?st.numberColor:'#ffffff';
+  const nameBorder=isValidCssColor(st.nameBorderColor)?st.nameBorderColor:'';
+  const numberBorder=isValidCssColor(st.numberBorderColor)?st.numberBorderColor:'';
   const numRaw=p.jerseyNumRaw||'--';
   const isNYY=p.team==='NYY';
   // Yankees jerseys carry no name - number only - unless there's no number assigned yet,
