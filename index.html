@@ -2879,20 +2879,34 @@ function resetTrade(){
 
 // ===== PLAYER MODAL =====
 const NAME_SUFFIXES=['JR','SR','II','III','IV','V'];
-function lastNameUpper(fullName){
+function jerseyNameText(fullName){
   const parts=(fullName||'').trim().split(/\s+/);
-  while(parts.length>1 && NAME_SUFFIXES.includes(parts[parts.length-1].replace(/\./g,'').toUpperCase())){
-    parts.pop();
+  let suffix='';
+  if(parts.length>1){
+    const tok=parts[parts.length-1].replace(/\./g,'').toUpperCase();
+    if(NAME_SUFFIXES.includes(tok)){
+      suffix=(tok==='JR'||tok==='SR')?tok+'.':tok;
+      parts.pop();
+    }
   }
-  return (parts[parts.length-1]||'').toUpperCase();
+  const lastName=(parts[parts.length-1]||'').toUpperCase();
+  return suffix?`${lastName} ${suffix}`:lastName;
 }
 function jerseyFitSize(text,maxSize){
   const len=(text||'').length;
-  if(len<=2) return maxSize;
-  if(len<=4) return maxSize*0.72;
-  if(len<=7) return maxSize*0.5;
-  if(len<=10) return maxSize*0.38;
-  return maxSize*0.3;
+  if(len<=3) return maxSize;
+  if(len<=5) return maxSize*0.85;
+  if(len<=7) return maxSize*0.70;
+  if(len<=9) return maxSize*0.58;
+  if(len<=11) return maxSize*0.48;
+  if(len<=13) return maxSize*0.40;
+  return maxSize*0.34;
+}
+// real jerseys arc the nameplate text slightly upward (like a rainbow) the longer
+// the name runs, to follow the curve of the collar - flat for short names.
+function jerseyNameArc(text){
+  const len=(text||'').length;
+  return len<=4 ? 0 : Math.min(14,(len-4)*1.6);
 }
 function isValidCssColor(c){
   if(!c) return false;
@@ -2919,9 +2933,11 @@ function buildJerseyMarkup(p){
   // Yankees jerseys carry no name - number only - unless there's no number assigned yet,
   // in which case the name fills the spot so the jersey isn't just showing blank dashes.
   const nameOnNumberSlot=isNYY && numRaw==='--';
-  const mainText=nameOnNumberSlot?lastNameUpper(p.name):numRaw;
+  const mainText=nameOnNumberSlot?jerseyNameText(p.name):numRaw;
   const showNameSlot=!isNYY;
-  const nameText=lastNameUpper(p.name);
+  const nameText=jerseyNameText(p.name);
+  const nameCurve=jerseyNameArc(nameText);
+  const nameArcPath=`M 26 62 Q 100 ${62-nameCurve} 174 62`;
   const nameStroke=nameBorder?`stroke="${esc(nameBorder)}" stroke-width="1.5" paint-order="stroke"`:'';
   const numStroke=numberBorder?`stroke="${esc(numberBorder)}" stroke-width="2.5" paint-order="stroke"`:'';
   const pinstripeFill=pinstripe?`<rect width="200" height="232" fill="url(#pmJerseyPins)"/>`:'';
@@ -2931,7 +2947,8 @@ function buildJerseyMarkup(p){
     </pattern></defs>
     <rect width="200" height="232" fill="${esc(baseColor)}"/>
     ${pinstripeFill}
-    ${showNameSlot?`<text x="100" y="60" text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,38)}" fill="${esc(nameColor)}" ${nameStroke}>${esc(nameText)}</text>`:''}
+    ${showNameSlot?`<path id="pmJerseyNameArc" d="${nameArcPath}" fill="none"/>
+    <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#pmJerseyNameArc" xlink:href="#pmJerseyNameArc" startOffset="50%">${esc(nameText)}</textPath></text>`:''}
     <text x="100" y="160" text-anchor="middle" font-family="'${esc(numberFont)}',sans-serif" font-size="${jerseyFitSize(mainText,96)}" fill="${esc(numberColor)}" ${numStroke}>${esc(mainText)}</text>
   </svg>`;
 }
