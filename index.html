@@ -1047,6 +1047,12 @@ async function loadStandings(){
 //       F=nameColor, G=numberColor, H=nameBorderColor, I=numberBorderColor
 const jerseyStylesLight = {};
 const jerseyStylesDark = {};
+function normalizeHexColor(c){
+  // sheet cells often have the hex digits without a leading '#' (e.g. "0f1e35") -
+  // that's not a valid CSS color, so SVG silently falls back to black. Patch it up here.
+  if(!c) return c;
+  return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(c) ? '#'+c : c;
+}
 async function loadJerseyStyles(tabName, target){
   try {
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&_cb=${Date.now()}`;
@@ -1064,14 +1070,14 @@ async function loadJerseyStyles(tabName, target){
       const team=getS(0).toUpperCase();
       if(!team || !TEAMS.includes(team)) continue;
       target[team]={
-        baseColor:getS(1),
-        pinstripeColor:getS(2),
+        baseColor:normalizeHexColor(getS(1)),
+        pinstripeColor:normalizeHexColor(getS(2)),
         numberFont:getS(3),
         nameFont:getS(4),
-        nameColor:getS(5),
-        numberColor:getS(6),
-        nameBorderColor:getS(7),
-        numberBorderColor:getS(8)
+        nameColor:normalizeHexColor(getS(5)),
+        numberColor:normalizeHexColor(getS(6)),
+        nameBorderColor:normalizeHexColor(getS(7)),
+        numberBorderColor:normalizeHexColor(getS(8))
       };
     }
   } catch(e){
