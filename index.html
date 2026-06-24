@@ -1054,6 +1054,12 @@ function normalizeHexColor(c){
   c=c.split(/\s/)[0];
   return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(c) ? '#'+c : c;
 }
+function normalizeFontName(f){
+  if(!f) return f;
+  // sheet cells include the font file extension (eg. "MLBBLOCK.TTF") but the
+  // @font-face family names in jerseyfonts.css don't - strip it so the lookup matches.
+  return f.replace(/\.(ttf|otf|woff2?)$/i,'');
+}
 async function loadJerseyStyles(tabName, target){
   try {
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&_cb=${Date.now()}`;
@@ -1073,8 +1079,8 @@ async function loadJerseyStyles(tabName, target){
       target[team]={
         baseColor:normalizeHexColor(getS(1)),
         pinstripeColor:normalizeHexColor(getS(2)),
-        numberFont:getS(3),
-        nameFont:getS(4),
+        numberFont:normalizeFontName(getS(3)),
+        nameFont:normalizeFontName(getS(4)),
         nameColor:normalizeHexColor(getS(5)),
         numberColor:normalizeHexColor(getS(6)),
         nameBorderColor:normalizeHexColor(getS(7)),
