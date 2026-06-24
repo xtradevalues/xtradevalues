@@ -2889,7 +2889,9 @@ function jerseyNameText(fullName){
       parts.pop();
     }
   }
-  const lastName=(parts[parts.length-1]||'').toUpperCase();
+  // "last name" on a jersey is everything after the first name, not just the final
+  // word - eg. Elly De La Cruz wears "DE LA CRUZ", not just "CRUZ".
+  const lastName=(parts.length>1?parts.slice(1).join(' '):(parts[0]||'')).toUpperCase();
   return suffix?`${lastName} ${suffix}`:lastName;
 }
 function jerseyFitSize(text,maxSize){
