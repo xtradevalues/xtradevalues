@@ -961,7 +961,16 @@ function showPage(p) {
   document.querySelectorAll('.desktop-nav-item').forEach(x=>x.classList.remove('active'));
   const dm=document.getElementById('dmenu-'+p); if(dm) dm.classList.add('active');
   closeMenu();
-  if(p==='rankings' && allPlayers.length) renderRankings();
+  if(p==='rankings'){
+    if(allPlayers.length){
+      renderRankings();
+    } else {
+      document.getElementById('rankingsBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
+      ensureDataLoaded().then(renderRankings).catch(e=>{
+        document.getElementById('rankingsBody').innerHTML='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--red-dark)">Unable to load data: '+esc(e.message)+'</td></tr>';
+      });
+    }
+  }
 }
 function openMenu(){document.getElementById('menuOverlay').classList.add('open')}
 function closeMenu(){document.getElementById('menuOverlay').classList.remove('open')}
@@ -1008,7 +1017,15 @@ function matchesPos(p, pos) {
   return v===pos;
 }
 
-// ===== DATA LOAD =====
+// ===== DATA LOAD (lazy: fetched on first need, not on page load) =====
+let dataLoaded=false, dataLoadPromise=null;
+function ensureDataLoaded(){
+  if(dataLoaded) return Promise.resolve();
+  if(!dataLoadPromise){
+    dataLoadPromise=loadData().then(()=>{dataLoaded=true;}).catch(e=>{dataLoadPromise=null;throw e;});
+  }
+  return dataLoadPromise;
+}
 async function loadData() {
   try {
     setProgress(5, 'Loading player data...');
@@ -1098,20 +1115,12 @@ async function loadData() {
       loadJerseyStyles('LIGHT MODE JERSEYS', jerseyStylesLight),
       loadJerseyStyles('DARK MODE JERSEYS', jerseyStylesDark)
     ]);
-    await new Promise(r=>setTimeout(r,300));
-    populateDDs();
     buildPercentiles();
-    document.getElementById('loadingScreen').style.display='none';
-    document.getElementById('mainContent').style.display='flex';
   } catch(e){
-    document.getElementById('loadingScreen').style.display='none';
     if(allPlayers.length > 0) {
-      populateDDs();
       buildPercentiles();
-      document.getElementById('mainContent').style.display='flex';
     } else {
-      document.getElementById('errorScreen').style.display='block';
-      document.getElementById('errorScreen').innerHTML='<strong>Unable to load data</strong><br>'+e.message+'<br><br>Players loaded: '+allPlayers.length;
+      throw e;
     }
   }
 }
@@ -1235,6 +1244,7 @@ function finderTeamChosen(){
     return;
   }
   document.getElementById('finderStep2').style.display='flex';
+  if(!allPlayers.length) ensureDataLoaded().catch(()=>{});
 }
 
 function finderIntentChosen(intent,el){
@@ -2388,7 +2398,23 @@ function finderGenerateSellerOffers(){
   return deduped;
 }
 
-function generateOffers(){
+async function generateOffers(){
+  if(!allPlayers.length){
+    const resultsModal=document.getElementById('finderResultsModal');
+    const scroller=document.getElementById('finderCardsScroller');
+    const counter=document.getElementById('finderResultsCounter');
+    counter.textContent='Loading…';
+    scroller.innerHTML='<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Loading player data…</div>';
+    resultsModal.classList.add('open');
+    try {
+      await ensureDataLoaded();
+    } catch(e){
+      counter.textContent='Error';
+      scroller.innerHTML='<div style="padding:24px;text-align:center;color:var(--red-dark);font-size:13px">Unable to load data: '+esc(e.message)+'</div>';
+      return;
+    }
+    resultsModal.classList.remove('open');
+  }
   let offers=[];
   if(finderState.intent==='buyer'){
     offers=finderGenerateBuyerOffers();
@@ -2661,6 +2687,14 @@ function onSearch(side){
     if(!avail.length){drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No comp picks available</div></div>';drop.classList.add('open');return;}
     drop.innerHTML=avail.map(p=>`<div class="drop-item" onclick="addCompPick('${side}','${esc(p.name)}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.team}</div></div><div class="drop-item-val">${p.val2026.toFixed(2)}</div></div>`).join('');
     drop.classList.add('open');
+    return;
+  }
+  if(!allPlayers.length){
+    drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">Loading players…</div></div>';
+    drop.classList.add('open');
+    ensureDataLoaded().then(()=>onSearch(side)).catch(e=>{
+      drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--red-dark)">Unable to load data: '+esc(e.message)+'</div></div>';
+    });
     return;
   }
   const p=document.getElementById('posFilter'+side)?.value||'';
@@ -3205,6 +3239,13 @@ function loadRoster(){
   const pf=document.getElementById('rosterPos').value;
   const c=document.getElementById('rosterContent');
   if(!t){c.innerHTML='<div class="roster-placeholder">Select a team to view their roster</div>';return;}
+  if(!allPlayers.length){
+    c.innerHTML='<div class="roster-placeholder">Loading player data…</div>';
+    ensureDataLoaded().then(loadRoster).catch(e=>{
+      c.innerHTML='<div class="roster-placeholder">Unable to load data: '+esc(e.message)+'</div>';
+    });
+    return;
+  }
   let pl=allPlayers.filter(x=>x.team===t);
   if(gf) pl=pl.filter(x=>matchesGroup(x,gf));
   if(pf) pl=pl.filter(x=>getPosGrp(x.pos)===pf);
@@ -3288,7 +3329,11 @@ function closePrivOut(e){if(e.target.id==='privacyModal')closePrivacy();}
 // close dropdowns on outside click
 document.addEventListener('click',e=>{if(!e.target.closest('.dropdown-wrap')){closeDrop('A');closeDrop('B');}});
 
-loadData();
+// App shell needs no fetched data to be usable (team dropdowns are static), so show it
+// immediately and fetch player data lazily on first real need (search/rankings/roster/finder).
+populateDDs();
+document.getElementById('loadingScreen').style.display='none';
+document.getElementById('mainContent').style.display='flex';
 </script>
 </body>
 </html>
