@@ -1156,7 +1156,9 @@ async function loadStandings(){
 
 // ===== JERSEY STYLES =====
 // Cols: A=team, B=baseColor, C=pinstripeColor, D=numberFont, E=nameFont,
-//       F=nameColor, G=numberColor, H=nameBorderColor, I=numberBorderColor
+//       F=nameColor, G=numberColor, H=nameBorderColor, I=numberBorderColor,
+//       J=numberBorderColorOuter (optional second ring around the number - if
+//       blank, I is the only border; if set, I becomes the inner ring and J the outer)
 const jerseyStylesLight = {};
 const jerseyStylesDark = {};
 function normalizeHexColor(c){
@@ -1164,6 +1166,10 @@ function normalizeHexColor(c){
   // sheet cells are formatted like "#27251F (Black)" - take just the leading hex
   // token and drop the descriptive "(Color Name)" suffix.
   c=c.split(/\s/)[0];
+  // Google Sheets silently treats an all-digit hex code (eg navy "000080") as a
+  // number, stripping the leading zeros down to just "80" before we ever see it -
+  // restore the padding so it round-trips back to a 6-digit hex code.
+  if(/^[0-9]+$/.test(c) && c.length<6) c=c.padStart(6,'0');
   return /^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$|^[0-9a-fA-F]{8}$/.test(c) ? '#'+c : c;
 }
 function normalizeFontName(f){
@@ -1196,7 +1202,8 @@ async function loadJerseyStyles(tabName, target){
         nameColor:normalizeHexColor(getS(5)),
         numberColor:normalizeHexColor(getS(6)),
         nameBorderColor:normalizeHexColor(getS(7)),
-        numberBorderColor:normalizeHexColor(getS(8))
+        numberBorderColor:normalizeHexColor(getS(8)),
+        numberBorderColorOuter:normalizeHexColor(getS(9))
       };
     }
   } catch(e){
@@ -3066,29 +3073,46 @@ function buildJerseyMarkup(p){
   const nameColor=isValidCssColor(st.nameColor)?st.nameColor:'#ffffff';
   const numberColor=isValidCssColor(st.numberColor)?st.numberColor:'#ffffff';
   const nameBorder=isValidCssColor(st.nameBorderColor)?st.nameBorderColor:'';
-  const numberBorder=isValidCssColor(st.numberBorderColor)?st.numberBorderColor:'';
+  const numberBorderInner=isValidCssColor(st.numberBorderColor)?st.numberBorderColor:'';
+  const numberBorderOuter=isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter:'';
   const numRaw=p.jerseyNumRaw||'--';
-  const isNYY=p.team==='NYY';
-  // Yankees jerseys carry no name - number only - unless there's no number assigned yet,
-  // in which case the name fills the spot so the jersey isn't just showing blank dashes.
-  const nameOnNumberSlot=isNYY && numRaw==='--';
-  const mainText=nameOnNumberSlot?jerseyNameText(p.name):numRaw;
-  const showNameSlot=!isNYY;
+  const mainText=numRaw;
   const nameText=jerseyNameText(p.name);
   const nameCurve=jerseyNameArc(nameText);
   const nameArcPath=`M 26 62 Q 100 ${62-nameCurve} 174 62`;
   const nameStroke=nameBorder?`stroke="${esc(nameBorder)}" stroke-width="1.5" paint-order="stroke"`:'';
-  const numStroke=numberBorder?`stroke="${esc(numberBorder)}" stroke-width="2.5" paint-order="stroke"`:'';
-  const pinstripeFill=pinstripe?`<rect width="200" height="232" fill="url(#pmJerseyPins)"/>`:'';
+  const numberFontAttrs=`font-family="'${esc(numberFont)}',sans-serif" font-size="${jerseyFitSize(mainText,96)}"`;
+  // two-ring border: outer ring drawn first (wider stroke), inner ring on top of it (narrower
+  // stroke), fill text on top of both - this layers like an actual screen-printed outline.
+  const numberMarkup=numberBorderOuter
+    ? `<text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="none" stroke="${esc(numberBorderOuter)}" stroke-width="6">${esc(mainText)}</text>
+    <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="none" stroke="${esc(numberBorderInner||numberBorderOuter)}" stroke-width="3">${esc(mainText)}</text>
+    <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}">${esc(mainText)}</text>`
+    : `<text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}" ${numberBorderInner?`stroke="${esc(numberBorderInner)}" stroke-width="2.5" paint-order="stroke"`:''}>${esc(mainText)}</text>`;
+  const pinstripeFill=pinstripe?`<rect x="-6" y="-6" width="212" height="244" fill="url(#pmJerseyPins)"/>`:'';
+  // subtle mesh-screen dot weave + gentle cloth waviness, so the fill reads as fabric rather than flat color.
+  const meshDot=isDark?'rgba(255,255,255,.12)':'rgba(0,0,0,.14)';
   return `<svg viewBox="0 0 200 232" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-    <defs><pattern id="pmJerseyPins" patternUnits="userSpaceOnUse" width="7" height="7">
-      <line x1="0" y1="0" x2="0" y2="7" stroke="${esc(pinstripe)}" stroke-width="1"/>
-    </pattern></defs>
-    <rect width="200" height="232" fill="${esc(baseColor)}"/>
-    ${pinstripeFill}
-    ${showNameSlot?`<path id="pmJerseyNameArc" d="${nameArcPath}" fill="none"/>
-    <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#pmJerseyNameArc" xlink:href="#pmJerseyNameArc" startOffset="50%">${esc(nameText)}</textPath></text>`:''}
-    <text x="100" y="160" text-anchor="middle" font-family="'${esc(numberFont)}',sans-serif" font-size="${jerseyFitSize(mainText,96)}" fill="${esc(numberColor)}" ${numStroke}>${esc(mainText)}</text>
+    <defs>
+      <pattern id="pmJerseyPins" patternUnits="userSpaceOnUse" width="7" height="7">
+        <line x1="0" y1="0" x2="0" y2="7" stroke="${esc(pinstripe)}" stroke-width="1"/>
+      </pattern>
+      <pattern id="pmJerseyMesh" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
+        <circle cx="1" cy="1" r="0.75" fill="${meshDot}"/>
+      </pattern>
+      <filter id="pmJerseyFabric" x="-15%" y="-15%" width="130%" height="130%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.06" numOctaves="2" seed="7" result="pmNoise"/>
+        <feDisplacementMap in="SourceGraphic" in2="pmNoise" scale="8" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+    <g filter="url(#pmJerseyFabric)">
+      <rect x="-6" y="-6" width="212" height="244" fill="${esc(baseColor)}"/>
+      ${pinstripeFill}
+    </g>
+    <rect width="200" height="232" fill="url(#pmJerseyMesh)"/>
+    <path id="pmJerseyNameArc" d="${nameArcPath}" fill="none"/>
+    <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#pmJerseyNameArc" xlink:href="#pmJerseyNameArc" startOffset="50%">${esc(nameText)}</textPath></text>
+    ${numberMarkup}
   </svg>`;
 }
 function showPM(name,team,pos){
