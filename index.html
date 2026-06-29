@@ -1172,6 +1172,288 @@ async function loadJerseyStyles(tabName, target){
   }
 }
 
+// ===== JERSEY CARD (detailed tackle-twill render for the player modal) =====
+// Full SVG markup stays a static template - renderJersey() below does all player/team
+// customization via DOM mutation after this string is mounted, never by editing this string.
+const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" width="100%" height="100%">
+  <defs>
+    <pattern id="meshPattern" width="4" height="7" patternUnits="userSpaceOnUse">
+      <ellipse cx="2" cy="2" rx="1.2" ry="2" fill="#000000" opacity="0.12"/>
+      <ellipse cx="2" cy="5.5" rx="1.2" ry="2" fill="#ffffff" opacity="0.08"/>
+    </pattern>
+    <pattern id="pinstripes" patternUnits="userSpaceOnUse" width="12" height="60" patternTransform="rotate(-1)">
+      <rect id="pinstripe-rect" width="1.5" height="60" fill="#2c3954" opacity="0.6"/>
+    </pattern>
+    <filter id="twillShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1.5" dy="2.5" stdDeviation="1.2" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <filter id="embossTwill" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/>
+      <feSpecularLighting in="blur" surfaceScale="2" specularConstant="0.75" specularExponent="20" lighting-color="#ffffff" result="light">
+        <feDistantLight azimuth="225" elevation="45"/>
+      </feSpecularLighting>
+      <feComposite in="light" in2="SourceAlpha" operator="in" result="lightAlpha"/>
+      <feBlend in="SourceGraphic" in2="lightAlpha" mode="screen"/>
+    </filter>
+    <linearGradient id="jerseyBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop id="bodyGrad0" offset="0%" stop-color="#111622"/>
+      <stop id="bodyGrad1" offset="15%" stop-color="#1d2536"/>
+      <stop id="bodyGrad2" offset="30%" stop-color="#161c29"/>
+      <stop id="bodyGrad3" offset="45%" stop-color="#242e42"/>
+      <stop id="bodyGrad4" offset="55%" stop-color="#1c2434"/>
+      <stop id="bodyGrad5" offset="70%" stop-color="#2a364d"/>
+      <stop id="bodyGrad6" offset="85%" stop-color="#181f2d"/>
+      <stop id="bodyGrad7" offset="100%" stop-color="#0f131f"/>
+    </linearGradient>
+    <linearGradient id="leftSleeveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop id="leftSleeve0" offset="0%" stop-color="#0d111b"/>
+      <stop id="leftSleeve1" offset="50%" stop-color="#1f283a"/>
+      <stop id="leftSleeve2" offset="100%" stop-color="#131924"/>
+    </linearGradient>
+    <linearGradient id="rightSleeveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop id="rightSleeve0" offset="0%" stop-color="#1a2232"/>
+      <stop id="rightSleeve1" offset="50%" stop-color="#222b3f"/>
+      <stop id="rightSleeve2" offset="100%" stop-color="#0a0d14"/>
+    </linearGradient>
+    <radialGradient id="vignette" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="60%" stop-color="#000000" stop-opacity="0.0"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.65"/>
+    </radialGradient>
+    <linearGradient id="foldHighlight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.0"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="foldShadow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.0"/>
+      <stop offset="50%" stop-color="#000000" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0.0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="#121315"/>
+  <g id="jersey">
+    <path id="left-sleeve" d="M 260 140 L 50 250 C 45 280 50 340 70 370 L 155 330 C 170 290 185 240 200 200 Z" fill="url(#leftSleeveGrad)"/>
+    <path id="left-cuff-outer" d="M 70 370 L 155 330" stroke="#131924" stroke-width="6" fill="none" opacity="0.95"/>
+    <path id="left-cuff-inner" d="M 67 365 L 152 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
+    <path id="right-sleeve" d="M 540 140 L 750 250 C 755 280 750 340 730 370 L 645 330 C 630 290 615 240 600 200 Z" fill="url(#rightSleeveGrad)"/>
+    <path id="right-cuff-outer" d="M 730 370 L 645 330" stroke="#0a0d14" stroke-width="6" fill="none" opacity="0.95"/>
+    <path id="right-cuff-inner" d="M 733 365 L 648 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
+    <path id="jersey-body" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#jerseyBodyGrad)"/>
+    <path id="pinstripe-layer" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#pinstripes)" opacity="0"/>
+    <g opacity="0.85">
+      <path d="M 260 140 L 50 250 C 45 280 50 340 70 370 L 155 330 C 170 290 185 240 200 200 Z" fill="url(#meshPattern)"/>
+      <path d="M 540 140 L 750 250 C 755 280 750 340 730 370 L 645 330 C 630 290 615 240 600 200 Z" fill="url(#meshPattern)"/>
+      <path d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#meshPattern)"/>
+    </g>
+    <path d="M 260 140 L 195 215" stroke="#111" stroke-width="2.5" fill="none"/>
+    <path d="M 260 140 L 195 215" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
+    <path d="M 263 142 L 198 217" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
+    <path d="M 540 140 L 605 215" stroke="#111" stroke-width="2.5" fill="none"/>
+    <path d="M 540 140 L 605 215" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
+    <path d="M 537 142 L 602 217" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
+    <path d="M 260 140 C 330 160 470 160 540 140 C 530 152 480 158 400 158 C 320 158 270 152 260 140 Z" fill="#0b0d13" stroke="#192233" stroke-width="1"/>
+    <path d="M 263 143 C 330 161 470 161 537 143" stroke="#2c3954" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
+    <g id="mlb-patch" transform="translate(400, 180) scale(0.8)">
+      <rect x="-18" y="-11" width="36" height="22" rx="4" fill="#081021" stroke="#bc964c" stroke-width="1.5" filter="url(#twillShadow)"/>
+      <path d="M -16 -9 L -2 -9 L -2 9 L -16 9 Z" fill="#042354"/>
+      <path d="M 2 -9 L 16 -9 L 16 9 L 2 9 Z" fill="#9c1c24"/>
+      <path d="M -2 0 C -2 -4 -1 -6 0 -8 C 1 -9 2 -9 2 -7 C 2 -5 1 -3 1 -1 C 2 2 4 4 5 7 C 6 9 4 9 3 9 C 1 9 -1 5 -1 3 C -2 3 -2 1 -2 0 Z" fill="#ffffff"/>
+      <circle cx="1" cy="-4" r="1.5" fill="#ffffff"/>
+    </g>
+    <path id="nameCurve" d="M 240 270 C 320 238 480 238 560 270" fill="none"/>
+    <text id="name-shadow" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" filter="url(#twillShadow)">
+      <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
+        <tspan id="name-shadow-tspan" fill="#050b14" stroke="#bc964c" stroke-width="5" stroke-linejoin="round">SAVANT</tspan>
+      </textPath>
+    </text>
+    <text id="name-fill" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" filter="url(#embossTwill)">
+      <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
+        <tspan id="name-fill-tspan" fill="#ffffff">SAVANT</tspan>
+      </textPath>
+    </text>
+    <text id="name-stitch" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" opacity="0.75">
+      <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
+        <tspan id="name-stitch-tspan" fill="none" stroke="#000000" stroke-width="0.6" stroke-dasharray="2,1.5">SAVANT</tspan>
+      </textPath>
+    </text>
+    <g id="jersey-number" transform="translate(400, 520)" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="250" text-anchor="middle">
+      <text id="num-shadow" x="0" y="0" fill="#050b14" stroke="#050b14" stroke-width="28" stroke-linejoin="round" filter="url(#twillShadow)">26</text>
+      <text id="num-trim" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="18" stroke-linejoin="round">26</text>
+      <text id="num-gap" x="0" y="0" fill="#0c121e" stroke="#0c121e" stroke-width="6" stroke-linejoin="round">26</text>
+      <text id="num-fill" x="0" y="0" fill="#ffffff" filter="url(#embossTwill)">26</text>
+      <text id="num-stitch" x="0" y="0" fill="none" stroke="#bc964c" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.85">26</text>
+    </g>
+    <path d="M 175 750 Q 320 790 420 740 T 625 770 L 630 810 Q 480 775 350 820 T 170 790 Z" fill="url(#foldShadow)" opacity="0.4"/>
+    <path d="M 170 735 Q 320 775 420 725 T 620 755 L 625 765 Q 475 735 345 780 T 175 745 Z" fill="url(#foldHighlight)" opacity="0.25"/>
+    <path d="M 195 340 Q 250 500 230 700 Q 210 500 195 340 Z" fill="url(#foldShadow)" opacity="0.35"/>
+    <path d="M 200 340 Q 255 500 235 700 Q 215 500 200 340 Z" fill="url(#foldHighlight)" opacity="0.15"/>
+    <path d="M 600 340 Q 550 520 570 720 Q 585 520 600 340 Z" fill="url(#foldShadow)" opacity="0.4"/>
+    <path d="M 595 340 Q 545 520 565 720 Q 580 520 595 340 Z" fill="url(#foldHighlight)" opacity="0.2"/>
+    <path d="M 280 220 Q 400 200 520 220 Q 400 215 280 220 Z" fill="url(#foldShadow)" opacity="0.5"/>
+    <rect width="800" height="1000" fill="url(#vignette)" pointer-events="none"/>
+  </g>
+</svg>`;
+
+// Relative lightness offsets (HSL, percentage points) baked into the template's original
+// stop colors - reapplying these against a team's baseColor keeps the same fabric-fold
+// shading pattern no matter what color is injected.
+const JERSEY_BODY_GRAD_DELTAS = [-5.0, 1.3, -2.6, 5.0, 0.7, 8.3, -1.5, -6.0];
+const JERSEY_LEFT_SLEEVE_DELTAS = [-4.2, 5.5, -1.2];
+const JERSEY_RIGHT_SLEEVE_DELTAS = [1.7, 5.7, -7.3];
+
+function jerseyHexToRgb(hex){
+  hex=hex.replace('#','');
+  if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+  const num=parseInt(hex,16);
+  return {r:(num>>16)&255, g:(num>>8)&255, b:num&255};
+}
+function jerseyRgbToHsl(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b);
+  let h=0,s=0; const l=(max+min)/2;
+  if(max!==min){
+    const d=max-min;
+    s=l>0.5 ? d/(2-max-min) : d/(max+min);
+    if(max===r) h=((g-b)/d+(g<b?6:0));
+    else if(max===g) h=(b-r)/d+2;
+    else h=(r-g)/d+4;
+    h/=6;
+  }
+  return {h:h*360, s:s*100, l:l*100};
+}
+function jerseyHslToRgb(h,s,l){
+  h/=360; s/=100; l/=100;
+  let r,g,b;
+  if(s===0){ r=g=b=l; }
+  else {
+    const hue2rgb=(p,q,t)=>{
+      if(t<0) t+=1;
+      if(t>1) t-=1;
+      if(t<1/6) return p+(q-p)*6*t;
+      if(t<1/2) return q;
+      if(t<2/3) return p+(q-p)*(2/3-t)*6;
+      return p;
+    };
+    const q=l<0.5 ? l*(1+s) : l+s-l*s;
+    const p=2*l-q;
+    r=hue2rgb(p,q,h+1/3);
+    g=hue2rgb(p,q,h);
+    b=hue2rgb(p,q,h-1/3);
+  }
+  return {r:Math.round(r*255), g:Math.round(g*255), b:Math.round(b*255)};
+}
+function jerseyRgbToHex(r,g,b){
+  return '#'+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+function jerseyShade(baseHex, lightnessDelta){
+  const {r,g,b}=jerseyHexToRgb(baseHex);
+  const {h,s,l}=jerseyRgbToHsl(r,g,b);
+  const rgb=jerseyHslToRgb(h, s, Math.max(0,Math.min(100,l+lightnessDelta)));
+  return jerseyRgbToHex(rgb.r,rgb.g,rgb.b);
+}
+
+// Injects a team/player config into a mounted JERSEY_CARD_TEMPLATE <svg> element via direct
+// DOM mutation - never touches the template string itself.
+function renderJersey(svgEl, config){
+  if(!svgEl || !config) return;
+  const q=id=>svgEl.querySelector('#'+id);
+  const baseColor=isValidCssColor(config.baseColor)?config.baseColor:'#1c2434';
+  const trimColor=isValidCssColor(config.trimColor)?config.trimColor:'#bc964c';
+  const name=config.name!=null?String(config.name):'';
+  const number=config.number!=null?String(config.number):'--';
+  const nameFontStack=config.nameFont?`'${config.nameFont}', 'Impact', 'Arial Black', sans-serif`:`'Impact', 'Arial Black', sans-serif`;
+  const numberFontStack=config.numberFont?`'${config.numberFont}', 'Impact', 'Arial Black', sans-serif`:`'Impact', 'Arial Black', sans-serif`;
+  const pinstripeColor=isValidCssColor(config.pinstripeColor)?config.pinstripeColor:null;
+
+  // baseColor -> jersey body + sleeve gradient stops
+  JERSEY_BODY_GRAD_DELTAS.forEach((d,i)=>{
+    const stop=q('bodyGrad'+i);
+    if(stop) stop.setAttribute('stop-color', jerseyShade(baseColor,d));
+  });
+  const leftShades=JERSEY_LEFT_SLEEVE_DELTAS.map(d=>jerseyShade(baseColor,d));
+  ['leftSleeve0','leftSleeve1','leftSleeve2'].forEach((id,i)=>{
+    const stop=q(id);
+    if(stop) stop.setAttribute('stop-color', leftShades[i]);
+  });
+  const rightShades=JERSEY_RIGHT_SLEEVE_DELTAS.map(d=>jerseyShade(baseColor,d));
+  ['rightSleeve0','rightSleeve1','rightSleeve2'].forEach((id,i)=>{
+    const stop=q(id);
+    if(stop) stop.setAttribute('stop-color', rightShades[i]);
+  });
+  const leftCuffOuter=q('left-cuff-outer'); if(leftCuffOuter) leftCuffOuter.setAttribute('stroke', leftShades[2]);
+  const rightCuffOuter=q('right-cuff-outer'); if(rightCuffOuter) rightCuffOuter.setAttribute('stroke', rightShades[2]);
+
+  // trimColor -> number border, sleeve piping, MLB patch border, name stroke
+  const numTrim=q('num-trim'); if(numTrim){ numTrim.setAttribute('fill',trimColor); numTrim.setAttribute('stroke',trimColor); }
+  const numStitch=q('num-stitch'); if(numStitch) numStitch.setAttribute('stroke',trimColor);
+  const leftCuffInner=q('left-cuff-inner'); if(leftCuffInner) leftCuffInner.setAttribute('stroke',trimColor);
+  const rightCuffInner=q('right-cuff-inner'); if(rightCuffInner) rightCuffInner.setAttribute('stroke',trimColor);
+  const mlbPatchBorder=svgEl.querySelector('#mlb-patch rect'); if(mlbPatchBorder) mlbPatchBorder.setAttribute('stroke',trimColor);
+  const nameShadowTspan=q('name-shadow-tspan'); if(nameShadowTspan) nameShadowTspan.setAttribute('stroke',trimColor);
+
+  // name -> all textPath layers
+  ['name-shadow-tspan','name-fill-tspan','name-stitch-tspan'].forEach(id=>{
+    const el=q(id); if(el) el.textContent=name;
+  });
+  // nameFont -> font-family on the name text elements
+  ['name-shadow','name-fill','name-stitch'].forEach(id=>{
+    const el=q(id); if(el) el.setAttribute('font-family', nameFontStack);
+  });
+
+  // number -> all 5 number text layers
+  ['num-shadow','num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
+    const el=q(id); if(el) el.textContent=number;
+  });
+  // numberFont -> font-family on the number text elements
+  ['num-shadow','num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
+    const el=q(id); if(el) el.setAttribute('font-family', numberFontStack);
+  });
+
+  // pinstripes -> second fill layer over the body, skipped entirely if no pinstripeColor
+  const pinstripeRect=q('pinstripe-rect');
+  const pinstripeLayer=q('pinstripe-layer');
+  if(pinstripeColor){
+    if(pinstripeRect) pinstripeRect.setAttribute('fill', pinstripeColor);
+    if(pinstripeLayer) pinstripeLayer.setAttribute('opacity','1');
+  } else if(pinstripeLayer){
+    pinstripeLayer.setAttribute('opacity','0');
+  }
+}
+
+const DEFAULT_JERSEY_CONFIG={baseColor:'#0f1e35', trimColor:'#ffffff', pinstripeColor:null, nameFont:'', numberFont:''};
+
+// Pulls per-team look from the DARK MODE JERSEYS sheet tab (jerseyStylesDark) - falls back
+// to a dark navy/white default when the team has no row yet or its data is malformed.
+function getJerseyTeamConfig(team){
+  const st=jerseyStylesDark[team];
+  if(!st || !isValidCssColor(st.baseColor)) return DEFAULT_JERSEY_CONFIG;
+  return {
+    baseColor: st.baseColor,
+    trimColor: isValidCssColor(st.numberBorderColor)?st.numberBorderColor
+      :isValidCssColor(st.nameBorderColor)?st.nameBorderColor
+      :isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter
+      :DEFAULT_JERSEY_CONFIG.trimColor,
+    pinstripeColor: isValidCssColor(st.pinstripeColor)?st.pinstripeColor:null,
+    nameFont: st.nameFont||DEFAULT_JERSEY_CONFIG.nameFont,
+    numberFont: st.numberFont||DEFAULT_JERSEY_CONFIG.numberFont
+  };
+}
+
+// JerseyCard equivalent: mounts the inline SVG template into containerEl and renders it for
+// this player/team. Call again on prop change (eg. a different player selected) to re-render.
+function mountJerseyCard(containerEl, player){
+  if(!containerEl || !player) return;
+  containerEl.innerHTML=JERSEY_CARD_TEMPLATE;
+  const svgEl=containerEl.querySelector('svg');
+  const config=Object.assign({}, getJerseyTeamConfig(player.team), {
+    name: jerseyNameText(player.name),
+    number: player.jerseyNumRaw||'--'
+  });
+  renderJersey(svgEl, config);
+  return svgEl;
+}
+
 // ===== TRADE FINDER STATE =====
 let finderState = {
   team: null,
@@ -3086,7 +3368,7 @@ function showPM(name,team,pos){
   const p=team ? allPlayers.find(x=>x.name===name && x.team===team && (!pos || x.pos===pos)) : allPlayers.find(x=>x.name===name);
   if(!p) return;
   // Jersey
-  document.getElementById('pmJersey').innerHTML=buildJerseyMarkup(p);
+  mountJerseyCard(document.getElementById('pmJersey'), p);
   // Name row: name + team badge + pos badge
   const nameEl=document.getElementById('pmNameRow');
   const nameLen=p.name.length;
