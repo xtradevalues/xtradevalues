@@ -1440,11 +1440,30 @@ function getJerseyTeamConfig(team){
   };
 }
 
+// Gradient/pattern/filter/textPath ids that get resolved via url(#id) or href="#id" - SVG
+// resolves those document-wide, so when several jersey cards are mounted at once (trade rows)
+// they need per-instance suffixes or one player's gradients leak into another's. IDs that
+// renderJersey() targets directly (bodyGrad0, num-trim, etc.) don't need this: they're never
+// referenced via url()/href(), so element.querySelector('#id') scoping to that one <svg> is
+// already enough to keep instances independent.
+const JERSEY_REFERENCE_IDS=['jerseyBodyGrad','leftSleeveGrad','rightSleeveGrad','meshPattern','pinstripes','vignette','foldHighlight','foldShadow','twillShadow','embossTwill','nameCurve'];
+function jerseyCardMarkup(uid){
+  let svg=JERSEY_CARD_TEMPLATE;
+  JERSEY_REFERENCE_IDS.forEach(id=>{
+    svg=svg.split(`id="${id}"`).join(`id="${id}-${uid}"`)
+           .split(`#${id}"`).join(`#${id}-${uid}"`)
+           .split(`#${id})`).join(`#${id}-${uid})`);
+  });
+  return svg;
+}
+let jerseyCardUidCounter=0;
+
 // JerseyCard equivalent: mounts the inline SVG template into containerEl and renders it for
 // this player/team. Call again on prop change (eg. a different player selected) to re-render.
 function mountJerseyCard(containerEl, player){
   if(!containerEl || !player) return;
-  containerEl.innerHTML=JERSEY_CARD_TEMPLATE;
+  const uid='jc'+(jerseyCardUidCounter++);
+  containerEl.innerHTML=jerseyCardMarkup(uid);
   const svgEl=containerEl.querySelector('svg');
   const config=Object.assign({}, getJerseyTeamConfig(player.team), {
     name: jerseyNameText(player.name),
@@ -3034,6 +3053,7 @@ function renderList(side){
   const list=side==='A'?selectedA:selectedB;
   const el=document.getElementById('list'+side);
   if(!list.length){el.innerHTML='<div class="empty-msg">No players selected yet</div>';return;}
+  const jerseyPlayers=[]; // cash/comp rows skip the jersey thumbnail entirely - only regular player rows get one
   el.innerHTML=list.map(p=>{
     if(p.isCash){
       // Cash: only 2026 value, no Avg, no Ctrl Yrs
@@ -3065,10 +3085,11 @@ function renderList(side){
     const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age)+'yo':'';
     const dc=dotClass(p.status);
     const injIcon=playerHasInjury(p)?'<span style="color:#D72229;font-size:10px;font-weight:600" title="'+injuredLabel(p.injuredRaw)+'"> ✚</span>':'';
+    jerseyPlayers.push(p);
     return `<div class="player-row">
       <div class="player-row-left" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">
         <div class="player-row-head">
-          <div class="player-row-jersey">${buildJerseyMarkup(p)}</div>
+          <div class="player-row-jersey"></div>
           <div class="player-row-headtext">
             <div class="player-row-name"><span class="sdot ${dc}"></span>${p.name}${injIcon}</div>
             <div class="player-row-pos">${p.pos||'?'}${age?' · '+age:''}</div>
@@ -3083,6 +3104,8 @@ function renderList(side){
       <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
     </div>`;
   }).join('');
+  const jerseyEls=el.querySelectorAll('.player-row-jersey');
+  jerseyPlayers.forEach((p,i)=>{ if(jerseyEls[i]) mountJerseyCard(jerseyEls[i], p); });
 }
 function sumF(list,f){return list.reduce((s,p)=>s+(p[f]!==null&&!isNaN(p[f])?p[f]:0),0);}
 
@@ -3273,96 +3296,11 @@ function jerseyNameText(fullName){
   const lastName=(parts.length>1?parts.slice(1).join(' '):(parts[0]||'')).toUpperCase();
   return suffix?`${lastName} ${suffix}`:lastName;
 }
-function jerseyFitSize(text,maxSize){
-  const len=(text||'').length;
-  if(len<=3) return maxSize;
-  if(len<=5) return maxSize*0.85;
-  if(len<=7) return maxSize*0.70;
-  if(len<=9) return maxSize*0.58;
-  if(len<=11) return maxSize*0.48;
-  if(len<=13) return maxSize*0.40;
-  return maxSize*0.34;
-}
-// real jerseys arc the nameplate text slightly upward (like a rainbow) the longer
-// the name runs, to follow the curve of the collar - flat for short names.
-function jerseyNameArc(text){
-  const len=(text||'').length;
-  return len<=4 ? 0 : Math.min(14,(len-4)*1.6);
-}
 function isValidCssColor(c){
   if(!c) return false;
   const opt=new Option();
   opt.style.color=c;
   return opt.style.color!=='';
-}
-let jerseyUidCounter=0;
-function buildJerseyMarkup(p){
-  // unique id suffix per call - multiple jersey thumbnails can be on screen at once (trade rows),
-  // and SVG id references resolve document-wide, so reused ids would leak one player's colors into another's.
-  const uid='jy'+(jerseyUidCounter++);
-  const isDark=document.body.classList.contains('dark-mode');
-  const st=(isDark?jerseyStylesDark:jerseyStylesLight)[p.team]||{};
-  // sheet values can come through corrupted (eg. Google Sheets silently converts an
-  // all-digit hex code like "000000" to the number 0, losing the leading zeros before
-  // we ever see it) - guard against rendering an invalid color as SVG's default black fill.
-  const baseColor=isValidCssColor(st.baseColor)?st.baseColor:(isDark?'#0f1e35':'#dcdcdc');
-  const pinstripe=isValidCssColor(st.pinstripeColor)?st.pinstripeColor:'';
-  const numberFont=st.numberFont||'VarsityTeam-Bold';
-  const nameFont=st.nameFont||'VarsityTeam-Bold';
-  const nameColor=isValidCssColor(st.nameColor)?st.nameColor:'#ffffff';
-  const numberColor=isValidCssColor(st.numberColor)?st.numberColor:'#ffffff';
-  const nameBorder=isValidCssColor(st.nameBorderColor)?st.nameBorderColor:'';
-  const numberBorderInner=isValidCssColor(st.numberBorderColor)?st.numberBorderColor:'';
-  const numberBorderOuter=isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter:'';
-  const numRaw=p.jerseyNumRaw||'--';
-  const mainText=numRaw;
-  const nameText=jerseyNameText(p.name);
-  const nameCurve=jerseyNameArc(nameText);
-  const nameArcPath=`M 26 62 Q 100 ${62-nameCurve} 174 62`;
-  const nameStroke=nameBorder?`stroke="${esc(nameBorder)}" stroke-width="1.5" paint-order="stroke"`:'';
-  const numberFontAttrs=`font-family="'${esc(numberFont)}',sans-serif" font-size="${jerseyFitSize(mainText,96)}"`;
-  // two-ring border: outer ring drawn first (wider stroke), inner ring on top of it (narrower
-  // stroke), fill text on top of both - this layers like an actual screen-printed outline.
-  const numberMarkup=numberBorderOuter
-    ? `<text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="none" stroke="${esc(numberBorderOuter)}" stroke-width="6">${esc(mainText)}</text>
-    <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="none" stroke="${esc(numberBorderInner||numberBorderOuter)}" stroke-width="3">${esc(mainText)}</text>
-    <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}">${esc(mainText)}</text>`
-    : `<text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}" ${numberBorderInner?`stroke="${esc(numberBorderInner)}" stroke-width="2.5" paint-order="stroke"`:''}>${esc(mainText)}</text>`;
-  const pinstripeFill=pinstripe?`<rect x="-6" y="-6" width="212" height="244" fill="url(#${uid}Pins)"/>`:'';
-  // subtle mesh-screen dot weave + gentle cloth waviness, so the fill reads as fabric rather than flat color.
-  const meshDot=isDark?'rgba(255,255,255,.12)':'rgba(0,0,0,.14)';
-  // jersey silhouette: raglan sleeve cutouts at the shoulders + a curved crew-neck collar notch,
-  // rather than a plain rectangle - this is what makes the thumbnail read as a jersey, not a swatch.
-  const jerseyClipPath='M 70 4 C 80 20 120 20 130 4 L 156 0 L 198 46 L 170 70 L 158 32 L 158 232 L 42 232 L 42 32 L 30 70 L 2 46 L 44 0 Z';
-  const collarTrimColor=nameBorder||numberBorderOuter||(isDark?'rgba(255,255,255,.35)':'rgba(0,0,0,.25)');
-  return `<svg viewBox="0 0 200 232" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <clipPath id="${uid}Clip">
-        <path d="${jerseyClipPath}"/>
-      </clipPath>
-      <pattern id="${uid}Pins" patternUnits="userSpaceOnUse" width="7" height="7">
-        <line x1="0" y1="0" x2="0" y2="7" stroke="${esc(pinstripe)}" stroke-width="1"/>
-      </pattern>
-      <pattern id="${uid}Mesh" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
-        <circle cx="1" cy="1" r="0.75" fill="${meshDot}"/>
-      </pattern>
-      <filter id="${uid}Fabric" x="-15%" y="-15%" width="130%" height="130%">
-        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.06" numOctaves="2" seed="7" result="pmNoise"/>
-        <feDisplacementMap in="SourceGraphic" in2="pmNoise" scale="8" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-    </defs>
-    <g clip-path="url(#${uid}Clip)">
-      <g filter="url(#${uid}Fabric)">
-        <rect x="-6" y="-6" width="212" height="244" fill="${esc(baseColor)}"/>
-        ${pinstripeFill}
-      </g>
-      <rect width="200" height="232" fill="url(#${uid}Mesh)"/>
-      <path id="${uid}NameArc" d="${nameArcPath}" fill="none"/>
-      <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#${uid}NameArc" xlink:href="#${uid}NameArc" startOffset="50%">${esc(nameText)}</textPath></text>
-      ${numberMarkup}
-    </g>
-    <path d="${jerseyClipPath}" fill="none" stroke="${esc(collarTrimColor)}" stroke-width="2"/>
-  </svg>`;
 }
 function showPM(name,team,pos){
   const p=team ? allPlayers.find(x=>x.name===name && x.team===team && (!pos || x.pos===pos)) : allPlayers.find(x=>x.name===name);
