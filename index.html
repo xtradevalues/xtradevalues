@@ -1187,14 +1187,6 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <filter id="twillShadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="1.5" dy="2.5" stdDeviation="1.2" flood-color="#000000" flood-opacity="0.6"/>
     </filter>
-    <filter id="embossTwill" x="-10%" y="-10%" width="120%" height="120%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/>
-      <feSpecularLighting in="blur" surfaceScale="2" specularConstant="0.75" specularExponent="20" lighting-color="#ffffff" result="light">
-        <feDistantLight azimuth="225" elevation="45"/>
-      </feSpecularLighting>
-      <feComposite in="light" in2="SourceAlpha" operator="in" result="lightAlpha"/>
-      <feBlend in="SourceGraphic" in2="lightAlpha" mode="screen"/>
-    </filter>
     <linearGradient id="jerseyBodyGrad" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop id="bodyGrad0" offset="0%" stop-color="#111622"/>
       <stop id="bodyGrad1" offset="15%" stop-color="#1d2536"/>
@@ -1264,26 +1256,20 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
       <circle cx="1" cy="-4" r="1.5" fill="#ffffff"/>
     </g>
     <path id="nameCurve" d="M 240 270 C 320 238 480 238 560 270" fill="none"/>
-    <text id="name-shadow" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" filter="url(#twillShadow)">
+    <text id="name-border" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12">
       <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
-        <tspan id="name-shadow-tspan" fill="#050b14" stroke="#bc964c" stroke-width="5" stroke-linejoin="round">SAVANT</tspan>
+        <tspan id="name-border-tspan" fill="#bc964c" stroke="#bc964c" stroke-width="5" stroke-linejoin="round" vector-effect="non-scaling-stroke">SAVANT</tspan>
       </textPath>
     </text>
-    <text id="name-fill" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" filter="url(#embossTwill)">
+    <text id="name-fill" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12">
       <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
         <tspan id="name-fill-tspan" fill="#ffffff">SAVANT</tspan>
       </textPath>
     </text>
-    <text id="name-stitch" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12" opacity="0.75">
-      <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
-        <tspan id="name-stitch-tspan" fill="none" stroke="#000000" stroke-width="0.6" stroke-dasharray="2,1.5">SAVANT</tspan>
-      </textPath>
-    </text>
     <g id="jersey-number" transform="translate(400, 520)" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="250" text-anchor="middle">
-      <text id="num-trim" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
-      <text id="num-gap" x="0" y="0" fill="#0c121e" stroke="#0c121e" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
-      <text id="num-fill" x="0" y="0" fill="#ffffff" filter="url(#embossTwill)">26</text>
-      <text id="num-stitch" x="0" y="0" fill="none" stroke="#bc964c" stroke-width="0.9" stroke-dasharray="4,3" opacity="0.85" vector-effect="non-scaling-stroke">26</text>
+      <text id="num-border-outer" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
+      <text id="num-border-inner" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
+      <text id="num-fill" x="0" y="0" fill="#ffffff">26</text>
     </g>
     <path d="M 175 750 Q 320 790 420 740 T 625 770 L 630 810 Q 480 775 350 820 T 170 790 Z" fill="url(#foldShadow)" opacity="0.4"/>
     <path d="M 170 735 Q 320 775 420 725 T 620 755 L 625 765 Q 475 735 345 780 T 175 745 Z" fill="url(#foldHighlight)" opacity="0.25"/>
@@ -1360,9 +1346,11 @@ function renderJersey(svgEl, config, compact){
   if(!svgEl || !config) return;
   const q=id=>svgEl.querySelector('#'+id);
   const baseColor=isValidCssColor(config.baseColor)?config.baseColor:'#1c2434';
-  const trimColor=isValidCssColor(config.trimColor)?config.trimColor:'#bc964c';
   const nameColor=isValidCssColor(config.nameColor)?config.nameColor:'#ffffff';
   const numberColor=isValidCssColor(config.numberColor)?config.numberColor:'#ffffff';
+  const nameBorderColor=isValidCssColor(config.nameBorderColor)?config.nameBorderColor:'#bc964c';
+  const numberBorderColor=isValidCssColor(config.numberBorderColor)?config.numberBorderColor:'#bc964c';
+  const numberBorderColorOuter=isValidCssColor(config.numberBorderColorOuter)?config.numberBorderColorOuter:numberBorderColor;
   const name=config.name!=null?String(config.name):'';
   const number=config.number!=null?String(config.number):'--';
   const nameFontStack=config.nameFont?`'${config.nameFont}', 'Impact', 'Arial Black', sans-serif`:`'Impact', 'Arial Black', sans-serif`;
@@ -1387,33 +1375,32 @@ function renderJersey(svgEl, config, compact){
   const leftCuffOuter=q('left-cuff-outer'); if(leftCuffOuter) leftCuffOuter.setAttribute('stroke', leftShades[2]);
   const rightCuffOuter=q('right-cuff-outer'); if(rightCuffOuter) rightCuffOuter.setAttribute('stroke', rightShades[2]);
 
-  // trimColor -> number border, sleeve piping, MLB patch border, name stroke
-  const numTrim=q('num-trim'); if(numTrim){ numTrim.setAttribute('fill',trimColor); numTrim.setAttribute('stroke',trimColor); }
-  const numStitch=q('num-stitch'); if(numStitch) numStitch.setAttribute('stroke',trimColor);
-  const leftCuffInner=q('left-cuff-inner'); if(leftCuffInner) leftCuffInner.setAttribute('stroke',trimColor);
-  const rightCuffInner=q('right-cuff-inner'); if(rightCuffInner) rightCuffInner.setAttribute('stroke',trimColor);
-  const mlbPatchBorder=svgEl.querySelector('#mlb-patch rect'); if(mlbPatchBorder) mlbPatchBorder.setAttribute('stroke',trimColor);
-  const nameShadowTspan=q('name-shadow-tspan'); if(nameShadowTspan) nameShadowTspan.setAttribute('stroke',trimColor);
+  // numberBorderColor -> sleeve piping, MLB patch border (general-purpose trim accent)
+  const leftCuffInner=q('left-cuff-inner'); if(leftCuffInner) leftCuffInner.setAttribute('stroke',numberBorderColor);
+  const rightCuffInner=q('right-cuff-inner'); if(rightCuffInner) rightCuffInner.setAttribute('stroke',numberBorderColor);
+  const mlbPatchBorder=svgEl.querySelector('#mlb-patch rect'); if(mlbPatchBorder) mlbPatchBorder.setAttribute('stroke',numberBorderColor);
 
-  // name -> all textPath layers
-  ['name-shadow-tspan','name-fill-tspan','name-stitch-tspan'].forEach(id=>{
+  // name -> flat fill + single flat border, no shadow/stitch texture
+  ['name-border-tspan','name-fill-tspan'].forEach(id=>{
     const el=q(id); if(el) el.textContent=name;
   });
-  // nameColor -> the name's solid fill layer (was hardcoded white, washed out on light jerseys)
+  const nameBorderTspan=q('name-border-tspan');
+  if(nameBorderTspan){ nameBorderTspan.setAttribute('fill',nameBorderColor); nameBorderTspan.setAttribute('stroke',nameBorderColor); }
   const nameFillTspan=q('name-fill-tspan'); if(nameFillTspan) nameFillTspan.setAttribute('fill', nameColor);
   // nameFont -> font-family on the name text elements
-  ['name-shadow','name-fill','name-stitch'].forEach(id=>{
+  ['name-border','name-fill'].forEach(id=>{
     const el=q(id); if(el) el.setAttribute('font-family', nameFontStack);
   });
 
-  // number -> all 4 number text layers
-  ['num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
+  // number -> flat fill + inner/outer flat borders, no bevel/stitch texture
+  ['num-border-outer','num-border-inner','num-fill'].forEach(id=>{
     const el=q(id); if(el) el.textContent=number;
   });
-  // numberColor -> the number's solid fill layer (was hardcoded white, washed out on light jerseys)
+  const numBorderOuter=q('num-border-outer'); if(numBorderOuter){ numBorderOuter.setAttribute('fill',numberBorderColorOuter); numBorderOuter.setAttribute('stroke',numberBorderColorOuter); }
+  const numBorderInner=q('num-border-inner'); if(numBorderInner){ numBorderInner.setAttribute('fill',numberBorderColor); numBorderInner.setAttribute('stroke',numberBorderColor); }
   const numFill=q('num-fill'); if(numFill) numFill.setAttribute('fill', numberColor);
   // numberFont -> font-family on the number text elements
-  ['num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
+  ['num-border-outer','num-border-inner','num-fill'].forEach(id=>{
     const el=q(id); if(el) el.setAttribute('font-family', numberFontStack);
   });
 
@@ -1431,7 +1418,7 @@ function renderJersey(svgEl, config, compact){
   });
 }
 
-const DEFAULT_JERSEY_CONFIG={baseColor:'#0f1e35', trimColor:'#ffffff', nameColor:'#ffffff', numberColor:'#ffffff', pinstripeColor:null, nameFont:'', numberFont:''};
+const DEFAULT_JERSEY_CONFIG={baseColor:'#0f1e35', nameColor:'#ffffff', numberColor:'#ffffff', nameBorderColor:'#bc964c', numberBorderColor:'#bc964c', numberBorderColorOuter:'', pinstripeColor:null, nameFont:'', numberFont:''};
 
 // Pulls per-team look from the DARK MODE JERSEYS sheet tab (jerseyStylesDark) - falls back
 // to a dark navy/white default when the team has no row yet or its data is malformed.
@@ -1440,12 +1427,11 @@ function getJerseyTeamConfig(team){
   if(!st || !isValidCssColor(st.baseColor)) return DEFAULT_JERSEY_CONFIG;
   return {
     baseColor: st.baseColor,
-    trimColor: isValidCssColor(st.numberBorderColor)?st.numberBorderColor
-      :isValidCssColor(st.nameBorderColor)?st.nameBorderColor
-      :isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter
-      :DEFAULT_JERSEY_CONFIG.trimColor,
     nameColor: isValidCssColor(st.nameColor)?st.nameColor:DEFAULT_JERSEY_CONFIG.nameColor,
     numberColor: isValidCssColor(st.numberColor)?st.numberColor:DEFAULT_JERSEY_CONFIG.numberColor,
+    nameBorderColor: isValidCssColor(st.nameBorderColor)?st.nameBorderColor:DEFAULT_JERSEY_CONFIG.nameBorderColor,
+    numberBorderColor: isValidCssColor(st.numberBorderColor)?st.numberBorderColor:DEFAULT_JERSEY_CONFIG.numberBorderColor,
+    numberBorderColorOuter: isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter:'',
     pinstripeColor: isValidCssColor(st.pinstripeColor)?st.pinstripeColor:null,
     nameFont: st.nameFont||DEFAULT_JERSEY_CONFIG.nameFont,
     numberFont: st.numberFont||DEFAULT_JERSEY_CONFIG.numberFont
@@ -1455,10 +1441,10 @@ function getJerseyTeamConfig(team){
 // Gradient/pattern/filter/textPath ids that get resolved via url(#id) or href="#id" - SVG
 // resolves those document-wide, so when several jersey cards are mounted at once (trade rows)
 // they need per-instance suffixes or one player's gradients leak into another's. IDs that
-// renderJersey() targets directly (bodyGrad0, num-trim, etc.) don't need this: they're never
+// renderJersey() targets directly (bodyGrad0, num-fill, etc.) don't need this: they're never
 // referenced via url()/href(), so element.querySelector('#id') scoping to that one <svg> is
 // already enough to keep instances independent.
-const JERSEY_REFERENCE_IDS=['jerseyBodyGrad','leftSleeveGrad','rightSleeveGrad','meshPattern','pinstripes','vignette','foldHighlight','foldShadow','twillShadow','embossTwill','nameCurve'];
+const JERSEY_REFERENCE_IDS=['jerseyBodyGrad','leftSleeveGrad','rightSleeveGrad','meshPattern','pinstripes','vignette','foldHighlight','foldShadow','twillShadow','nameCurve'];
 function jerseyCardMarkup(uid){
   let svg=JERSEY_CARD_TEMPLATE;
   JERSEY_REFERENCE_IDS.forEach(id=>{
