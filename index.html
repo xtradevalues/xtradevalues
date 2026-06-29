@@ -283,7 +283,7 @@
                     <div id="pm-avgval" class="text-3xl font-semibold value-number mt-0.5"></div>
                 </div>
                 <div>
-                    <div class="metric-label">CONTROL</div>
+                    <div class="metric-label">LEVEL</div>
                     <div id="pm-ctrl" class="text-xl font-semibold mt-1"></div>
                 </div>
             </div>
@@ -299,23 +299,18 @@
 
     <script>
         // ==================== DATA ====================
-        let allPlayers = [
-            { id: 1, name: "Shohei Ohtani", team: "LAD", pos: "DH/SP", age: 31, val2026: 42.8, avgVal: 36.4, control: "2025-2030", hitter: true, obp: 0.385, slg: 0.605, wrcPlus: 168, era: 3.35, fip: 3.28, k9: 10.8, prospect: false },
-            { id: 2, name: "Aaron Judge", team: "NYY", pos: "OF", age: 34, val2026: 27.5, avgVal: 21.2, control: "Free Agent", hitter: true, obp: 0.415, slg: 0.685, wrcPlus: 175, prospect: false },
-            { id: 3, name: "Juan Soto", team: "NYY", pos: "OF", age: 27, val2026: 31.2, avgVal: 29.8, control: "2025-2029", hitter: true, obp: 0.430, slg: 0.590, wrcPlus: 162, prospect: false },
-            { id: 4, name: "Bobby Witt Jr.", team: "KC", pos: "SS", age: 25, val2026: 26.4, avgVal: 31.5, control: "2025-2028", hitter: true, obp: 0.355, slg: 0.545, wrcPlus: 138, prospect: false },
-            { id: 5, name: "Paul Skenes", team: "PIT", pos: "SP", age: 24, val2026: 19.8, avgVal: 26.7, control: "Pre-ARB", pitcher: true, era: 2.75, fip: 2.82, k9: 12.4, prospect: false },
-            { id: 6, name: "Gunnar Henderson", team: "BAL", pos: "SS", age: 25, val2026: 21.5, avgVal: 27.2, control: "Pre-ARB", hitter: true, obp: 0.365, slg: 0.525, wrcPlus: 142, prospect: false },
-            { id: 7, name: "Corbin Carroll", team: "ARI", pos: "OF", age: 25, val2026: 18.9, avgVal: 24.1, control: "Pre-ARB", hitter: true, obp: 0.370, slg: 0.510, wrcPlus: 135, prospect: false },
-            { id: 8, name: "Elly De La Cruz", team: "CIN", pos: "SS", age: 24, val2026: 17.6, avgVal: 25.8, control: "Pre-ARB", hitter: true, obp: 0.340, slg: 0.515, wrcPlus: 128, prospect: false },
-            { id: 9, name: "Top Prospect 1 (TB)", team: "TB", pos: "OF", age: 20, val2026: 8.5, avgVal: 22.4, control: "Minors", hitter: true, prospect: true },
-            { id: 10, name: "Top Prospect 2 (BAL)", team: "BAL", pos: "SP", age: 21, val2026: 6.2, avgVal: 18.9, control: "Minors", pitcher: true, prospect: true },
-            { id: 11, name: "Kyle Tucker", team: "CHC", pos: "OF", age: 29, val2026: 20.1, avgVal: 19.4, control: "2025-2026", hitter: true, obp: 0.360, slg: 0.535, wrcPlus: 140, prospect: false },
-            { id: 12, name: "Tarik Skubal", team: "DET", pos: "SP", age: 29, val2026: 15.3, avgVal: 14.7, control: "2025-2026", pitcher: true, era: 3.15, fip: 3.25, k9: 10.1, prospect: false },
-            { id: 13, name: "Fernando Tatis Jr.", team: "SD", pos: "OF/SS", age: 27, val2026: 16.8, avgVal: 18.4, control: "2025-2028", hitter: true, obp: 0.355, slg: 0.555, wrcPlus: 138, prospect: false },
-            { id: 14, name: "Adley Rutschman", team: "BAL", pos: "C", age: 28, val2026: 12.1, avgVal: 15.3, control: "Pre-ARB", hitter: true, obp: 0.365, slg: 0.465, wrcPlus: 125, prospect: false },
-            { id: 15, name: "Julio Rodríguez", team: "SEA", pos: "OF", age: 25, val2026: 15.9, avgVal: 21.4, control: "Pre-ARB", hitter: true, obp: 0.350, slg: 0.520, wrcPlus: 135, prospect: false },
-        ];
+        // Loaded at runtime from players.json (exported from the live spreadsheet).
+        let allPlayers = [];
+
+        async function loadPlayers() {
+            try {
+                const res = await fetch('players.json', { cache: 'no-store' });
+                allPlayers = await res.json();
+            } catch (e) {
+                console.error('[ValueSavant] Failed to load players.json', e);
+                allPlayers = [];
+            }
+        }
 
         let selectedA = [];
         let selectedB = [];
@@ -386,12 +381,8 @@
         }
 
         function getControlYears(p) {
-            if (!p.control) return 0;
-            if (p.control.includes('Pre-ARB')) return 6;
-            if (p.control.includes('Free Agent')) return 0;
-            if (p.control.includes('Minors')) return 7;
-            const match = p.control.match(/(\d{4})-(\d{4})/);
-            if (match) return parseInt(match[2]) - 2026 + 1;
+            // Approximate remaining control from level: minor leaguers carry more years of control than established MLB players.
+            if (p.prospect) return 6;
             return 2;
         }
 
@@ -652,10 +643,15 @@
             document.getElementById('pm-pos').textContent = player.pos;
             document.getElementById('pm-val2026').textContent = fmt(player.val2026);
             document.getElementById('pm-avgval').textContent = fmt(player.avgVal);
-            document.getElementById('pm-ctrl').textContent = player.control || '—';
+            document.getElementById('pm-ctrl').textContent = player.level || '—';
 
             const adv = document.getElementById('pm-advanced');
-            adv.innerHTML = player.pitcher ? `<div class="grid grid-cols-3 gap-4 text-center text-sm pt-2 border-t border-[#222222]"><div><div class="text-[#888888] text-xs">ERA</div><div class="font-mono text-lg">${player.era || '—'}</div></div><div><div class="text-[#888888] text-xs">FIP</div><div class="font-mono text-lg">${player.fip || '—'}</div></div><div><div class="text-[#888888] text-xs">K/9</div><div class="font-mono text-lg">${player.k9 || '—'}</div></div></div>` : '';
+            adv.innerHTML = `<div class="grid grid-cols-4 gap-4 text-center text-sm pt-2 border-t border-[#222222]">
+                <div><div class="text-[#888888] text-xs">ORG RANK</div><div class="font-mono text-lg">${player.orgRank || '—'}</div></div>
+                <div><div class="text-[#888888] text-xs">MLB RANK</div><div class="font-mono text-lg">${player.mlbRank || '—'}</div></div>
+                <div><div class="text-[#888888] text-xs">STATUS</div><div class="font-mono text-base">${player.injuryStatus || '—'}</div></div>
+                <div><div class="text-[#888888] text-xs">JERSEY</div><div class="font-mono text-lg">${player.jersey || '—'}</div></div>
+            </div>`;
 
             document.getElementById('playerModal').classList.remove('hidden');
             document.getElementById('playerModal').classList.add('flex');
@@ -714,13 +710,15 @@
             alert('Share modal would open here with clean summary + historical comps (easy to add).');
         }
 
-        function initializeEverything() {
+        async function initializeEverything() {
             // Set initial empty states
             ['A','B'].forEach(side => {
                 document.getElementById(`selected${side}`).innerHTML = `<div class="h-[110px] flex flex-col items-center justify-center text-center border border-dashed border-[#333333] rounded-2xl"><i class="fa-solid fa-user-plus text-xl text-[#444444] mb-1.5"></i><div class="text-xs text-[#666666]">No players added</div></div>`;
             });
 
-            console.log('%c[ValueSavant] Enhanced with Trade Finder + Historical Comps ready', 'color:#666');
+            await loadPlayers();
+
+            console.log(`%c[ValueSavant] Loaded ${allPlayers.length} players from spreadsheet`, 'color:#666');
         }
 
         window.onload = initializeEverything;
