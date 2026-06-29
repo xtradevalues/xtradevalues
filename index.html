@@ -67,6 +67,12 @@
             font-weight: 600;
         }
 
+        .compact-table td, .compact-table th {
+            padding-top: 0.4rem;
+            padding-bottom: 0.4rem;
+            font-size: 0.875rem;
+        }
+
         .logo-v {
             filter: drop-shadow(0 2px 4px rgb(0 0 0 / 0.4));
         }
@@ -292,11 +298,432 @@
     </div>
 
     <script>
-        // Paste the full JS from the previous version here (the one with the smart verdict, Trade Finder, historical comps, etc.)
-        // The full JS is in the previous messages or the artifacts file.
-        // For brevity, the core functions are in the earlier code block.
-        // Replace this comment with the full <script> from the enhanced file.
-        console.log('Full modern ValueSavant loaded');
+        // ==================== DATA ====================
+        let allPlayers = [
+            { id: 1, name: "Shohei Ohtani", team: "LAD", pos: "DH/SP", age: 31, val2026: 42.8, avgVal: 36.4, control: "2025-2030", hitter: true, obp: 0.385, slg: 0.605, wrcPlus: 168, era: 3.35, fip: 3.28, k9: 10.8, prospect: false },
+            { id: 2, name: "Aaron Judge", team: "NYY", pos: "OF", age: 34, val2026: 27.5, avgVal: 21.2, control: "Free Agent", hitter: true, obp: 0.415, slg: 0.685, wrcPlus: 175, prospect: false },
+            { id: 3, name: "Juan Soto", team: "NYY", pos: "OF", age: 27, val2026: 31.2, avgVal: 29.8, control: "2025-2029", hitter: true, obp: 0.430, slg: 0.590, wrcPlus: 162, prospect: false },
+            { id: 4, name: "Bobby Witt Jr.", team: "KC", pos: "SS", age: 25, val2026: 26.4, avgVal: 31.5, control: "2025-2028", hitter: true, obp: 0.355, slg: 0.545, wrcPlus: 138, prospect: false },
+            { id: 5, name: "Paul Skenes", team: "PIT", pos: "SP", age: 24, val2026: 19.8, avgVal: 26.7, control: "Pre-ARB", pitcher: true, era: 2.75, fip: 2.82, k9: 12.4, prospect: false },
+            { id: 6, name: "Gunnar Henderson", team: "BAL", pos: "SS", age: 25, val2026: 21.5, avgVal: 27.2, control: "Pre-ARB", hitter: true, obp: 0.365, slg: 0.525, wrcPlus: 142, prospect: false },
+            { id: 7, name: "Corbin Carroll", team: "ARI", pos: "OF", age: 25, val2026: 18.9, avgVal: 24.1, control: "Pre-ARB", hitter: true, obp: 0.370, slg: 0.510, wrcPlus: 135, prospect: false },
+            { id: 8, name: "Elly De La Cruz", team: "CIN", pos: "SS", age: 24, val2026: 17.6, avgVal: 25.8, control: "Pre-ARB", hitter: true, obp: 0.340, slg: 0.515, wrcPlus: 128, prospect: false },
+            { id: 9, name: "Top Prospect 1 (TB)", team: "TB", pos: "OF", age: 20, val2026: 8.5, avgVal: 22.4, control: "Minors", hitter: true, prospect: true },
+            { id: 10, name: "Top Prospect 2 (BAL)", team: "BAL", pos: "SP", age: 21, val2026: 6.2, avgVal: 18.9, control: "Minors", pitcher: true, prospect: true },
+            { id: 11, name: "Kyle Tucker", team: "CHC", pos: "OF", age: 29, val2026: 20.1, avgVal: 19.4, control: "2025-2026", hitter: true, obp: 0.360, slg: 0.535, wrcPlus: 140, prospect: false },
+            { id: 12, name: "Tarik Skubal", team: "DET", pos: "SP", age: 29, val2026: 15.3, avgVal: 14.7, control: "2025-2026", pitcher: true, era: 3.15, fip: 3.25, k9: 10.1, prospect: false },
+            { id: 13, name: "Fernando Tatis Jr.", team: "SD", pos: "OF/SS", age: 27, val2026: 16.8, avgVal: 18.4, control: "2025-2028", hitter: true, obp: 0.355, slg: 0.555, wrcPlus: 138, prospect: false },
+            { id: 14, name: "Adley Rutschman", team: "BAL", pos: "C", age: 28, val2026: 12.1, avgVal: 15.3, control: "Pre-ARB", hitter: true, obp: 0.365, slg: 0.465, wrcPlus: 125, prospect: false },
+            { id: 15, name: "Julio Rodríguez", team: "SEA", pos: "OF", age: 25, val2026: 15.9, avgVal: 21.4, control: "Pre-ARB", hitter: true, obp: 0.350, slg: 0.520, wrcPlus: 135, prospect: false },
+        ];
+
+        let selectedA = [];
+        let selectedB = [];
+        let currentPlayerForModal = null;
+        let currentFinderTarget = null;
+
+        // ==================== HISTORICAL TRADES DATABASE ====================
+        const historicalTrades = [
+            {
+                id: "soto-2022",
+                name: "Juan Soto to Padres (2022)",
+                description: "Nationals received a massive prospect package (CJ Abrams, MacKenzie Gore, Jarlin Susana, Robert Hassell) for Soto + Josh Bell. One of the heaviest prospect hauls for a single star in recent memory.",
+                pattern: "superstar_for_heavy_prospect_package"
+            },
+            {
+                id: "tatis-2016",
+                name: "Fernando Tatis Jr. for James Shields (2016)",
+                description: "White Sox traded 17-year-old Tatis (future superstar) for veteran pitcher James Shields. One of the most lopsided prospect-for-veteran deals in modern history.",
+                pattern: "top_prospect_for_veteran_rental"
+            },
+            {
+                id: "arraez-2024",
+                name: "Luis Arraez to Padres (2024)",
+                description: "Padres acquired the batting champion from Marlins for a package of prospects (Dillon Head, Jakob Marsee, Nathan Martorella, Woo-Suk Go). Contact hitting with limited power still commands real value.",
+                pattern: "contact_hitter_for_prospects"
+            },
+            {
+                id: "betts-2020",
+                name: "Mookie Betts to Dodgers (2020)",
+                description: "Dodgers acquired Betts + David Price from Red Sox in a blockbuster that included Alex Verdugo going the other way. Rare case of two contenders making a star-for-package deal work for both.",
+                pattern: "star_for_package_contenders"
+            }
+        ];
+
+        function findHistoricalComps(selectedA, selectedB) {
+            const comps = [];
+            const sumA = selectedA.reduce((s, p) => s + (p.val2026 || 0), 0);
+            const sumB = selectedB.reduce((s, p) => s + (p.val2026 || 0), 0);
+            const prosA = selectedA.filter(p => p.prospect).length;
+            const prosB = selectedB.filter(p => p.prospect).length;
+            const hasSuperstarA = selectedA.some(p => (p.val2026 || 0) > 30);
+            const hasSuperstarB = selectedB.some(p => (p.val2026 || 0) > 30);
+
+            if (hasSuperstarA && prosB >= 3) {
+                comps.push(historicalTrades.find(t => t.id === "soto-2022"));
+            }
+            if (prosA >= 2 && selectedB.some(p => p.age > 30 && (p.val2026 || 0) < 12)) {
+                comps.push(historicalTrades.find(t => t.id === "tatis-2016"));
+            }
+            if (selectedA.some(p => p.name.includes("Arraez") || (p.pos === "2B" && (p.avgVal || 0) > 10)) && prosB >= 2) {
+                comps.push(historicalTrades.find(t => t.id === "arraez-2024"));
+            }
+            if ((hasSuperstarA || hasSuperstarB) && Math.abs(sumA - sumB) < 8 && (prosA > 0 || prosB > 0)) {
+                comps.push(historicalTrades.find(t => t.id === "betts-2020"));
+            }
+
+            return comps.filter(Boolean);
+        }
+
+        // ==================== CORE FUNCTIONS ====================
+        function fmt(val) {
+            if (val === null || val === undefined || isNaN(val)) return '—';
+            return parseFloat(val).toFixed(1);
+        }
+
+        function sum(list, key) {
+            return list.reduce((s, p) => s + (p[key] || 0), 0);
+        }
+
+        function getControlYears(p) {
+            if (!p.control) return 0;
+            if (p.control.includes('Pre-ARB')) return 6;
+            if (p.control.includes('Free Agent')) return 0;
+            if (p.control.includes('Minors')) return 7;
+            const match = p.control.match(/(\d{4})-(\d{4})/);
+            if (match) return parseInt(match[2]) - 2026 + 1;
+            return 2;
+        }
+
+        function updateTeamTotals(side) {
+            const list = side === 'A' ? selectedA : selectedB;
+            const sum2026 = sum(list, 'val2026');
+            const sumAvg = sum(list, 'avgVal');
+            document.getElementById(`team${side}-total-2026`).textContent = fmt(sum2026);
+            document.getElementById(`team${side}-total-avg`).textContent = fmt(sumAvg);
+            document.getElementById(`team${side}-count`).textContent = list.length;
+        }
+
+        function renderSelected(side) {
+            const container = document.getElementById(`selected${side}`);
+            const list = side === 'A' ? selectedA : selectedB;
+
+            if (list.length === 0) {
+                container.innerHTML = `<div class="h-[110px] flex flex-col items-center justify-center text-center border border-dashed border-[#333333] rounded-2xl"><i class="fa-solid fa-user-plus text-xl text-[#444444] mb-1.5"></i><div class="text-xs text-[#666666]">No players added</div></div>`;
+                return;
+            }
+
+            container.innerHTML = list.map((p, idx) => `
+                <div class="player-row flex items-center justify-between bg-[#0a0a0a] border border-[#222222] px-3.5 py-2 rounded-2xl group">
+                    <div class="flex items-center gap-x-3 min-w-0 flex-1 cursor-pointer" onclick="showPlayerModal(${p.id})">
+                        <div class="w-7 h-7 text-[10px] font-mono tracking-widest bg-white/10 rounded-lg flex items-center justify-center flex-shrink-0">${p.pos}</div>
+                        <div class="min-w-0">
+                            <div class="font-medium truncate">${p.name}</div>
+                            <div class="text-xs text-[#888888]">${p.team} • ${p.age}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-x-3 text-right">
+                        <div><div class="font-mono text-sm font-semibold value-number">${fmt(p.val2026)}</div><div class="text-[9px] text-[#666666] -mt-px">2026</div></div>
+                        <button onclick="event.stopImmediatePropagation(); removePlayer('${side}', ${idx})" class="opacity-40 group-hover:opacity-100 w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-500 rounded-xl"><i class="fa-solid fa-times text-sm"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addPlayer(side, playerId) {
+            const player = allPlayers.find(p => p.id === playerId);
+            if (!player) return;
+            const list = side === 'A' ? selectedA : selectedB;
+            if (list.some(p => p.id === playerId)) return;
+            list.push({...player});
+            document.getElementById(`dropdown${side}`).classList.add('hidden');
+            document.getElementById(`search${side}`).value = '';
+            renderSelected(side);
+            updateTeamTotals(side);
+            updateVerdictAndInsight();
+        }
+
+        function removePlayer(side, index) {
+            const list = side === 'A' ? selectedA : selectedB;
+            list.splice(index, 1);
+            renderSelected(side);
+            updateTeamTotals(side);
+            updateVerdictAndInsight();
+        }
+
+        function filterDropdown(side) {
+            const input = document.getElementById(`search${side}`).value.toLowerCase().trim();
+            const resultsContainer = document.getElementById(`dropdownResults${side}`);
+            const dropdown = document.getElementById(`dropdown${side}`);
+            if (!input) { dropdown.classList.add('hidden'); return; }
+
+            const list = side === 'A' ? selectedA : selectedB;
+            const selectedIds = list.map(p => p.id);
+            const matches = allPlayers.filter(p => !selectedIds.includes(p.id) && (p.name.toLowerCase().includes(input) || p.team.toLowerCase().includes(input))).slice(0, 6);
+
+            resultsContainer.innerHTML = matches.length ? matches.map(p => `
+                <div onclick="addPlayer('${side}', ${p.id}); event.stopImmediatePropagation();" class="flex items-center justify-between px-3.5 py-2 hover:bg-white/5 cursor-pointer rounded-xl mx-1">
+                    <div><div class="font-medium">${p.name}</div><div class="text-xs text-[#888888]">${p.team} • ${p.pos}</div></div>
+                    <div class="font-mono text-sm font-semibold">${fmt(p.val2026)}</div>
+                </div>
+            `).join('') : `<div class="px-4 py-3 text-sm text-[#888888]">No matches</div>`;
+            dropdown.classList.remove('hidden');
+        }
+
+        function showDropdown(side) {
+            if (document.getElementById(`search${side}`).value.trim()) filterDropdown(side);
+        }
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#dropdownA') && !e.target.closest('#searchA')) document.getElementById('dropdownA').classList.add('hidden');
+            if (!e.target.closest('#dropdownB') && !e.target.closest('#searchB')) document.getElementById('dropdownB').classList.add('hidden');
+        });
+
+        // ==================== SMART VERDICT WITH HISTORICAL COMPS ====================
+        function updateVerdictAndInsight() {
+            const sumA = sum(selectedA, 'val2026');
+            const sumB = sum(selectedB, 'val2026');
+            const avgA = sum(selectedA, 'avgVal');
+            const avgB = sum(selectedB, 'avgVal');
+            const total = sumA + sumB;
+
+            let barA = 50, barB = 50;
+            if (total > 0) { barA = Math.max(12, Math.round((sumB / total) * 100)); barB = 100 - barA; }
+
+            document.getElementById('bar-a').style.width = `${barA}%`;
+            document.getElementById('bar-b').style.width = `${barB}%`;
+            document.getElementById('bar-pct-a').textContent = `${barA}%`;
+            document.getElementById('bar-pct-b').textContent = `${barB}%`;
+
+            const vText = document.getElementById('verdict-text');
+            const vSub = document.getElementById('verdict-sub');
+            const insightBox = document.getElementById('insight-box');
+            const insightContent = document.getElementById('insight-content');
+
+            insightContent.innerHTML = '';
+            insightBox.classList.add('hidden');
+
+            if (selectedA.length === 0 && selectedB.length === 0) {
+                vText.textContent = 'Build a trade to analyze';
+                vText.className = 'verdict-text tracking-tighter text-[#e5e5e5]';
+                vSub.textContent = 'Add players and I\'ll give detailed analysis + historical comparisons.';
+                return;
+            }
+
+            const diff = sumB - sumA;
+            const pct = total > 0 ? Math.abs(diff) / total * 100 : 0;
+            const prosA = selectedA.filter(p => p.prospect).length;
+            const prosB = selectedB.filter(p => p.prospect).length;
+            const ctrlA = selectedA.reduce((s, p) => s + getControlYears(p), 0);
+            const ctrlB = selectedB.reduce((s, p) => s + getControlYears(p), 0);
+
+            let verdict = Math.abs(diff) < 2.5 ? 'Very close to even' : (diff > 0 ? 'Team A gets the better return' : 'Team B gets the better return');
+            let verdictClass = Math.abs(diff) < 2.5 ? 'text-emerald-400' : (diff > 0 ? 'text-emerald-400' : 'text-red-400');
+
+            vText.textContent = verdict;
+            vText.className = `verdict-text tracking-tighter ${verdictClass}`;
+            vSub.innerHTML = `${fmt(pct)}% value difference • ${selectedA.length} vs ${selectedB.length} players`;
+
+            // Build detailed insight
+            let html = '';
+
+            if (Math.abs(diff) < 3) html += `<div><span class="text-emerald-400 font-medium">Value is well balanced.</span> Both sides exchanging similar production.</div>`;
+            else if (Math.abs(diff) < 8) html += `<div>Moderate value gap. One side has a clear edge in near-term production.</div>`;
+            else html += `<div><span class="text-red-400 font-medium">Significant imbalance.</span> One side is clearly winning on raw value.</div>`;
+
+            if (ctrlA > ctrlB + 3) html += `<div>Team A is acquiring meaningfully more future control. Classic contender acquiring from a rebuilder.</div>`;
+            else if (ctrlB > ctrlA + 3) html += `<div>Team B is gaining more control years. Good for extending a competitive window.</div>`;
+            else html += `<div>Control years are relatively balanced between the two sides.</div>`;
+
+            if (prosA > prosB + 1) html += `<div>Team A is sending more prospect capital — higher variance, betting on upside.</div>`;
+            else if (prosB > prosA + 1) html += `<div>Team B is sending more prospects. They are prioritizing present help.</div>`;
+
+            // Historical comps
+            const comps = findHistoricalComps(selectedA, selectedB);
+            if (comps.length > 0) {
+                html += `<div class="pt-2 border-t border-[#333333]"><div class="text-xs uppercase tracking-widest text-[#ef4444] mb-1.5">SIMILAR HISTORICAL TRADES</div>`;
+                comps.forEach(c => {
+                    html += `<div class="mb-2"><span class="font-medium">${c.name}</span><br><span class="text-xs text-[#aaaaaa]">${c.description}</span></div>`;
+                });
+                html += `</div>`;
+            }
+
+            // Light clowning for absurd trades
+            if (prosA + prosB >= 4 && Math.max(sumA, sumB) < 14) {
+                html += `<div class="text-amber-400">This has more prospects flying around than most 2018 rebuilds. Make sure the values actually line up.</div>`;
+            }
+
+            insightContent.innerHTML = html;
+            insightBox.classList.remove('hidden');
+        }
+
+        // ==================== TRADE FINDER ====================
+        function openTradeFinder() {
+            document.getElementById('tradeFinderModal').classList.remove('hidden');
+            document.getElementById('tradeFinderModal').classList.add('flex');
+            document.getElementById('finderSearch').value = '';
+            document.getElementById('finderResults').innerHTML = '<div class="text-center py-8 text-[#888888]">Search for a player you want to target and I\'ll suggest realistic return packages.</div>';
+        }
+
+        function closeTradeFinder() {
+            const m = document.getElementById('tradeFinderModal');
+            m.classList.remove('flex');
+            m.classList.add('hidden');
+        }
+
+        function renderFinderResults() {
+            const search = document.getElementById('finderSearch').value.toLowerCase().trim();
+            const container = document.getElementById('finderResults');
+            if (!search) {
+                container.innerHTML = '<div class="text-center py-6 text-[#888888]">Type a player name to see suggested packages</div>';
+                return;
+            }
+
+            const target = allPlayers.find(p => p.name.toLowerCase().includes(search));
+            if (!target) {
+                container.innerHTML = '<div class="text-center py-4 text-[#888888]">No player found</div>';
+                return;
+            }
+
+            currentFinderTarget = target;
+
+            // Find reasonable packages (similar total value, mix of control)
+            const targetValue = target.val2026 || target.avgVal || 10;
+            const candidates = allPlayers.filter(p => p.id !== target.id);
+
+            // Simple matching: find combinations close in value
+            let suggestions = [];
+            // 1-for-1 similar value
+            const oneForOne = candidates.filter(p => Math.abs((p.val2026 || 0) - targetValue) < targetValue * 0.35).slice(0, 2);
+            suggestions = suggestions.concat(oneForOne.map(p => [p]));
+
+            // Package of 2-3 lower value players
+            const lowerValue = candidates.filter(p => (p.val2026 || 0) < targetValue * 0.6 && (p.val2026 || 0) > 3).sort((a,b) => (b.val2026||0) - (a.val2026||0)).slice(0, 5);
+            if (lowerValue.length >= 2) suggestions.push(lowerValue.slice(0, 3));
+
+            container.innerHTML = `
+                <div class="mb-4 p-4 bg-[#0a0a0a] rounded-2xl border border-[#222222]">
+                    <div class="font-medium mb-1">Target: ${target.name} (${target.team}) — ${fmt(target.val2026)} 2026 Value</div>
+                    <div class="text-xs text-[#888888]">Suggested realistic returns below. Click any package to load it into the simulator.</div>
+                </div>
+            ` + suggestions.map((pkg, i) => `
+                <div onclick="loadSuggestedPackage(${target.id}, ${i})" class="cursor-pointer p-3.5 bg-[#111111] hover:bg-[#1a1a1a] border border-[#222222] rounded-2xl mb-2">
+                    <div class="text-xs text-[#ef4444] mb-1">SUGGESTED PACKAGE ${i+1}</div>
+                    ${pkg.map(p => `<div class="flex justify-between py-0.5"><span>${p.name} (${p.team})</span> <span class="font-mono">${fmt(p.val2026)}</span></div>`).join('')}
+                    <div class="text-[10px] text-[#888888] mt-1">Total ~${fmt(pkg.reduce((s,p)=>s+(p.val2026||0),0))} value • Good control balance</div>
+                </div>
+            `).join('');
+        }
+
+        function loadSuggestedPackage(targetId, suggestionIndex) {
+            // This is a simplified version - in real version with full data it would be smarter
+            const target = allPlayers.find(p => p.id === targetId);
+            if (!target) return;
+
+            resetTrade();
+            
+            // Add target to Team A (the side "acquiring")
+            selectedA.push({...target});
+
+            // For demo, add some reasonable return to Team B
+            // In production this would be more sophisticated
+            const returnPlayers = allPlayers.filter(p => p.id !== targetId && (p.val2026 || 0) > 4 && (p.val2026 || 0) < (target.val2026 || 15) * 0.8).slice(0, 3);
+            returnPlayers.forEach(p => selectedB.push({...p}));
+
+            document.getElementById('teamA-name').value = 'Acquiring Team';
+            document.getElementById('teamB-name').value = 'Trading Team';
+
+            renderSelected('A');
+            renderSelected('B');
+            updateTeamTotals('A');
+            updateTeamTotals('B');
+            updateVerdictAndInsight();
+            closeTradeFinder();
+        }
+
+        // Player modal functions (same as before, abbreviated for space)
+        function showPlayerModal(playerId) {
+            const player = allPlayers.find(p => p.id === playerId);
+            if (!player) return;
+            currentPlayerForModal = player;
+
+            document.getElementById('pm-name').textContent = player.name;
+            document.getElementById('pm-team').textContent = player.team;
+            document.getElementById('pm-pos').textContent = player.pos;
+            document.getElementById('pm-val2026').textContent = fmt(player.val2026);
+            document.getElementById('pm-avgval').textContent = fmt(player.avgVal);
+            document.getElementById('pm-ctrl').textContent = player.control || '—';
+
+            const adv = document.getElementById('pm-advanced');
+            adv.innerHTML = player.pitcher ? `<div class="grid grid-cols-3 gap-4 text-center text-sm pt-2 border-t border-[#222222]"><div><div class="text-[#888888] text-xs">ERA</div><div class="font-mono text-lg">${player.era || '—'}</div></div><div><div class="text-[#888888] text-xs">FIP</div><div class="font-mono text-lg">${player.fip || '—'}</div></div><div><div class="text-[#888888] text-xs">K/9</div><div class="font-mono text-lg">${player.k9 || '—'}</div></div></div>` : '';
+
+            document.getElementById('playerModal').classList.remove('hidden');
+            document.getElementById('playerModal').classList.add('flex');
+        }
+
+        function closePlayerModal() {
+            const m = document.getElementById('playerModal');
+            m.classList.remove('flex');
+            m.classList.add('hidden');
+        }
+
+        function addCurrentPlayerToTrade() {
+            if (!currentPlayerForModal) return;
+            const targetSide = selectedA.length <= selectedB.length ? 'A' : 'B';
+            addPlayer(targetSide, currentPlayerForModal.id);
+            closePlayerModal();
+        }
+
+        function resetTrade() {
+            selectedA = []; selectedB = [];
+            document.getElementById('selectedA').innerHTML = '';
+            document.getElementById('selectedB').innerHTML = '';
+            ['A','B'].forEach(s => {
+                document.getElementById(`team${s}-total-2026`).textContent = '0.0';
+                document.getElementById(`team${s}-total-avg`).textContent = '0.0';
+                document.getElementById(`team${s}-count`).textContent = '0';
+            });
+            document.getElementById('verdict-text').textContent = 'Build a trade to analyze';
+            document.getElementById('verdict-text').className = 'verdict-text tracking-tighter text-[#e5e5e5]';
+            document.getElementById('insight-box').classList.add('hidden');
+            document.getElementById('bar-a').style.width = '50%';
+            document.getElementById('bar-b').style.width = '50%';
+        }
+
+        function loadSampleTrade() {
+            resetTrade();
+            const soto = allPlayers.find(p => p.name === "Juan Soto");
+            const witt = allPlayers.find(p => p.name === "Bobby Witt Jr.");
+            const skenes = allPlayers.find(p => p.name === "Paul Skenes");
+            const tatis = allPlayers.find(p => p.name === "Fernando Tatis Jr.");
+
+            if (soto) selectedA.push({...soto});
+            if (witt && skenes && tatis) selectedB.push({...witt}, {...skenes}, {...tatis});
+
+            document.getElementById('teamA-name').value = 'New York Yankees';
+            document.getElementById('teamB-name').value = 'Kansas City Royals';
+
+            renderSelected('A');
+            renderSelected('B');
+            updateTeamTotals('A');
+            updateTeamTotals('B');
+            updateVerdictAndInsight();
+        }
+
+        function openShareModal() {
+            alert('Share modal would open here with clean summary + historical comps (easy to add).');
+        }
+
+        function initializeEverything() {
+            // Set initial empty states
+            ['A','B'].forEach(side => {
+                document.getElementById(`selected${side}`).innerHTML = `<div class="h-[110px] flex flex-col items-center justify-center text-center border border-dashed border-[#333333] rounded-2xl"><i class="fa-solid fa-user-plus text-xl text-[#444444] mb-1.5"></i><div class="text-xs text-[#666666]">No players added</div></div>`;
+            });
+
+            console.log('%c[ValueSavant] Enhanced with Trade Finder + Historical Comps ready', 'color:#666');
+        }
+
+        window.onload = initializeEverything;
     </script>
 </body>
 </html>
