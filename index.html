@@ -1280,10 +1280,10 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
       </textPath>
     </text>
     <g id="jersey-number" transform="translate(400, 520)" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="250" text-anchor="middle">
-      <text id="num-trim" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="18" stroke-linejoin="round">26</text>
-      <text id="num-gap" x="0" y="0" fill="#0c121e" stroke="#0c121e" stroke-width="6" stroke-linejoin="round">26</text>
+      <text id="num-trim" x="0" y="0" fill="#bc964c" stroke="#bc964c" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
+      <text id="num-gap" x="0" y="0" fill="#0c121e" stroke="#0c121e" stroke-width="1" stroke-linejoin="round" vector-effect="non-scaling-stroke">26</text>
       <text id="num-fill" x="0" y="0" fill="#ffffff" filter="url(#embossTwill)">26</text>
-      <text id="num-stitch" x="0" y="0" fill="none" stroke="#bc964c" stroke-width="1.2" stroke-dasharray="4,3" opacity="0.85">26</text>
+      <text id="num-stitch" x="0" y="0" fill="none" stroke="#bc964c" stroke-width="0.9" stroke-dasharray="4,3" opacity="0.85" vector-effect="non-scaling-stroke">26</text>
     </g>
     <path d="M 175 750 Q 320 790 420 740 T 625 770 L 630 810 Q 480 775 350 820 T 170 790 Z" fill="url(#foldShadow)" opacity="0.4"/>
     <path d="M 170 735 Q 320 775 420 725 T 620 755 L 625 765 Q 475 735 345 780 T 175 745 Z" fill="url(#foldHighlight)" opacity="0.25"/>
@@ -1356,11 +1356,13 @@ function jerseyShade(baseHex, lightnessDelta){
 
 // Injects a team/player config into a mounted JERSEY_CARD_TEMPLATE <svg> element via direct
 // DOM mutation - never touches the template string itself.
-function renderJersey(svgEl, config){
+function renderJersey(svgEl, config, compact){
   if(!svgEl || !config) return;
   const q=id=>svgEl.querySelector('#'+id);
   const baseColor=isValidCssColor(config.baseColor)?config.baseColor:'#1c2434';
   const trimColor=isValidCssColor(config.trimColor)?config.trimColor:'#bc964c';
+  const nameColor=isValidCssColor(config.nameColor)?config.nameColor:'#ffffff';
+  const numberColor=isValidCssColor(config.numberColor)?config.numberColor:'#ffffff';
   const name=config.name!=null?String(config.name):'';
   const number=config.number!=null?String(config.number):'--';
   const nameFontStack=config.nameFont?`'${config.nameFont}', 'Impact', 'Arial Black', sans-serif`:`'Impact', 'Arial Black', sans-serif`;
@@ -1397,6 +1399,8 @@ function renderJersey(svgEl, config){
   ['name-shadow-tspan','name-fill-tspan','name-stitch-tspan'].forEach(id=>{
     const el=q(id); if(el) el.textContent=name;
   });
+  // nameColor -> the name's solid fill layer (was hardcoded white, washed out on light jerseys)
+  const nameFillTspan=q('name-fill-tspan'); if(nameFillTspan) nameFillTspan.setAttribute('fill', nameColor);
   // nameFont -> font-family on the name text elements
   ['name-shadow','name-fill','name-stitch'].forEach(id=>{
     const el=q(id); if(el) el.setAttribute('font-family', nameFontStack);
@@ -1406,21 +1410,28 @@ function renderJersey(svgEl, config){
   ['num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
     const el=q(id); if(el) el.textContent=number;
   });
+  // numberColor -> the number's solid fill layer (was hardcoded white, washed out on light jerseys)
+  const numFill=q('num-fill'); if(numFill) numFill.setAttribute('fill', numberColor);
   // numberFont -> font-family on the number text elements
   ['num-trim','num-gap','num-fill','num-stitch'].forEach(id=>{
     const el=q(id); if(el) el.setAttribute('font-family', numberFontStack);
   });
 
-  // pinstripes -> second fill layer over the body and both sleeves, skipped entirely if no pinstripeColor
+  // pinstripes -> second fill layer over the body and both sleeves, skipped entirely if no pinstripeColor.
+  // The pattern's stripe repeat is well under a screen pixel at trade-row thumbnail sizes (~34-42px
+  // wide for an 800-unit-wide jersey), so true alternating stripes are unresolvable there - fall back
+  // to a flat tint of pinstripeColor in compact contexts instead of the unresolvable pattern fill.
   const pinstripeRect=q('pinstripe-rect');
   if(pinstripeRect && pinstripeColor) pinstripeRect.setAttribute('fill', pinstripeColor);
   ['pinstripe-layer','pinstripe-layer-left','pinstripe-layer-right'].forEach(id=>{
     const layer=q(id); if(!layer) return;
-    layer.setAttribute('opacity', pinstripeColor?'1':'0');
+    if(!pinstripeColor){ layer.setAttribute('opacity','0'); return; }
+    if(compact) layer.setAttribute('fill', pinstripeColor);
+    layer.setAttribute('opacity', compact?'0.4':'1');
   });
 }
 
-const DEFAULT_JERSEY_CONFIG={baseColor:'#0f1e35', trimColor:'#ffffff', pinstripeColor:null, nameFont:'', numberFont:''};
+const DEFAULT_JERSEY_CONFIG={baseColor:'#0f1e35', trimColor:'#ffffff', nameColor:'#ffffff', numberColor:'#ffffff', pinstripeColor:null, nameFont:'', numberFont:''};
 
 // Pulls per-team look from the DARK MODE JERSEYS sheet tab (jerseyStylesDark) - falls back
 // to a dark navy/white default when the team has no row yet or its data is malformed.
@@ -1433,6 +1444,8 @@ function getJerseyTeamConfig(team){
       :isValidCssColor(st.nameBorderColor)?st.nameBorderColor
       :isValidCssColor(st.numberBorderColorOuter)?st.numberBorderColorOuter
       :DEFAULT_JERSEY_CONFIG.trimColor,
+    nameColor: isValidCssColor(st.nameColor)?st.nameColor:DEFAULT_JERSEY_CONFIG.nameColor,
+    numberColor: isValidCssColor(st.numberColor)?st.numberColor:DEFAULT_JERSEY_CONFIG.numberColor,
     pinstripeColor: isValidCssColor(st.pinstripeColor)?st.pinstripeColor:null,
     nameFont: st.nameFont||DEFAULT_JERSEY_CONFIG.nameFont,
     numberFont: st.numberFont||DEFAULT_JERSEY_CONFIG.numberFont
@@ -1459,7 +1472,7 @@ let jerseyCardUidCounter=0;
 
 // JerseyCard equivalent: mounts the inline SVG template into containerEl and renders it for
 // this player/team. Call again on prop change (eg. a different player selected) to re-render.
-function mountJerseyCard(containerEl, player){
+function mountJerseyCard(containerEl, player, compact){
   if(!containerEl || !player) return;
   const uid='jc'+(jerseyCardUidCounter++);
   containerEl.innerHTML=jerseyCardMarkup(uid);
@@ -1468,7 +1481,7 @@ function mountJerseyCard(containerEl, player){
     name: jerseyNameText(player.name),
     number: player.jerseyNumRaw||'--'
   });
-  renderJersey(svgEl, config);
+  renderJersey(svgEl, config, compact);
   return svgEl;
 }
 
@@ -3104,7 +3117,7 @@ function renderList(side){
     </div>`;
   }).join('');
   const jerseyEls=el.querySelectorAll('.player-row-jersey');
-  jerseyPlayers.forEach((p,i)=>{ if(jerseyEls[i]) mountJerseyCard(jerseyEls[i], p); });
+  jerseyPlayers.forEach((p,i)=>{ if(jerseyEls[i]) mountJerseyCard(jerseyEls[i], p, true); });
 }
 function sumF(list,f){return list.reduce((s,p)=>s+(p[f]!==null&&!isNaN(p[f])?p[f]:0),0);}
 
