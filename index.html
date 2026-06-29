@@ -33,10 +33,10 @@
   --text-primary: #161B23;
   --text-secondary: #4A535F;
   --text-muted: #8A929C;
-  --accent: #3F6DA8;
-  --accent-soft: rgba(63,109,168,0.10);
-  --bar2: #B07A2E;
-  --bar2-soft: rgba(176,122,46,0.12);
+  --accent: #15325E;
+  --accent-soft: rgba(21,50,94,0.10);
+  --bar2: #DE122E;
+  --bar2-soft: rgba(222,18,46,0.12);
   --org-dot: #5C8A66;
   --red-dark: #b54a3c;
   --red-light: #c97a6c;
@@ -65,8 +65,8 @@ body.dark-mode {
   --text-muted: #69727E;
   --accent: #6E9BD8;
   --accent-soft: rgba(110,155,216,0.14);
-  --bar2: #C9A05B;
-  --bar2-soft: rgba(201,160,91,0.14);
+  --bar2: #E0596F;
+  --bar2-soft: rgba(224,89,111,0.16);
   --org-dot: #7FA88C;
   --red-dark: #d98a78;
   --red-light: #c97a6c;
@@ -197,7 +197,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 /* STATUS DOTS */
 .sdot{width:6px;height:6px;border-radius:50%;display:inline-block;flex-shrink:0;margin-right:4px;vertical-align:middle}
 .dot-mlb{background:var(--accent)}
-.dot-top100{background:var(--bar2)}
+.dot-top100{background:var(--neg)}
 .dot-org{background:var(--org-dot)}
 .dot-minors{background:var(--text-muted)}
 
@@ -2517,11 +2517,10 @@ function finderBuildBarsHtml(giveList, getList){
     const pctA=(vA/tot)*100,pctB=100-pctA;
     const aWins=pctA<=pctB;
     const winPct=Math.round(aWins?pctB:pctA);
-    const {win,lose}=barColors(winPct);
     return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
-      <div class="share-bar-l" style="width:${pctA}%;background:${aWins?win:lose}"></div>
-      <div class="share-bar-r" style="width:${pctB}%;background:${aWins?lose:win}"></div>
-      <div class="share-bar-bubble" style="left:${pctA}%;background:${win}">${winPct}%</div>
+      <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
+      <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
+      <div class="share-bar-bubble" style="left:${pctA}%;background:${aWins?'var(--accent)':'var(--bar2)'}">${winPct}%</div>
     </div></div>`;
   }).join('');
 }
@@ -3104,7 +3103,11 @@ function isValidCssColor(c){
   opt.style.color=c;
   return opt.style.color!=='';
 }
+let jerseyUidCounter=0;
 function buildJerseyMarkup(p){
+  // unique id suffix per call - multiple jersey thumbnails can be on screen at once (trade rows),
+  // and SVG id references resolve document-wide, so reused ids would leak one player's colors into another's.
+  const uid='jy'+(jerseyUidCounter++);
   const isDark=document.body.classList.contains('dark-mode');
   const st=(isDark?jerseyStylesDark:jerseyStylesLight)[p.team]||{};
   // sheet values can come through corrupted (eg. Google Sheets silently converts an
@@ -3133,30 +3136,40 @@ function buildJerseyMarkup(p){
     <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="none" stroke="${esc(numberBorderInner||numberBorderOuter)}" stroke-width="3">${esc(mainText)}</text>
     <text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}">${esc(mainText)}</text>`
     : `<text x="100" y="160" text-anchor="middle" ${numberFontAttrs} fill="${esc(numberColor)}" ${numberBorderInner?`stroke="${esc(numberBorderInner)}" stroke-width="2.5" paint-order="stroke"`:''}>${esc(mainText)}</text>`;
-  const pinstripeFill=pinstripe?`<rect x="-6" y="-6" width="212" height="244" fill="url(#pmJerseyPins)"/>`:'';
+  const pinstripeFill=pinstripe?`<rect x="-6" y="-6" width="212" height="244" fill="url(#${uid}Pins)"/>`:'';
   // subtle mesh-screen dot weave + gentle cloth waviness, so the fill reads as fabric rather than flat color.
   const meshDot=isDark?'rgba(255,255,255,.12)':'rgba(0,0,0,.14)';
+  // jersey silhouette: raglan sleeve cutouts at the shoulders + a curved crew-neck collar notch,
+  // rather than a plain rectangle - this is what makes the thumbnail read as a jersey, not a swatch.
+  const jerseyClipPath='M 70 4 C 80 20 120 20 130 4 L 156 0 L 198 46 L 170 70 L 158 32 L 158 232 L 42 232 L 42 32 L 30 70 L 2 46 L 44 0 Z';
+  const collarTrimColor=nameBorder||numberBorderOuter||(isDark?'rgba(255,255,255,.35)':'rgba(0,0,0,.25)');
   return `<svg viewBox="0 0 200 232" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <pattern id="pmJerseyPins" patternUnits="userSpaceOnUse" width="7" height="7">
+      <clipPath id="${uid}Clip">
+        <path d="${jerseyClipPath}"/>
+      </clipPath>
+      <pattern id="${uid}Pins" patternUnits="userSpaceOnUse" width="7" height="7">
         <line x1="0" y1="0" x2="0" y2="7" stroke="${esc(pinstripe)}" stroke-width="1"/>
       </pattern>
-      <pattern id="pmJerseyMesh" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
+      <pattern id="${uid}Mesh" patternUnits="userSpaceOnUse" width="4" height="4" patternTransform="rotate(45)">
         <circle cx="1" cy="1" r="0.75" fill="${meshDot}"/>
       </pattern>
-      <filter id="pmJerseyFabric" x="-15%" y="-15%" width="130%" height="130%">
+      <filter id="${uid}Fabric" x="-15%" y="-15%" width="130%" height="130%">
         <feTurbulence type="fractalNoise" baseFrequency="0.02 0.06" numOctaves="2" seed="7" result="pmNoise"/>
         <feDisplacementMap in="SourceGraphic" in2="pmNoise" scale="8" xChannelSelector="R" yChannelSelector="G"/>
       </filter>
     </defs>
-    <g filter="url(#pmJerseyFabric)">
-      <rect x="-6" y="-6" width="212" height="244" fill="${esc(baseColor)}"/>
-      ${pinstripeFill}
+    <g clip-path="url(#${uid}Clip)">
+      <g filter="url(#${uid}Fabric)">
+        <rect x="-6" y="-6" width="212" height="244" fill="${esc(baseColor)}"/>
+        ${pinstripeFill}
+      </g>
+      <rect width="200" height="232" fill="url(#${uid}Mesh)"/>
+      <path id="${uid}NameArc" d="${nameArcPath}" fill="none"/>
+      <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#${uid}NameArc" xlink:href="#${uid}NameArc" startOffset="50%">${esc(nameText)}</textPath></text>
+      ${numberMarkup}
     </g>
-    <rect width="200" height="232" fill="url(#pmJerseyMesh)"/>
-    <path id="pmJerseyNameArc" d="${nameArcPath}" fill="none"/>
-    <text text-anchor="middle" font-family="'${esc(nameFont)}',sans-serif" font-size="${jerseyFitSize(nameText,46)}" fill="${esc(nameColor)}" ${nameStroke}><textPath href="#pmJerseyNameArc" xlink:href="#pmJerseyNameArc" startOffset="50%">${esc(nameText)}</textPath></text>
-    ${numberMarkup}
+    <path d="${jerseyClipPath}" fill="none" stroke="${esc(collarTrimColor)}" stroke-width="2"/>
   </svg>`;
 }
 function showPM(name,team,pos){
@@ -3260,12 +3273,11 @@ function openShareModal(){
       // aWins = A gives up less = A receives relatively more value than what it gave = A's side highlighted
       const aWins=pctA<=pctB;
       const winPct=Math.round(aWins?pctB:pctA);
-      const {win,lose}=barColors(winPct);
       const bubblePos=pctA;
       return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
-        <div class="share-bar-l" style="width:${pctA}%;background:${aWins?win:lose}"></div>
-        <div class="share-bar-r" style="width:${pctB}%;background:${aWins?lose:win}"></div>
-        <div class="share-bar-bubble" style="left:${bubblePos}%;background:${win}">${winPct}%</div>
+        <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
+        <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
+        <div class="share-bar-bubble" style="left:${bubblePos}%;background:${aWins?'var(--accent)':'var(--bar2)'}">${winPct}%</div>
       </div></div>`;
     }).join('');
   } else {
