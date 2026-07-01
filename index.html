@@ -319,7 +319,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .share-bar-track{position:relative;height:7px;background:var(--bg-light);border-radius:4px;overflow:visible}
 .share-bar-l{position:absolute;left:0;top:0;bottom:0;border-radius:4px 0 0 4px}
 .share-bar-r{position:absolute;right:0;top:0;bottom:0;border-radius:0 4px 4px 0}
-.share-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;color:#fff;border:2px solid var(--bg-mid);z-index:2}
+.share-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;border:2px solid var(--bg-mid);z-index:2}
 .share-footer{text-align:center;font-size:10px;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:9px}
 /* SCORE MODAL */
 .score-desc{font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:13px}
@@ -3434,7 +3434,7 @@ function finderBuildBarsHtml(giveList, getList){
     return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
       <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
       <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
-      <div class="share-bar-bubble" style="left:${pctA}%;background:${aWins?'var(--accent)':'var(--bar2)'}">${winPct}%</div>
+      <div class="share-bar-bubble" style="left:${pctA}%;background:${aWins?'var(--accent)':'var(--bar2)'};color:${aWins?'#fff':'var(--accent)'}">${winPct}%</div>
     </div></div>`;
   }).join('');
 }
@@ -3832,7 +3832,7 @@ function updateBar(valA, valB, flId, frId, bubId, lScoreId, rScoreId) {
   fr.style.width=pctB+'%';
   // Bubble sits at the split, colored by whichever side is winning
   bub.style.left=pctA+'%'; bub.style.marginLeft=-bSize+'px';
-  bub.textContent=winPct+'%'; bub.style.background=aWins?'var(--accent)':'var(--bar2)';
+  bub.textContent=winPct+'%'; bub.style.background=aWins?'var(--accent)':'var(--bar2)'; bub.style.color=aWins?'#fff':'var(--accent)';
   // Side scores
   lScore.textContent=valA.toFixed(2); lScore.style.color='var(--accent)';
   rScore.textContent=valB.toFixed(2); rScore.style.color='var(--bar2)';
@@ -4103,7 +4103,7 @@ function openShareModal(){
       return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
         <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
         <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
-        <div class="share-bar-bubble" style="left:${bubblePos}%;background:${aWins?'var(--accent)':'var(--bar2)'}">${winPct}%</div>
+        <div class="share-bar-bubble" style="left:${bubblePos}%;background:${aWins?'var(--accent)':'var(--bar2)'};color:${aWins?'#fff':'var(--accent)'}">${winPct}%</div>
       </div></div>`;
     }).join('');
   } else {
