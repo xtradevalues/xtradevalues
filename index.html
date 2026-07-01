@@ -957,7 +957,7 @@ const MLB_JERSEY_CONFIG = {
   ATL:{baseColor:"#CE1141",pinstripeColor:null,numberColor:"#002D62",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#FFFFFF",nameFont:"VarsityTeam-Bold",numberFont:"MLBBLOCK"},
   PHI:{baseColor:"#E81828",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#002D72",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#002D72",nameFont:"MLBPHILL",numberFont:"MLBPHILL"},
   WSH:{baseColor:"#AB0003",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#002D62",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#002D62",nameFont:"MLBNRB__",numberFont:"MLBNRB__"},
-  MIA:{baseColor:"#27251F",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#00A3E0",numberOuterBorderColor:"#EF3340",nameColor:"#FFFFFF",nameBorderColor:"#00A3E0",nameFont:"Mlbdia07",numberFont:"MLBBLOCK"},
+  MIA:{baseColor:"#27251F",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#00A3E0",numberOuterBorderColor:"#EF3340",nameColor:"#FFFFFF",nameBorderColor:"#00A3E0",nameFont:"Mlbdia07",numberFont:"Mlbdia07"},
   NYM:{baseColor:"#002D72",pinstripeColor:null,numberColor:"#002D72",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:"#DF4601",nameColor:"#002D72",nameBorderColor:"#DF4601",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   MIL:{baseColor:"#12284B",pinstripeColor:null,numberColor:"#FFC52F",numberInnerBorderColor:"#12284B",numberOuterBorderColor:"#12284B",nameColor:"#FFC52F",nameBorderColor:"#12284B",nameFont:"VarsityTeam-Bold",numberFont:"VarsityTeam-Bold"},
   STL:{baseColor:"#C41E3A",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#12284B",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#12284B",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
@@ -1637,8 +1637,7 @@ async function ppRenderStats(){
     }
     return;
   }
-  // MLB view
-  if(isMinorLeaguer){section.innerHTML='<div class="pp-no-data">No MLB data available</div>';return;}
+  // MLB view — minor leaguers may still have MLB stats (call-ups, spring stats); always attempt lookup
   // Load per-season stats
   const seasonTabs=isPitcher?['MLB Pitchers 2023','MLB Pitchers 2024','MLB Pitchers 2025','MLB Pitchers 2026']:['MLB Hitters 2023','MLB Hitters 2024','MLB Hitters 2025','MLB Hitters 2026'];
   const careerTab=isPitcher?'Career Pitching Stats':'Career Hitting Stats';
@@ -1853,8 +1852,8 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path id="right-cuff-outer" d="M 730 370 L 645 330" stroke="#0a0d14" stroke-width="6" fill="none" opacity="0.95"/>
     <path id="right-cuff-inner" d="M 733 365 L 648 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
     <!-- armpit/shoulder fills: bridge gap between sleeve inner edge and body edge, tinted base color -->
-    <path id="left-armpit" d="M 260 140 L 200 200 C 192 215 190 225 190 230 L 210 230 C 212 218 218 205 260 140 Z" fill="#1c2434"/>
-    <path id="right-armpit" d="M 540 140 C 582 205 588 218 590 230 L 610 230 C 610 225 608 215 600 200 Z" fill="#1c2434"/>
+    <path id="left-armpit" d="M 260 140 L 195 210 C 190 222 189 235 190 250 L 210 252 C 211 236 214 222 260 140 Z" fill="#1c2434"/>
+    <path id="right-armpit" d="M 540 140 L 586 210 C 591 222 592 235 610 250 L 610 252 C 611 236 610 222 540 140 Z" fill="#1c2434"/>
     <path id="jersey-body" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#jerseyBodyGrad)"/>
     <path id="pinstripe-layer" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#pinstripes)" opacity="0"/>
     <!-- shoulder seam stitching: colored to match jersey, no dark stripes -->
