@@ -366,17 +366,18 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .player-page-inner{max-width:680px;margin:0 auto;width:100%;padding:0 0 40px}
 .player-back-btn{display:flex;align-items:center;gap:7px;padding:14px 16px;color:var(--text-muted);font-size:12px;cursor:pointer;transition:color 0.15s;border:none;background:none;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
 .player-back-btn:hover{color:var(--accent)}
-.player-page-header{padding:16px;display:flex;gap:16px;align-items:flex-start;border-bottom:1px solid var(--border-light)}
+.player-page-header{padding:16px;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--border-light)}
+.player-page-body-row{display:flex;gap:16px;align-items:flex-start}
 .player-page-jersey{width:72px;height:84px;flex-shrink:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,0.55))}
 .player-page-info{flex:1;min-width:0}
-.player-page-values{display:flex;gap:8px;flex-shrink:0}
+.player-page-values{display:flex;gap:8px;flex-shrink:0;margin-left:auto}
 .pp-value-box{border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;text-align:center;min-width:64px}
 .pp-value-box .pp-value-val{font-size:17px;font-weight:600;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .pp-value-box .pp-value-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-top:3px}
-.player-page-name{font-size:22px;font-weight:500;color:var(--text-primary);letter-spacing:-0.01em;font-family:'Space Grotesk','Inter',sans-serif;line-height:1.2;overflow-wrap:break-word}
+.player-page-name{font-size:22px;font-weight:500;color:var(--text-primary);letter-spacing:-0.01em;font-family:'Space Grotesk','Inter',sans-serif;line-height:1.2}
 .player-page-name.long{font-size:17px}
 .player-page-name.vlong{font-size:14px}
-.player-page-meta{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
+.player-page-meta{font-size:12px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap}
 .player-page-badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
 .player-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:0.02em}
 .player-badge-prospect{background:var(--neg-soft);color:var(--neg);border:1px solid rgba(201,160,91,0.3)}
@@ -783,7 +784,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       <select id="playersLevel" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
         <option value="">All Levels</option>
-        <option value="mlb">MLB</option>
+        <option value="mlb" selected>MLB</option>
         <option value="prospects">Prospects</option>
         <option value="aaa">AAA</option>
         <option value="aa">AA</option>
@@ -810,7 +811,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <div class="players-table-wrap" id="playersTableWrap" style="overflow-y:auto">
     <table class="players-table" id="playersTable">
       <thead id="playersTableHead"></thead>
-      <tbody id="playersBody"><tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      <tbody id="playersBody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -825,7 +826,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <div class="players-table-wrap" id="prospectsTableWrap" style="overflow-y:auto">
     <table class="players-table" id="prospectsTable">
       <thead id="prospectsTableHead"></thead>
-      <tbody id="prospectsBody"><tr><td colspan="14" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      <tbody id="prospectsBody"><tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -843,15 +844,17 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <div class="player-page-inner">
       <button class="player-back-btn" onclick="playerPageGoBack()">‹ Back</button>
       <div class="player-page-header">
-        <div class="player-page-jersey" id="ppJersey"></div>
-        <div class="player-page-info">
-          <div class="player-page-name" id="ppName">—</div>
-          <div class="player-page-meta" id="ppMeta">—</div>
-          <div class="player-page-badges" id="ppBadges"></div>
-        </div>
-        <div class="player-page-values">
-          <div class="pp-value-box"><div class="pp-value-val" id="ppVal2026">—</div><div class="pp-value-lbl">2026 Value</div></div>
-          <div class="pp-value-box"><div class="pp-value-val" id="ppValAvg">—</div><div class="pp-value-lbl">Avg Value</div></div>
+        <div class="player-page-name" id="ppName">—</div>
+        <div class="player-page-body-row">
+          <div class="player-page-jersey" id="ppJersey"></div>
+          <div class="player-page-info">
+            <div class="player-page-meta" id="ppMeta">—</div>
+            <div class="player-page-badges" id="ppBadges"></div>
+          </div>
+          <div class="player-page-values">
+            <div class="pp-value-box"><div class="pp-value-val" id="ppVal2026">—</div><div class="pp-value-lbl">2026 Value</div></div>
+            <div class="pp-value-box"><div class="pp-value-val" id="ppValAvg">—</div><div class="pp-value-lbl">Avg Value</div></div>
+          </div>
         </div>
       </div>
       <div class="player-page-toggle-wrap" id="ppToggleWrap">
@@ -1102,8 +1105,10 @@ function showPage(p) {
       closeDrop(s);
     });
   }
-  if(p==='roster' && _leavingPage!=='standings'){
-    // Reset roster team and content when entering roster from anywhere but standings
+  if(p==='roster' && _leavingPage!=='standings' && _leavingPage!=='player'){
+    // Reset roster team and content when entering roster from anywhere but standings —
+    // but not when coming back from a player detail page opened from the roster, so
+    // backing out of a player page keeps the roster on the same team.
     const rt=document.getElementById('rosterTeam'); if(rt) rt.value='';
     const rc=document.getElementById('rosterContent'); if(rc) rc.innerHTML='<div class="roster-placeholder">Select a team to view their roster</div>';
     const bb=document.getElementById('rosterBackBar'); if(bb) bb.style.display='none';
@@ -1119,18 +1124,18 @@ function showPage(p) {
   if(p==='players'){
     if(allPlayers.length){ renderPlayers(); }
     else {
-      document.getElementById('playersBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
+      document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
       ensureDataLoaded().then(()=>renderPlayers()).catch(e=>{
-        document.getElementById('playersBody').innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--red-dark)">'+esc(e.message)+'</td></tr>';
+        document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--red-dark)">'+esc(e.message)+'</td></tr>';
       });
     }
   }
   if(p==='prospects'){
     if(allPlayers.length){ renderProspects(); }
     else {
-      document.getElementById('prospectsBody').innerHTML='<tr><td colspan="14" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
+      document.getElementById('prospectsBody').innerHTML='<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
       ensureDataLoaded().then(()=>renderProspects()).catch(e=>{
-        document.getElementById('prospectsBody').innerHTML='<tr><td colspan="14" style="text-align:center;padding:30px;color:var(--red-dark)">'+esc(e.message)+'</td></tr>';
+        document.getElementById('prospectsBody').innerHTML='<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--red-dark)">'+esc(e.message)+'</td></tr>';
       });
     }
   }
@@ -1190,6 +1195,9 @@ function getPlayerDetailLevel(p){
 }
 function matchesPos(p, pos) {
   if(!pos) return true;
+  // Ohtani is a two-way player (pos:"TWP") — treat him as matching both the pitcher (SP)
+  // and hitter (DH) position filters instead of neither.
+  if(p.name==='Shohei Ohtani' && (pos==='SP'||pos==='DH')) return true;
   const v=(p.pos||'').toUpperCase();
   if(pos==='OF') return ['OF','LF','CF','RF'].includes(v);
   if(pos==='DH') return ['DH','UT','INF','IF'].includes(v)||v==='';
@@ -1243,7 +1251,7 @@ async function loadData() {
         if (!playerID || playerID === '0' || playerID === 'NaN') continue;
 
         const pos = String(row['Position'] || '').trim();
-        const age = parseFloat(row['Age']) || null;
+        const age = numOrNull(row['Age']);
         // col F: Jersey number
         const jerseyNumRaw = row['Jersey #'] != null ? String(row['Jersey #']).trim() : '--';
         // col G: Status — purely injury/roster status ("Active", "60-Day IL", "7-Day IL", "RM", etc.)
@@ -1256,15 +1264,15 @@ async function loadData() {
         const val2026 = val2026raw != null ? parseFloat(val2026raw) : null;
         if (val2026 === null || isNaN(val2026)) continue;
 
-        const val2027 = parseFloat(row['2027 Value']) || null;
-        const val2028 = parseFloat(row['2028 Value']) || null;
-        const val2029 = parseFloat(row['2029 Value']) || null;
-        const val2030 = parseFloat(row['2030 Value']) || null;
-        const val2031 = parseFloat(row['2031 Value']) || null;
+        const val2027 = numOrNull(row['2027 Value']);
+        const val2028 = numOrNull(row['2028 Value']);
+        const val2029 = numOrNull(row['2029 Value']);
+        const val2030 = numOrNull(row['2030 Value']);
+        const val2031 = numOrNull(row['2031 Value']);
         const ctrlYears = [val2026,val2027,val2028,val2029,val2030,val2031].filter(v=>v!=null&&!isNaN(v)&&v>0).length;
 
-        const avgVal = parseFloat(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']) || null;
-        const valueScore = parseFloat(row['Value Score']) || null;
+        const avgVal = numOrNull(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']);
+        const valueScore = numOrNull(row['Value Score']);
         // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
         const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
         const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
@@ -1299,6 +1307,7 @@ async function loadData() {
           hr: null, k: null, vWAR: null,
           ip: null, whip: null, pa: null, h: null, avg26: null,
           rbi: null, w: null, l: null,
+          vWARHit: null, vWARPitch: null,
           fgUrl: null,
         };
 
@@ -1326,15 +1335,15 @@ async function loadData() {
         if (!p) continue;
         const ab = parseFloat(row['AB']) || 0;
         const h = parseFloat(row['H']);
-        p.pa  = parseFloat(row['PA']) || null;
+        p.pa  = numOrNull(row['PA']);
         p.h   = isNaN(h) ? null : h;
-        p.hr  = parseFloat(row['HR']) || null;
-        p.rbi = parseFloat(row['RBI']) || null;
-        p.obp = parseFloat(row['OBP']) || null;
-        p.slg = parseFloat(row['SLG']) || null;
+        p.hr  = numOrNull(row['HR']);
+        p.rbi = numOrNull(colVal(row,'RBI',10));
+        p.obp = numOrNull(row['OBP']);
+        p.slg = numOrNull(row['SLG']);
         p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
         const vw = parseFloat(row['vWAR']);
-        if (!isNaN(vw)) p.vWAR = vw;
+        if (!isNaN(vw)) { p.vWAR = vw; p.vWARHit = vw; }
       }
     }
 
@@ -1343,16 +1352,16 @@ async function loadData() {
         const id = row['mlbam_id'] != null ? String(Math.round(Number(row['mlbam_id']))) : null;
         const p = id ? playerIndex[id] : null;
         if (!p) continue;
-        p.era  = parseFloat(row['ERA']) || null;
-        p.k    = parseFloat(row['K']) || null;
-        p.ip   = parseFloat(row['IP']) ? parseFloat(row['IP']) : null;
-        p.whip = parseFloat(row['WHIP']) || null;
-        p.k9   = parseFloat(row['K9']) || null;
-        p.fip  = parseFloat(row['xERA']) || null;
-        p.w    = parseFloat(row['W']) || null;
-        p.l    = parseFloat(row['L']) || null;
+        p.era  = numOrNull(row['ERA']);
+        p.k    = numOrNull(row['K']);
+        p.ip   = numOrNull(row['IP']);
+        p.whip = numOrNull(row['WHIP']);
+        p.k9   = numOrNull(row['K9']);
+        p.fip  = calcFIP(row['IP'], row['HR'], row['BB'], row['HBP'], row['K']);
+        p.w    = numOrNull(colVal(row,'W',4));
+        p.l    = numOrNull(colVal(row,'L',5));
         const vw = parseFloat(row['vWAR']);
-        if (!isNaN(vw)) p.vWAR = vw;
+        if (!isNaN(vw)) { p.vWAR = vw; p.vWARPitch = vw; }
       }
     }
 
@@ -1410,6 +1419,37 @@ async function loadStandings(){
 }
 
 // ===== SEASON & CAREER STAT LOADING =====
+// parseFloat(x)||null is wrong for legitimate zero stats (0 HR, 0 RBI, ...) since 0||null
+// evaluates to null — use this instead so a real 0 is preserved and only genuinely missing
+// non-numeric values become null (and format as "-" instead of "0").
+function numOrNull(v){
+  const n=parseFloat(v);
+  return isNaN(n)?null:n;
+}
+// Some sheet tabs use inconsistent header text for the same logical column (or the header
+// lookup collides), so prefer the named header but fall back to the column-letter index
+// (fetchSheetTab's '_N' fallback) when the named value is missing.
+function colVal(r,name,idx){
+  const v=r[name];
+  return (v!=null&&v!=='')?v:r['_'+idx];
+}
+// Org Rank / MLB Top 100 Rank cells are formatted like "ATH 1" or "MLB 35" (team/league
+// prefix + rank), matching the same convention as the team roster sheet's Org/MLB Rank
+// columns — pull the trailing number out rather than parsing the whole string.
+function extractRank(v){
+  if(v==null||v==='') return NaN;
+  const m=String(v).match(/(\d+(?:\.\d+)?)/);
+  return m?parseFloat(m[1]):NaN;
+}
+// FIP for MLB pitchers, matching the sheet's own formula exactly:
+// =ARRAYFORMULA(IF(A2:A="","",IF(J2:J=0,"",ROUND(((13*N2:N+3*(O2:O+P2:P)-2*Q2:Q)/J2:J)+3.10,2))))
+// J=IP, N=HR, O=BB, P=HBP, Q=K
+function calcFIP(ip,hr,bb,hbp,k){
+  const ipN=parseFloat(ip);
+  if(!ipN||isNaN(ipN)) return null;
+  const hrN=parseFloat(hr)||0, bbN=parseFloat(bb)||0, hbpN=parseFloat(hbp)||0, kN=parseFloat(k)||0;
+  return Math.round((((13*hrN+3*(bbN+hbpN)-2*kN)/ipN)+3.10)*100)/100;
+}
 async function fetchSheetTab(tabName){
   if(seasonStatsCache[tabName]) return seasonStatsCache[tabName];
   try {
@@ -1563,7 +1603,7 @@ function renderStandingsPage(){
 }
 
 // ===== PLAYERS PAGE (replaces Rankings) =====
-let playersSortCol='val2026', playersSortDir=1, playersViewHitters=true;
+let playersSortCol='vWAR', playersSortDir=1, playersViewHitters=true;
 function playersFilterChanged(){renderPlayers();}
 function renderPlayers(){
   const levelF=document.getElementById('playersLevel').value;
@@ -1574,21 +1614,31 @@ function renderPlayers(){
   let pl=[...allPlayers];
   // Level filter
   if(levelF) pl=pl.filter(x=>matchesGroup(x,levelF));
-  // Position filter
+  // Position filter — Ohtani (pos:"TWP") belongs on both the Hitters and Pitchers views
   if(posF==='hitter') pl=pl.filter(x=>!['SP','RP'].includes(finderFirstPos(x.pos)));
-  else if(posF==='pitcher') pl=pl.filter(x=>['SP','RP'].includes(finderFirstPos(x.pos)));
+  else if(posF==='pitcher') pl=pl.filter(x=>['SP','RP'].includes(finderFirstPos(x.pos))||x.name==='Shohei Ohtani');
   else if(posF) pl=pl.filter(x=>matchesPos(x,posF));
-  // Sort
-  pl.sort((a,b)=>playersSortDir*((b[playersSortCol]||0)-(a[playersSortCol]||0)));
   // Build header columns based on type
   const isHitter=playersViewHitters||(!posF);
+  // Ohtani's displayed/sorted vWAR depends on context: combined on the unfiltered "All Pos"
+  // view, split to just his hitting or pitching side once a Hitters/Pitchers view is chosen.
+  const effVWAR=p=>{
+    if(p.name!=='Shohei Ohtani') return p.vWAR;
+    if(!posF) return (p.vWARHit||0)+(p.vWARPitch||0);
+    return isHitter?p.vWARHit:p.vWARPitch;
+  };
+  // Sort
+  pl.sort((a,b)=>{
+    const av=playersSortCol==='vWAR'?effVWAR(a):a[playersSortCol];
+    const bv=playersSortCol==='vWAR'?effVWAR(b):b[playersSortCol];
+    return playersSortDir*((bv||0)-(av||0));
+  });
   // For Players tab we show 2026 stat line from allPlayers (PLAYERS tab stats)
   // Hitters: PA, H, HR, AVG, OBP, SLG, vWAR + 2026 Val + Avg Val
   // Pitchers: IP, K, ERA, FIP, WHIP, K9, vWAR + 2026 Val + Avg Val
-  const hCols=['Player','Pos','PA','H','HR','AVG','OBP','SLG','vWAR','2026','Avg'];
-  const pCols=['Player','Pos','IP','K','ERA','FIP','WHIP','K/9','vWAR','2026','Avg'];
+  const hCols=['#','Player','Pos','PA','H','HR','AVG','OBP','SLG','vWAR','2026','Avg'];
+  const pCols=['#','Player','Pos','IP','K','ERA','FIP','WHIP','K/9','vWAR','2026','Avg'];
   const cols=isHitter?hCols:pCols;
-  const sortable=['2026','Avg','vWAR','HR','ERA','K','IP','OBP','SLG','AVG'];
   const thSort={};thSort['2026']='val2026';thSort['Avg']='avgVal';thSort['vWAR']='vWAR';
   thSort['HR']='hr';thSort['ERA']='era';thSort['K']='k';thSort['IP']='ip';
   thSort['OBP']='obp';thSort['SLG']='slg';thSort['AVG']='avg26';
@@ -1604,14 +1654,15 @@ function renderPlayers(){
   const fmt3=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(3).replace(/^0\./,'.'):'-';
   const fmtI=v=>v!==null&&!isNaN(v)?Math.round(v):'-';
   const fmtF=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'-';
-  const body=pl.slice(0,500).map(p=>{
-    const dc=dotClass(p.status);
+  const body=pl.slice(0,500).map((p,idx)=>{
     const inj=playerHasInjury(p)?'<span style="color:#D72229">✚</span>':'';
     const teamB=`<span class="team-pill">${p.team}</span>`;
+    const vWARDisp=fmtF(effVWAR(p));
     let cells;
     if(isHitter){
       cells=[
-        `<td style="text-align:left"><span class="sdot ${dc}"></span>${esc(p.name)}${inj}${teamB}</td>`,
+        `<td>${idx+1}</td>`,
+        `<td style="text-align:left">${esc(p.name)}${inj}${teamB}</td>`,
         `<td>${esc(p.pos||'—')}</td>`,
         `<td>${fmtI(p.pa)}</td>`,
         `<td>${fmtI(p.h)}</td>`,
@@ -1619,13 +1670,14 @@ function renderPlayers(){
         `<td>${fmt3(p.avg26)}</td>`,
         `<td>${fmt3(p.obp)}</td>`,
         `<td>${fmt3(p.slg)}</td>`,
-        `<td>${fmtF(p.vWAR)}</td>`,
+        `<td>${vWARDisp}</td>`,
         `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
         `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
       ];
     } else {
       cells=[
-        `<td style="text-align:left"><span class="sdot ${dc}"></span>${esc(p.name)}${inj}${teamB}</td>`,
+        `<td>${idx+1}</td>`,
+        `<td style="text-align:left">${esc(p.name)}${inj}${teamB}</td>`,
         `<td>${esc(p.pos||'—')}</td>`,
         `<td>${fmtF(p.ip)}</td>`,
         `<td>${fmtI(p.k)}</td>`,
@@ -1633,14 +1685,14 @@ function renderPlayers(){
         `<td>${fmt2(p.fip)}</td>`,
         `<td>${fmt2(p.whip)}</td>`,
         `<td>${fmtF(p.k9)}</td>`,
-        `<td>${fmtF(p.vWAR)}</td>`,
+        `<td>${vWARDisp}</td>`,
         `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
         `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
       ];
     }
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
-  document.getElementById('playersBody').innerHTML=body||'<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-muted)">No players found</td></tr>';
+  document.getElementById('playersBody').innerHTML=body||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">No players found</td></tr>';
 }
 function playersSetSort(col,el){
   if(playersSortCol===col) playersSortDir*=-1; else{playersSortCol=col;playersSortDir=1;}
@@ -1652,35 +1704,35 @@ async function renderProspects(){
   const tbody=document.getElementById('prospectsBody');
   const scope=document.getElementById('prospectsScope').value||'__top100';
   if(!pipelineRankingsLoaded){
-    tbody.innerHTML='<tr><td colspan="14" style="text-align:center;padding:30px;color:var(--text-muted)">Loading prospects…</td></tr>';
+    tbody.innerHTML='<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Loading prospects…</td></tr>';
     await loadPipelineRankings();
     if(document.getElementById('prospectsScope').value!==scope) return; // scope changed mid-load
   }
   const cols=['Age','ETA','Hit','Power','Speed','Fielding','Proj vWAR (Hit)','Fastball','Changeup','Slider','Curveball','Command','Proj vWAR (Pitch)'];
-  document.getElementById('prospectsTableHead').innerHTML='<tr><th style="text-align:left">Player</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.getElementById('prospectsTableHead').innerHTML='<tr><th>#</th><th style="text-align:left">Player</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
 
   // Column C (index 2) is the join key on 2026 Pipeline Rankings, not column A
   let list=allPlayers.map(p=>({p,row:pipelineRankings[p.playerID]})).filter(x=>x.row);
   if(scope==='__top100'){
-    list=list.filter(({row})=>row['_21']!=null&&row['_21']!==''&&!isNaN(parseFloat(row['_21'])));
-    list.sort((a,b)=>parseFloat(a.row['_21'])-parseFloat(b.row['_21']));
+    list=list.map(x=>({...x,rank:extractRank(colVal(x.row,'MLB Top 100 Rank',21))})).filter(x=>!isNaN(x.rank));
+    list.sort((a,b)=>a.rank-b.rank);
   } else {
-    list=list.filter(({p})=>p.team===scope);
+    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',20))}));
     list.sort((a,b)=>{
-      const av=parseFloat(a.row['_20']), bv=parseFloat(b.row['_20']);
-      if(isNaN(av)&&isNaN(bv)) return 0;
-      if(isNaN(av)) return 1;
-      if(isNaN(bv)) return -1;
-      return av-bv;
+      if(isNaN(a.rank)&&isNaN(b.rank)) return 0;
+      if(isNaN(a.rank)) return 1;
+      if(isNaN(b.rank)) return -1;
+      return a.rank-b.rank;
     });
   }
 
   const fmtI=v=>v!=null&&v!==''&&!isNaN(parseFloat(v))?Math.round(parseFloat(v)):'-';
   const fmtF=v=>v!=null&&v!==''&&!isNaN(parseFloat(v))?parseFloat(v).toFixed(1):'-';
   const fmtS=v=>v!=null&&v!==''?esc(String(v)):'-';
-  const body=list.map(({p,row})=>{
+  const body=list.map(({p,row,rank})=>{
     const cells=[
-      `<td style="text-align:left"><span class="sdot ${dotClass(p.status)}"></span>${esc(p.name)}<span class="team-pill">${esc(p.team)}</span></td>`,
+      `<td>${!isNaN(rank)?rank:'-'}</td>`,
+      `<td style="text-align:left">${esc(p.name)}<span class="team-pill">${esc(p.team)}</span></td>`,
       `<td>${fmtI(row['_7'])}</td>`,
       `<td>${fmtS(row['_6'])}</td>`,
       `<td>${fmtI(row['_8'])}</td>`,
@@ -1697,7 +1749,7 @@ async function renderProspects(){
     ];
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
-  tbody.innerHTML=body||'<tr><td colspan="14" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
+  tbody.innerHTML=body||'<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
 }
 
 // ===== PLAYER PAGE =====
@@ -1750,7 +1802,12 @@ function ppToggleHitPitch(){
   ppRenderStats();
 }
 function playerPageGoBack(){
-  showPage(_prevPage==='player'?'trade':_prevPage);
+  const target=_prevPage==='player'?'trade':_prevPage;
+  showPage(target);
+  if(_reopenFinderResultsOnBack && target==='finder'){
+    document.getElementById('finderResultsModal').classList.add('open');
+  }
+  _reopenFinderResultsOnBack=false;
 }
 // Shared MiLB row -> stat computation, used by both the full player page (Minors tab)
 // and the player popup, so both read the same pHitters/pPitchers fields the same way.
@@ -1766,16 +1823,17 @@ function computeMiLBHitterStats(r){
   const tb=singles+2*dbl+3*trpl+4*hr;
   const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
   return {
-    pa:parseFloat(r['plateAppearances'])||null, h:parseFloat(r['hits'])||null, hr:parseFloat(r['homeRuns'])||null,
-    rbi:parseFloat(r['rbi'])||null, avg, obp, slg, vWAR:parseFloat(r['vWAR'])||null
+    pa:numOrNull(r['plateAppearances']), h:numOrNull(r['hits']), hr:numOrNull(r['homeRuns']),
+    rbi:numOrNull(colVal(r,'rbi',25)), avg, obp, slg, vWAR:numOrNull(r['vWAR'])
   };
 }
 function computeMiLBPitcherStats(r){
   if(!r) return null;
+  // 26 pPitchers: W is column F (index 5), L is column G (index 6)
   return {
-    ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null, era:parseFloat(r['ERA'])||null,
-    fip:parseFloat(r['FIP'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-    w:parseFloat(r['W'])||null, l:parseFloat(r['L'])||null, vWAR:parseFloat(r['vWAR'])||null
+    ip:numOrNull(r['IP']), k:numOrNull(r['K']), era:numOrNull(r['ERA']),
+    fip:numOrNull(r['FIP']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+    w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
 }
 function ppAddToTrade(){
@@ -1847,27 +1905,22 @@ async function ppRenderStats(){
   const rCareer=findRow(careerRows);
   if(isPitcher){
     const rows=[];
+    // FIP is computed with the sheet's own formula (calcFIP), not read from a column.
     const pRow=(season,r)=>{
       if(!r) return null;
-      return {season, ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null,
-        era:parseFloat(r['ERA'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-        er:parseFloat(r['ER'])||null, hr:parseFloat(r['HR'])||null, bb:parseFloat(r['BB'])||null,
-        hbp:parseFloat(r['HBP'])||null, vWAR:parseFloat(r['vWAR'])||null,
-        fip:parseFloat(r['FIP'])||null,
-        w:parseFloat(r['W'])||null, l:parseFloat(r['L'])||null};
-    };
-    const pfip=row=>{
-      if(!row||!row.ip||row.ip<=0) return null;
-      if(row.fip!==null&&!isNaN(row.fip)) return row.fip;
-      return ((13*(row.hr||0)+3*((row.bb||0)+(row.hbp||0))-2*(row.k||0))/row.ip)+3.10;
+      return {season, ip:numOrNull(r['IP']), k:numOrNull(r['K']),
+        era:numOrNull(r['ERA']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+        vWAR:numOrNull(r['vWAR']),
+        fip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
+        w:numOrNull(colVal(r,'W',4)), l:numOrNull(colVal(r,'L',5))};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
-      const row=pRow(season,r); if(row){row.fip=pfip(row);rows.push(row);}
+      const row=pRow(season,r); if(row) rows.push(row);
     });
     // Career row is pre-blended server-side — read it directly, no frontend blending.
     if(rCareer){
       const cRow=pRow('Career',rCareer);
-      if(cRow){cRow.fip=pfip(cRow);cRow.isCareer=true;rows.push(cRow);}
+      if(cRow){cRow.isCareer=true;rows.push(cRow);}
     }
     section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No stats available</div>';
   } else {
@@ -1877,14 +1930,14 @@ async function ppRenderStats(){
       const h=parseFloat(r['H'])||0, ab=parseFloat(r['AB'])||0, hr=parseFloat(r['HR'])||0;
       const dbl=parseFloat(r['2B'])||0, trpl=parseFloat(r['3B'])||0;
       const bb=parseFloat(r['BB'])||0, hbp=parseFloat(r['HBP'])||0, sf=parseFloat(r['SF'])||0;
-      const pa=parseFloat(r['PA'])||null;
-      const rbi=parseFloat(r['RBI'])||null;
+      const pa=numOrNull(r['PA']);
+      const rbi=numOrNull(colVal(r,'RBI',10));
       const avg=ab>0?h/ab:null;
       const obp=(ab+bb+hbp+sf)>0?(h+bb+hbp)/(ab+bb+hbp+sf):null;
       const singles=h-dbl-trpl-hr;
       const tb=singles+2*dbl+3*trpl+4*hr;
       const slg=ab>0?tb/ab:null;
-      const vwar=parseFloat(r['vWAR'])||null;
+      const vwar=numOrNull(r['vWAR']);
       return {season,pa,h,hr,rbi,avg,obp,slg,vWAR:vwar,ab,bb,hbp,sf,tb,dbl,trpl};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
@@ -1894,10 +1947,10 @@ async function ppRenderStats(){
     if(rCareer){
       const c=rCareer;
       rows.push({season:'Career',
-        pa:parseFloat(c['PA'])||null, h:parseFloat(c['H'])||null, hr:parseFloat(c['HR'])||null,
-        rbi:parseFloat(c['RBI'])||null,
-        avg:parseFloat(c['AVG'])||null, obp:parseFloat(c['OBP'])||null, slg:parseFloat(c['SLG'])||null,
-        vWAR:parseFloat(c['vWAR'])||null, isCareer:true});
+        pa:numOrNull(c['PA']), h:numOrNull(c['H']), hr:numOrNull(c['HR']),
+        rbi:numOrNull(colVal(c,'RBI',10)),
+        avg:numOrNull(c['AVG']), obp:numOrNull(c['OBP']), slg:numOrNull(c['SLG']),
+        vWAR:numOrNull(c['vWAR']), isCareer:true});
     }
     section.innerHTML=rows.length?ppHitterTable(rows):'<div class="pp-no-data">No stats available</div>';
   }
@@ -2311,8 +2364,69 @@ function finderRestart(){
   document.getElementById('finderStep1').style.display='flex';
 }
 
+// ----- CASCADE RESET: changing an earlier answer invalidates everything after it -----
+// Each tier clears its own state/UI, then calls the next tier down, so calling any one
+// of these wipes that step and everything downstream of it (but leaves earlier steps alone).
+// Closes a stale results modal without touching the Generate/Restart buttons — for optional
+// side-selections (untouchable prospect, trade partner) that don't gate generation itself.
+function finderCloseResultsIfOpen(){
+  if(document.getElementById('finderResultsModal').classList.contains('open')) closeFinderResults();
+}
+function finderResetResultsTier(){
+  finderCloseResultsIfOpen();
+  document.getElementById('finderGenerateWrap').style.display='none';
+  document.getElementById('finderRestartWrap').style.display='none';
+}
+function finderResetCaliberTier(){
+  finderState.caliber=null;
+  document.querySelectorAll('#finderStep4B .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep4B').style.display='none';
+  finderResetResultsTier();
+}
+function finderResetPartnerTier(){
+  finderState.partnerTeam=null;
+  document.getElementById('finderPartnerTeam').value='';
+  finderResetResultsTier();
+}
+function finderResetHaulTier(){
+  finderState.haulType=null;
+  document.querySelectorAll('#finderStep4S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep5S').style.display='none';
+  finderResetPartnerTier();
+}
+function finderResetPositionBranchTier(){
+  // Position/target-player and caliber all sit at or below the "what are you buying" step
+  finderState.position=null;
+  finderState.targetPlayers=[];
+  finderState.untouchableProspect=null;
+  document.getElementById('finderPosSelect').value='';
+  document.getElementById('finderTargetPlayerSearch').value='';
+  document.getElementById('finderTargetPlayerSelected').innerHTML='';
+  document.getElementById('finderTargetPlayerWarning').style.display='none';
+  document.getElementById('finderUntouchableSearch').value='';
+  document.getElementById('finderUntouchableSelected').innerHTML='';
+  document.getElementById('finderStep3B').style.display='none';
+  finderResetCaliberTier();
+}
+function finderResetSellBranchTier(){
+  finderState.sellPlayers=[];
+  document.getElementById('finderPlayerSearch').value='';
+  document.getElementById('finderPlayerSelected').innerHTML='';
+  document.getElementById('finderStep3S').style.display='none';
+  finderResetHaulTier();
+}
+function finderResetIntentTier(){
+  finderState.intent=null;
+  document.querySelectorAll('#finderStep2 .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep3B').style.display='none';
+  document.getElementById('finderStep3S').style.display='none';
+  finderResetPositionBranchTier();
+  finderResetSellBranchTier();
+}
+
 function finderTeamChosen(){
   const team=document.getElementById('finderTeam').value;
+  if(team!==finderState.team) finderResetIntentTier();
   finderState.team=team;
   if(!team){
     document.getElementById('finderStep2').style.display='none';
@@ -2323,16 +2437,10 @@ function finderTeamChosen(){
 }
 
 function finderIntentChosen(intent,el){
+  if(intent!==finderState.intent) finderResetIntentTier();
   finderState.intent=intent;
   document.querySelectorAll('#finderStep2 .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
-
-  // Hide both branches first, then show the right one
-  document.getElementById('finderStep3B').style.display='none';
-  document.getElementById('finderStep4B').style.display='none';
-  document.getElementById('finderStep3S').style.display='none';
-  document.getElementById('finderStep4S').style.display='none';
-  document.getElementById('finderGenerateWrap').style.display='none';
 
   if(intent==='buyer'){
     document.getElementById('finderStep3B').style.display='flex';
@@ -2343,6 +2451,12 @@ function finderIntentChosen(intent,el){
 
 // ----- BUYER PATH -----
 function finderPosChosen(pos){
+  // Changing the position invalidates caliber, the protected/untouchable prospect pick,
+  // and any already-generated results — everything after this step in the flow.
+  finderResetCaliberTier();
+  finderState.untouchableProspect=null;
+  document.getElementById('finderUntouchableSearch').value='';
+  document.getElementById('finderUntouchableSelected').innerHTML='';
   finderState.position=pos||null;
   finderState.targetPlayers=[]; // choosing a position cancels any direct player search
   document.getElementById('finderTargetPlayerSearch').value='';
@@ -2350,12 +2464,10 @@ function finderPosChosen(pos){
   document.getElementById('finderTargetPlayerWarning').style.display='none';
   if(!pos){
     document.getElementById('finderStep4B').style.display='none';
-    document.getElementById('finderGenerateWrap').style.display='none';
     return;
   }
   document.getElementById('finderCaliberQ').textContent=`What caliber ${pos} are you looking to acquire?`;
   document.getElementById('finderStep4B').style.display='flex';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 // ----- BUYER PATH: search for a specific target player instead of position/caliber -----
@@ -2399,6 +2511,8 @@ function finderTargetPlayerChosen(name,team,pos){
   }
 
   document.getElementById('finderTargetPlayerWarning').style.display='none';
+  // The target list is changing — any already-generated results are now stale.
+  finderResetResultsTier();
 
   // Same-team players stack together; a different team replaces the current selection entirely
   if(finderState.targetPlayers.length===0){
@@ -2422,10 +2536,12 @@ function finderTargetPlayerChosen(name,team,pos){
 }
 
 function finderRemoveTargetPlayer(name,pos){
+  finderResetResultsTier();
   finderState.targetPlayers=finderState.targetPlayers.filter(p=>!(p.name===name && (!pos || p.pos===pos)));
   finderRenderTargetPlayersSelected();
-  if(!finderState.targetPlayers.length){
-    document.getElementById('finderGenerateWrap').style.display='none';
+  if(finderState.targetPlayers.length){
+    document.getElementById('finderGenerateWrap').style.display='block';
+    document.getElementById('finderRestartWrap').style.display='block';
   }
 }
 
@@ -2459,6 +2575,7 @@ function finderUntouchableChosen(name,pos){
   if(!p) return;
   document.getElementById('finderUntouchableSearch').value='';
   document.getElementById('finderUntouchableDrop').classList.remove('open');
+  finderCloseResultsIfOpen(); // protecting a prospect invalidates any already-generated results
   finderState.untouchableProspect=p;
   finderRenderUntouchableSelected();
 }
@@ -2471,6 +2588,7 @@ function finderRenderUntouchableSelected(){
 }
 
 function finderClearUntouchable(){
+  finderCloseResultsIfOpen();
   finderState.untouchableProspect=null;
   finderRenderUntouchableSelected();
 }
@@ -2483,6 +2601,7 @@ document.addEventListener('click', e => {
 });
 
 function finderCaliberChosen(caliber,el){
+  finderCloseResultsIfOpen();
   finderState.caliber=caliber;
   document.querySelectorAll('#finderStep4B .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
@@ -2534,31 +2653,33 @@ function finderPlayerChosen(name,pos){
   const p=allPlayers.find(x=>x.name===name && x.team===finderState.team && (!pos || x.pos===pos)) || allPlayers.find(x=>x.name===name && x.team===finderState.team);
   if(!p) return;
   if(finderState.sellPlayers.find(x=>x.name===p.name)) return; // already added
+  // Changing what's being sold invalidates the haul-type/partner choices and any results
+  finderResetHaulTier();
   finderState.sellPlayers.push(p);
   document.getElementById('finderPlayerSearch').value='';
   document.getElementById('finderPlayerDrop').classList.remove('open');
   finderRenderSellPlayersSelected();
   document.getElementById('finderStep4S').style.display='flex';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 function finderRemoveSellPlayer(name,pos){
+  finderResetHaulTier();
   finderState.sellPlayers=finderState.sellPlayers.filter(p=>!(p.name===name && (!pos || p.pos===pos)));
   finderRenderSellPlayersSelected();
   if(!finderState.sellPlayers.length){
     document.getElementById('finderStep4S').style.display='none';
-    document.getElementById('finderGenerateWrap').style.display='none';
   }
 }
 
 function finderClearPlayer(){
+  finderResetHaulTier();
   finderState.sellPlayers=[];
   document.getElementById('finderPlayerSelected').innerHTML='';
   document.getElementById('finderStep4S').style.display='none';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 function finderHaulChosen(haul,el){
+  finderResetPartnerTier(); // changing haul type invalidates the partner pick and any results
   finderState.haulType=haul;
   document.querySelectorAll('#finderStep4S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
@@ -2568,6 +2689,7 @@ function finderHaulChosen(haul,el){
 }
 
 function finderPartnerChosen(){
+  finderCloseResultsIfOpen();
   finderState.partnerTeam = document.getElementById('finderPartnerTeam').value || null;
 }
 
@@ -3732,7 +3854,7 @@ function onTeamChange(side){
   document.getElementById('label'+side).textContent=team?team+' — Gives':'— Gives';
   document.getElementById('search'+side).value='';
   document.getElementById('filters'+side).style.display=team?'flex':'none';
-  document.getElementById('groupFilter'+side).value='';
+  document.getElementById('groupFilter'+side).value=team?'mlb':'';
   document.getElementById('posFilter'+side).value='';
   document.getElementById('posFilter'+side).style.display='block';
   document.getElementById('dropdownWrap'+side).style.display='block';
@@ -4178,9 +4300,13 @@ async function showPM(name,team,pos){
 }
 function closePM(){document.getElementById('playerModal').classList.remove('open');}
 function closePMOut(e){if(e.target.id==='playerModal')closePM();}
+let _reopenFinderResultsOnBack = false;
 function pmGoToPlayerPage(){
   if(!_currentModalPlayer) return;
   closePM();
+  // Remember to reopen the finder results modal on the way back instead of losing it —
+  // it's only hidden here so it doesn't sit on top of the player page.
+  _reopenFinderResultsOnBack = document.getElementById('finderResultsModal').classList.contains('open');
   closeFinderResults();
   showPlayerPage(_currentModalPlayer);
 }
@@ -4260,7 +4386,7 @@ function onRosterTeamChange(){
   const t=document.getElementById('rosterTeam').value;
   const pg=document.getElementById('rosterGroup');
   const ps=document.getElementById('rosterPos');
-  pg.style.display=t?'block':'none'; pg.value='';
+  pg.style.display=t?'block':'none'; pg.value=t?'mlb':'';
   ps.style.display=t?'block':'none'; ps.value='';
   loadRoster();
 }
