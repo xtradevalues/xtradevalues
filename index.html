@@ -1055,7 +1055,9 @@ let rosterSortCol = 'val2026', rosterSortDir = 1;
 // ===== NAV =====
 let _prevPage = 'trade';
 function showPage(p) {
-  _prevPage = document.querySelector('.page.active')?.id?.replace('page-','') || 'trade';
+  const _leavingPage = document.querySelector('.page.active')?.id?.replace('page-','') || '';
+  if(_leavingPage==='trade' && p!=='trade'){ selectedA=[]; selectedB=[]; }
+  _prevPage = _leavingPage || 'trade';
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.menu-item[id^="menu-"]').forEach(x=>x.classList.remove('active'));
