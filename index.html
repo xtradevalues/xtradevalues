@@ -1664,9 +1664,12 @@ async function ppRenderStats(){
         const r=pMap&&pMap[p.playerID];
         if(!r) return;
         rows.push({season:yr+' (MiLB)',
-          ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null,
-          era:parseFloat(r['ERA'])||null, fip:parseFloat(r['FIP'])||null,
-          whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
+          ip:parseFloat(r['IP'])||null,
+          k:parseFloat(r['K'])||null,
+          era:parseFloat(r['ERA'])||null,
+          fip:parseFloat(r['FIP'])||null,
+          whip:parseFloat(r['WHIP'])||null,
+          k9:parseFloat(r['K9'])||null,
           vWAR:parseFloat(r['vWAR'])||null});
       });
       section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No MiLB data available</div>';
@@ -1675,11 +1678,27 @@ async function ppRenderStats(){
       miYears.forEach(([yr,hMap,pMap])=>{
         const r=hMap&&hMap[p.playerID];
         if(!r) return;
-        rows.push({season:yr+' (MiLB)',
-          pa:parseFloat(r['PA'])||null, h:parseFloat(r['H'])||null,
-          hr:parseFloat(r['HR'])||null, avg:parseFloat(r['AVG'])||null,
-          obp:parseFloat(r['OBP'])||null, slg:parseFloat(r['SLG'])||null,
-          vWAR:parseFloat(r['vWAR'])||null});
+        // pHitters sheet uses camelCase column names
+        const pa=parseFloat(r['plateAppearances'])||null;
+        const h=parseFloat(r['hits'])||null;
+        const ab=parseFloat(r['atBats'])||0;
+        const hr=parseFloat(r['homeRuns'])||null;
+        const bb=parseFloat(r['baseOnBalls'])||0;
+        const hbp=parseFloat(r['hitByPitch'])||0;
+        const sf=parseFloat(r['sacFlies'])||0;
+        const dbl=parseFloat(r['doubles'])||0;
+        const trpl=parseFloat(r['triples'])||0;
+        const hVal=h||0;
+        // Use pre-computed avg/obp/slg from sheet (already camelCase)
+        const preAvg=parseFloat(r['avg']);
+        const preObp=parseFloat(r['obp']);
+        const preSlg=parseFloat(r['slg']);
+        const avg=(!isNaN(preAvg)&&preAvg)?preAvg:(ab>0?hVal/ab:null);
+        const obp=(!isNaN(preObp)&&preObp)?preObp:((ab+bb+hbp+sf)>0?(hVal+bb+hbp)/(ab+bb+hbp+sf):null);
+        const singles=hVal-(hr||0)-dbl-trpl;
+        const tb=singles+2*dbl+3*trpl+4*(hr||0);
+        const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
+        rows.push({season:yr+' (MiLB)',pa,h,hr,avg,obp,slg,vWAR:parseFloat(r['vWAR'])||null});
       });
       section.innerHTML=rows.length?ppHitterTable(rows):'<div class="pp-no-data">No MiLB data available</div>';
     }
@@ -1706,9 +1725,7 @@ async function ppRenderStats(){
       const rid2=r['mlbam_id']!=null?String(Math.round(Number(r['mlbam_id']))):null;
       return rid===p.playerID||rid2===p.playerID;
     });
-    if(found) return found;
-    // Fallback: name match
-    return rows.find(r=>(r['player_name']||r['playerName']||r['name']||'').toLowerCase()===p.name.toLowerCase());
+    return found||null;
   };
   const r23=findRow(s23), r24=findRow(s24), r25=findRow(s25), r26=findRow(s26);
   const rCareer=findRow(careerRows);
