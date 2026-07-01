@@ -1725,9 +1725,7 @@ async function ppRenderStats(){
       const rid2=r['mlbam_id']!=null?String(Math.round(Number(r['mlbam_id']))):null;
       return rid===p.playerID||rid2===p.playerID;
     });
-    if(found) return found;
-    // Fallback: name match
-    return rows.find(r=>(r['player_name']||r['playerName']||r['name']||'').toLowerCase()===p.name.toLowerCase());
+    return found||null;
   };
   const r23=findRow(s23), r24=findRow(s24), r25=findRow(s25), r26=findRow(s26);
   const rCareer=findRow(careerRows);
