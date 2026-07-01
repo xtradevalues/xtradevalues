@@ -1795,7 +1795,12 @@ function ppToggleHitPitch(){
   ppRenderStats();
 }
 function playerPageGoBack(){
-  showPage(_prevPage==='player'?'trade':_prevPage);
+  const target=_prevPage==='player'?'trade':_prevPage;
+  showPage(target);
+  if(_reopenFinderResultsOnBack && target==='finder'){
+    document.getElementById('finderResultsModal').classList.add('open');
+  }
+  _reopenFinderResultsOnBack=false;
 }
 // Shared MiLB row -> stat computation, used by both the full player page (Minors tab)
 // and the player popup, so both read the same pHitters/pPitchers fields the same way.
@@ -2352,8 +2357,69 @@ function finderRestart(){
   document.getElementById('finderStep1').style.display='flex';
 }
 
+// ----- CASCADE RESET: changing an earlier answer invalidates everything after it -----
+// Each tier clears its own state/UI, then calls the next tier down, so calling any one
+// of these wipes that step and everything downstream of it (but leaves earlier steps alone).
+// Closes a stale results modal without touching the Generate/Restart buttons — for optional
+// side-selections (untouchable prospect, trade partner) that don't gate generation itself.
+function finderCloseResultsIfOpen(){
+  if(document.getElementById('finderResultsModal').classList.contains('open')) closeFinderResults();
+}
+function finderResetResultsTier(){
+  finderCloseResultsIfOpen();
+  document.getElementById('finderGenerateWrap').style.display='none';
+  document.getElementById('finderRestartWrap').style.display='none';
+}
+function finderResetCaliberTier(){
+  finderState.caliber=null;
+  document.querySelectorAll('#finderStep4B .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep4B').style.display='none';
+  finderResetResultsTier();
+}
+function finderResetPartnerTier(){
+  finderState.partnerTeam=null;
+  document.getElementById('finderPartnerTeam').value='';
+  finderResetResultsTier();
+}
+function finderResetHaulTier(){
+  finderState.haulType=null;
+  document.querySelectorAll('#finderStep4S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep5S').style.display='none';
+  finderResetPartnerTier();
+}
+function finderResetPositionBranchTier(){
+  // Position/target-player and caliber all sit at or below the "what are you buying" step
+  finderState.position=null;
+  finderState.targetPlayers=[];
+  finderState.untouchableProspect=null;
+  document.getElementById('finderPosSelect').value='';
+  document.getElementById('finderTargetPlayerSearch').value='';
+  document.getElementById('finderTargetPlayerSelected').innerHTML='';
+  document.getElementById('finderTargetPlayerWarning').style.display='none';
+  document.getElementById('finderUntouchableSearch').value='';
+  document.getElementById('finderUntouchableSelected').innerHTML='';
+  document.getElementById('finderStep3B').style.display='none';
+  finderResetCaliberTier();
+}
+function finderResetSellBranchTier(){
+  finderState.sellPlayers=[];
+  document.getElementById('finderPlayerSearch').value='';
+  document.getElementById('finderPlayerSelected').innerHTML='';
+  document.getElementById('finderStep3S').style.display='none';
+  finderResetHaulTier();
+}
+function finderResetIntentTier(){
+  finderState.intent=null;
+  document.querySelectorAll('#finderStep2 .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep3B').style.display='none';
+  document.getElementById('finderStep3S').style.display='none';
+  finderResetPositionBranchTier();
+  finderResetSellBranchTier();
+}
+
 function finderTeamChosen(){
   const team=document.getElementById('finderTeam').value;
+  if(team!==finderState.team) finderResetIntentTier();
   finderState.team=team;
   if(!team){
     document.getElementById('finderStep2').style.display='none';
@@ -2364,16 +2430,10 @@ function finderTeamChosen(){
 }
 
 function finderIntentChosen(intent,el){
+  if(intent!==finderState.intent) finderResetIntentTier();
   finderState.intent=intent;
   document.querySelectorAll('#finderStep2 .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
-
-  // Hide both branches first, then show the right one
-  document.getElementById('finderStep3B').style.display='none';
-  document.getElementById('finderStep4B').style.display='none';
-  document.getElementById('finderStep3S').style.display='none';
-  document.getElementById('finderStep4S').style.display='none';
-  document.getElementById('finderGenerateWrap').style.display='none';
 
   if(intent==='buyer'){
     document.getElementById('finderStep3B').style.display='flex';
@@ -2384,6 +2444,12 @@ function finderIntentChosen(intent,el){
 
 // ----- BUYER PATH -----
 function finderPosChosen(pos){
+  // Changing the position invalidates caliber, the protected/untouchable prospect pick,
+  // and any already-generated results — everything after this step in the flow.
+  finderResetCaliberTier();
+  finderState.untouchableProspect=null;
+  document.getElementById('finderUntouchableSearch').value='';
+  document.getElementById('finderUntouchableSelected').innerHTML='';
   finderState.position=pos||null;
   finderState.targetPlayers=[]; // choosing a position cancels any direct player search
   document.getElementById('finderTargetPlayerSearch').value='';
@@ -2391,12 +2457,10 @@ function finderPosChosen(pos){
   document.getElementById('finderTargetPlayerWarning').style.display='none';
   if(!pos){
     document.getElementById('finderStep4B').style.display='none';
-    document.getElementById('finderGenerateWrap').style.display='none';
     return;
   }
   document.getElementById('finderCaliberQ').textContent=`What caliber ${pos} are you looking to acquire?`;
   document.getElementById('finderStep4B').style.display='flex';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 // ----- BUYER PATH: search for a specific target player instead of position/caliber -----
@@ -2440,6 +2504,8 @@ function finderTargetPlayerChosen(name,team,pos){
   }
 
   document.getElementById('finderTargetPlayerWarning').style.display='none';
+  // The target list is changing — any already-generated results are now stale.
+  finderResetResultsTier();
 
   // Same-team players stack together; a different team replaces the current selection entirely
   if(finderState.targetPlayers.length===0){
@@ -2463,10 +2529,12 @@ function finderTargetPlayerChosen(name,team,pos){
 }
 
 function finderRemoveTargetPlayer(name,pos){
+  finderResetResultsTier();
   finderState.targetPlayers=finderState.targetPlayers.filter(p=>!(p.name===name && (!pos || p.pos===pos)));
   finderRenderTargetPlayersSelected();
-  if(!finderState.targetPlayers.length){
-    document.getElementById('finderGenerateWrap').style.display='none';
+  if(finderState.targetPlayers.length){
+    document.getElementById('finderGenerateWrap').style.display='block';
+    document.getElementById('finderRestartWrap').style.display='block';
   }
 }
 
@@ -2500,6 +2568,7 @@ function finderUntouchableChosen(name,pos){
   if(!p) return;
   document.getElementById('finderUntouchableSearch').value='';
   document.getElementById('finderUntouchableDrop').classList.remove('open');
+  finderCloseResultsIfOpen(); // protecting a prospect invalidates any already-generated results
   finderState.untouchableProspect=p;
   finderRenderUntouchableSelected();
 }
@@ -2512,6 +2581,7 @@ function finderRenderUntouchableSelected(){
 }
 
 function finderClearUntouchable(){
+  finderCloseResultsIfOpen();
   finderState.untouchableProspect=null;
   finderRenderUntouchableSelected();
 }
@@ -2524,6 +2594,7 @@ document.addEventListener('click', e => {
 });
 
 function finderCaliberChosen(caliber,el){
+  finderCloseResultsIfOpen();
   finderState.caliber=caliber;
   document.querySelectorAll('#finderStep4B .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
@@ -2575,31 +2646,33 @@ function finderPlayerChosen(name,pos){
   const p=allPlayers.find(x=>x.name===name && x.team===finderState.team && (!pos || x.pos===pos)) || allPlayers.find(x=>x.name===name && x.team===finderState.team);
   if(!p) return;
   if(finderState.sellPlayers.find(x=>x.name===p.name)) return; // already added
+  // Changing what's being sold invalidates the haul-type/partner choices and any results
+  finderResetHaulTier();
   finderState.sellPlayers.push(p);
   document.getElementById('finderPlayerSearch').value='';
   document.getElementById('finderPlayerDrop').classList.remove('open');
   finderRenderSellPlayersSelected();
   document.getElementById('finderStep4S').style.display='flex';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 function finderRemoveSellPlayer(name,pos){
+  finderResetHaulTier();
   finderState.sellPlayers=finderState.sellPlayers.filter(p=>!(p.name===name && (!pos || p.pos===pos)));
   finderRenderSellPlayersSelected();
   if(!finderState.sellPlayers.length){
     document.getElementById('finderStep4S').style.display='none';
-    document.getElementById('finderGenerateWrap').style.display='none';
   }
 }
 
 function finderClearPlayer(){
+  finderResetHaulTier();
   finderState.sellPlayers=[];
   document.getElementById('finderPlayerSelected').innerHTML='';
   document.getElementById('finderStep4S').style.display='none';
-  document.getElementById('finderGenerateWrap').style.display='none';
 }
 
 function finderHaulChosen(haul,el){
+  finderResetPartnerTier(); // changing haul type invalidates the partner pick and any results
   finderState.haulType=haul;
   document.querySelectorAll('#finderStep4S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
   if(el) el.classList.add('selected');
@@ -2609,6 +2682,7 @@ function finderHaulChosen(haul,el){
 }
 
 function finderPartnerChosen(){
+  finderCloseResultsIfOpen();
   finderState.partnerTeam = document.getElementById('finderPartnerTeam').value || null;
 }
 
@@ -4219,9 +4293,13 @@ async function showPM(name,team,pos){
 }
 function closePM(){document.getElementById('playerModal').classList.remove('open');}
 function closePMOut(e){if(e.target.id==='playerModal')closePM();}
+let _reopenFinderResultsOnBack = false;
 function pmGoToPlayerPage(){
   if(!_currentModalPlayer) return;
   closePM();
+  // Remember to reopen the finder results modal on the way back instead of losing it —
+  // it's only hidden here so it doesn't sit on top of the player page.
+  _reopenFinderResultsOnBack = document.getElementById('finderResultsModal').classList.contains('open');
   closeFinderResults();
   showPlayerPage(_currentModalPlayer);
 }
