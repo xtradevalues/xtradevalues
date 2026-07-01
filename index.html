@@ -1827,8 +1827,20 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
       <stop offset="50%" stop-color="#000000" stop-opacity="0.35"/>
       <stop offset="100%" stop-color="#000000" stop-opacity="0.0"/>
     </linearGradient>
+    <radialGradient id="underglow" cx="50%" cy="100%" r="55%" fx="50%" fy="100%">
+      <stop id="underglowStop0" offset="0%" stop-color="#4466ff" stop-opacity="0.9"/>
+      <stop id="underglowStop1" offset="40%" stop-color="#2244cc" stop-opacity="0.5"/>
+      <stop id="underglowStop2" offset="100%" stop-color="#000000" stop-opacity="0.0"/>
+    </radialGradient>
+    <radialGradient id="backglow" cx="50%" cy="42%" r="50%">
+      <stop id="backglowStop0" offset="0%" stop-color="#4466ff" stop-opacity="0.28"/>
+      <stop id="backglowStop1" offset="55%" stop-color="#2244cc" stop-opacity="0.10"/>
+      <stop id="backglowStop2" offset="100%" stop-color="#000000" stop-opacity="0.0"/>
+    </radialGradient>
   </defs>
   <rect width="800" height="1000" fill="#121315"/>
+  <!-- back glow: sits behind the jersey, radiates outward from behind -->
+  <ellipse id="backglow-el" cx="400" cy="420" rx="380" ry="340" fill="url(#backglow)" opacity="0.85" pointer-events="none"/>
   <g id="jersey">
     <path id="left-sleeve" d="M 260 140 L 50 250 C 45 280 50 340 70 370 L 155 330 C 170 290 185 240 200 200 Z" fill="url(#leftSleeveGrad)"/>
     <path id="pinstripe-layer-left" d="M 260 140 L 50 250 C 45 280 50 340 70 370 L 155 330 C 170 290 185 240 200 200 Z" fill="url(#pinstripes)" opacity="0"/>
@@ -1879,7 +1891,9 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path d="M 595 340 Q 545 520 565 720 Q 580 520 595 340 Z" fill="url(#foldHighlight)" opacity="0.2"/>
     <path d="M 280 220 Q 400 200 520 220 Q 400 215 280 220 Z" fill="url(#foldShadow)" opacity="0.5"/>
     <rect width="800" height="1000" fill="url(#vignette)" pointer-events="none"/>
-    <ellipse cx="400" cy="980" rx="300" ry="80" fill="url(#underglow)" opacity="0.7" pointer-events="none"/>
+    <!-- floor underglow: sits below the jersey hem, colored by team -->
+    <ellipse id="underglow-el" cx="400" cy="975" rx="340" ry="90" fill="url(#underglow)" opacity="1.0" pointer-events="none"/>
+    <ellipse id="underglow-core" cx="400" cy="985" rx="180" ry="45" fill="url(#underglow)" opacity="0.6" pointer-events="none"/>
   </g>
 </svg>`;
 
@@ -1982,6 +1996,16 @@ function renderJersey(svgEl, config){
   const leftCuffInner=q('left-cuff-inner'); if(leftCuffInner) leftCuffInner.setAttribute('stroke',numberBorderColor);
   const rightCuffInner=q('right-cuff-inner'); if(rightCuffInner) rightCuffInner.setAttribute('stroke',numberBorderColor);
   const mlbPatchBorder=svgEl.querySelector('#mlb-patch rect'); if(mlbPatchBorder) mlbPatchBorder.setAttribute('stroke',numberBorderColor);
+
+  // underglow + backglow: use team base color, brightened for glow effect
+  const glowColor=jerseyShade(baseColor,22);
+  const glowColorMid=jerseyShade(baseColor,10);
+  [['underglowStop0',glowColor,0.9],['underglowStop1',glowColorMid,0.5],['underglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
+    const s=q(id); if(s){s.setAttribute('stop-color',col);s.setAttribute('stop-opacity',String(op));}
+  });
+  [['backglowStop0',glowColor,0.30],['backglowStop1',glowColorMid,0.12],['backglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
+    const s=q(id); if(s){s.setAttribute('stop-color',col);s.setAttribute('stop-opacity',String(op));}
+  });
 
   // name -> flat fill + single flat border, no shadow/stitch texture
   ['name-border-tspan','name-fill-tspan'].forEach(id=>{
