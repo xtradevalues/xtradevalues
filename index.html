@@ -8,8 +8,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="ValueSavant">
-    <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="icon" href="logo.png" type="image/png">
     <title>ValueSavant • MLB Trade Simulator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <link rel="stylesheet" href="jerseyfonts.css?v=4">
@@ -461,12 +461,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <!-- HEADER -->
 <div class="header">
   <div class="header-logo-wrap">
-    <svg class="header-logo-svg" width="34" height="34" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="18" cy="18" r="17" fill="#0a0a0a"/>
-      <path d="M9 8 L9 18 L16 28" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M27 8 L27 18 L20 28" stroke="#ef4444" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="18" cy="28" r="2" fill="#ef4444"/>
-    </svg>
+<img src="logo.png" class="header-logo-svg" width="34" height="34" alt="ValueSavant" style="object-fit:contain">
     <span class="header-wordmark"><span style="color:#fff">Value</span><span style="color:var(--accent)">Savant</span></span>
   </div>
   <nav class="desktop-nav">
@@ -1407,21 +1402,37 @@ async function loadCareerStats(){
   });
 }
 
+// Per-year MiLB data: miLBHittersByYear['2023'][id]=row, etc.
+const miLBHittersByYear={};
+const miLBPitchersByYear={};
 async function loadMiLBStats(){
-  const [hRows,pRows]=await Promise.all([
-    fetchSheetTab('26 pHitters'),
-    fetchSheetTab('26 pPitchers')
+  const years=['23','24','25','26'];
+  const [h23,p23,h24,p24,h25,p25,h26,p26]=await Promise.all([
+    fetchSheetTab('23 pHitters'), fetchSheetTab('23 pPitchers'),
+    fetchSheetTab('24 pHitters'), fetchSheetTab('24 pPitchers'),
+    fetchSheetTab('25 pHitters'), fetchSheetTab('25 pPitchers'),
+    fetchSheetTab('26 pHitters'), fetchSheetTab('26 pPitchers'),
   ]);
-  if(hRows) hRows.forEach(r=>{
-    const raw=r['playerID']!=null?r['playerID']:null;
-    const id=raw!=null?String(Math.round(Number(raw))):null;
-    if(id&&id!=='0'&&id!=='NaN') miLBHitters[id]=r;
-  });
-  if(pRows) pRows.forEach(r=>{
-    const raw=r['playerID']!=null?r['playerID']:null;
-    const id=raw!=null?String(Math.round(Number(raw))):null;
-    if(id&&id!=='0'&&id!=='NaN') miLBPitchers[id]=r;
-  });
+  const parseRows=(rows,dest,year)=>{
+    if(!rows) return;
+    if(!dest[year]) dest[year]={};
+    rows.forEach(r=>{
+      const raw=r['playerID']!=null?r['playerID']:null;
+      const id=raw!=null?String(Math.round(Number(raw))):null;
+      if(id&&id!=='0'&&id!=='NaN') dest[year][id]=r;
+    });
+  };
+  parseRows(h23,miLBHittersByYear,'2023');
+  parseRows(p23,miLBPitchersByYear,'2023');
+  parseRows(h24,miLBHittersByYear,'2024');
+  parseRows(p24,miLBPitchersByYear,'2024');
+  parseRows(h25,miLBHittersByYear,'2025');
+  parseRows(p25,miLBPitchersByYear,'2025');
+  parseRows(h26,miLBHittersByYear,'2026');
+  parseRows(p26,miLBPitchersByYear,'2026');
+  // Keep flat 2026 objects for backward compat (openPM modal stats)
+  if(miLBHittersByYear['2026']) Object.assign(miLBHitters,miLBHittersByYear['2026']);
+  if(miLBPitchersByYear['2026']) Object.assign(miLBPitchers,miLBPitchersByYear['2026']);
 }
 
 // ===== STANDINGS PAGE =====
@@ -1611,33 +1622,35 @@ async function ppRenderStats(){
   const isOhtani=p.name==='Shohei Ohtani';
   const isMinorLeaguer=p.level==='minors';
   if(_ppLevelView==='minors'){
-    // Show MiLB stats
-    if(!isMinorLeaguer && !isOhtani){section.innerHTML='<div class="pp-no-data">No minor league data available</div>';return;}
-    // Load MiLB data if needed
     if(!Object.keys(miLBHitters).length&&!Object.keys(miLBPitchers).length) await loadMiLBStats();
-    const miRow=isPitcher?miLBPitchers[p.playerID]:miLBHitters[p.playerID];
-    if(!miRow){section.innerHTML='<div class="pp-no-data">No MiLB data available</div>';return;}
+    const miYears=[['2023',miLBHittersByYear['2023'],miLBPitchersByYear['2023']],
+                   ['2024',miLBHittersByYear['2024'],miLBPitchersByYear['2024']],
+                   ['2025',miLBHittersByYear['2025'],miLBPitchersByYear['2025']],
+                   ['2026',miLBHittersByYear['2026'],miLBPitchersByYear['2026']]];
     if(isPitcher){
-      const ip=parseFloat(miRow['IP'])||null;
-      const k=parseFloat(miRow['K'])||null;
-      const era=parseFloat(miRow['ERA'])||null;
-      const whip=parseFloat(miRow['WHIP'])||null;
-      const k9=parseFloat(miRow['K9'])||null;
-      const hr=parseFloat(miRow['HR'])||null;
-      const bb=parseFloat(miRow['BB'])||null;
-      const hbp=parseFloat(miRow['HBP'])||null;
-      const vwar=parseFloat(miRow['vWAR'])||null;
-      const fip=ip&&ip>0?((13*(hr||0)+3*((bb||0)+(hbp||0))-2*(k||0))/ip)+3.10:null;
-      section.innerHTML=ppPitcherTable([{season:'2026 (MiLB)',ip,k,era,fip,whip,k9,vWAR:vwar}]);
+      const rows=[];
+      miYears.forEach(([yr,hMap,pMap])=>{
+        const r=pMap&&pMap[p.playerID];
+        if(!r) return;
+        rows.push({season:yr+' (MiLB)',
+          ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null,
+          era:parseFloat(r['ERA'])||null, fip:parseFloat(r['FIP'])||null,
+          whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
+          vWAR:parseFloat(r['vWAR'])||null});
+      });
+      section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No MiLB data available</div>';
     } else {
-      const pa=parseFloat(miRow['plateAppearances'])||null;
-      const h=parseFloat(miRow['hits'])||null;
-      const hr=parseFloat(miRow['homeRuns'])||null;
-      const avg=parseFloat(miRow['avg'])||null;
-      const obp=parseFloat(miRow['obp'])||null;
-      const slg=parseFloat(miRow['slg'])||null;
-      const vwar=parseFloat(miRow['vWAR'])||null;
-      section.innerHTML=ppHitterTable([{season:'2026 (MiLB)',pa,h,hr,avg,obp,slg,vWAR:vwar}]);
+      const rows=[];
+      miYears.forEach(([yr,hMap,pMap])=>{
+        const r=hMap&&hMap[p.playerID];
+        if(!r) return;
+        rows.push({season:yr+' (MiLB)',
+          pa:parseFloat(r['PA'])||null, h:parseFloat(r['H'])||null,
+          hr:parseFloat(r['HR'])||null, avg:parseFloat(r['AVG'])||null,
+          obp:parseFloat(r['OBP'])||null, slg:parseFloat(r['SLG'])||null,
+          vWAR:parseFloat(r['vWAR'])||null});
+      });
+      section.innerHTML=rows.length?ppHitterTable(rows):'<div class="pp-no-data">No MiLB data available</div>';
     }
     return;
   }
@@ -1708,7 +1721,8 @@ async function ppRenderStats(){
       const cWHIP=totalIP>0?(cBB+cH+sBB+sH)/totalIP:null;
       const cK9=totalIP>0?(cK+sK)/totalIP*9:null;
       const cFIP=totalIP>0?((13*(cHR+sHR)+3*((cBB+sBB)+(cHBP+sHBP))-2*(cK+sK))/totalIP)+3.10:null;
-      rows.push({season:'Career',ip:totalIP||null,k:cK+sK||null,era:cERA,fip:cFIP,whip:cWHIP,k9:cK9,vWAR:cVWAR+sVWAR,isCareer:true});
+      const pCareerVWAR=rows.reduce((s,r)=>s+(r.vWAR||0),0);
+      rows.push({season:'Career',ip:totalIP||null,k:cK+sK||null,era:cERA,fip:cFIP,whip:cWHIP,k9:cK9,vWAR:pCareerVWAR,isCareer:true});
     }
     section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No stats available</div>';
   } else {
@@ -1744,7 +1758,7 @@ async function ppRenderStats(){
       const totalH=cH+sH, totalAB=cAB+sAB, totalHR=cHR+sHR;
       const totalDbl=cDbl+sDbl, totalTrpl=cTrpl+sTrpl;
       const totalBB=cBB+sBB, totalHBP=cHBP+sHBP, totalSF=cSF+sSF;
-      const totalVWAR=cVWAR+sVWAR;
+      const totalVWAR=rows.reduce((s,r)=>s+(r.vWAR||0),0);
       const cAvg=totalAB>0?totalH/totalAB:null;
       const cOBP=(totalAB+totalBB+totalHBP+totalSF)>0?(totalH+totalBB+totalHBP)/(totalAB+totalBB+totalHBP+totalSF):null;
       const cSingles=totalH-totalDbl-totalTrpl-totalHR;
@@ -1855,11 +1869,11 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path id="pinstripe-layer-right" d="M 540 140 L 750 250 C 755 280 750 340 730 370 L 645 330 C 630 290 615 240 600 200 Z" fill="url(#pinstripes)" opacity="0"/>
     <path id="right-cuff-outer" d="M 730 370 L 645 330" stroke="#0a0d14" stroke-width="6" fill="none" opacity="0.95"/>
     <path id="right-cuff-inner" d="M 733 365 L 648 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
-    <!-- armpit/shoulder fills: bridge gap between sleeve inner edge and body edge, tinted base color -->
-    <path id="left-armpit" d="M 260 140 L 200 200 L 190 230 Z" fill="#1c2434"/>
-    <path id="right-armpit" d="M 540 140 L 600 200 L 610 230 Z" fill="#1c2434"/>
     <path id="jersey-body" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#jerseyBodyGrad)"/>
     <path id="pinstripe-layer" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#pinstripes)" opacity="0"/>
+    <!-- armpit/shoulder fills: rendered AFTER body so they cover the seam gap -->
+    <path id="left-armpit" d="M 263 137 L 197 197 L 187 233 Z" fill="#1c2434"/>
+    <path id="right-armpit" d="M 537 137 L 603 197 L 613 233 Z" fill="#1c2434"/>
     <!-- shoulder seam stitching: colored to match jersey, no dark stripes -->
     <path id="seam-left" d="M 260 140 L 195 215" stroke="#1c2434" stroke-width="1.5" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
     <path id="seam-right" d="M 540 140 L 605 215" stroke="#1c2434" stroke-width="1.5" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
@@ -3962,8 +3976,7 @@ function showPM(name,team,pos){
   const pmProspectBadges=p.isProspect?(p.mlbRank?'<span class="player-badge player-badge-prospect">'+esc(p.mlbRank)+'</span>':'')+(p.orgRank?'<span class="player-badge player-badge-prospect">'+esc(p.orgRank)+'</span>':''):'';
   nameEl.innerHTML=`<span class="${nameSizeClass}">${p.name}</span><span class="team-pill">${p.team}</span><span class="team-pill">${p.pos||'?'}</span>${pmProspectBadges}`;
   // Status + injury
-  const injBadge=playerHasInjury(p)?'<span style="color:#D72229;font-weight:600;font-size:11px"> ✚ '+injuredLabel(p.injuredRaw)+'</span>':'';
-  document.getElementById('pmStatus').innerHTML=(p.aaRaw||'—')+injBadge;
+  document.getElementById('pmStatus').innerHTML=(p.aaRaw||'—');
   const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
   const dash=v=>(v===null||v===undefined||isNaN(v))?'-':v;
   const isPitcher=['SP','RP'].includes(finderFirstPos(p.pos));
@@ -4013,6 +4026,7 @@ function closePMOut(e){if(e.target.id==='playerModal')closePM();}
 function pmGoToPlayerPage(){
   if(!_currentModalPlayer) return;
   closePM();
+  closeFinderResults();
   showPlayerPage(_currentModalPlayer);
 }
 
