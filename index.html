@@ -1105,8 +1105,10 @@ function showPage(p) {
       closeDrop(s);
     });
   }
-  if(p==='roster' && _leavingPage!=='standings'){
-    // Reset roster team and content when entering roster from anywhere but standings
+  if(p==='roster' && _leavingPage!=='standings' && _leavingPage!=='player'){
+    // Reset roster team and content when entering roster from anywhere but standings —
+    // but not when coming back from a player detail page opened from the roster, so
+    // backing out of a player page keeps the roster on the same team.
     const rt=document.getElementById('rosterTeam'); if(rt) rt.value='';
     const rc=document.getElementById('rosterContent'); if(rc) rc.innerHTML='<div class="roster-placeholder">Select a team to view their roster</div>';
     const bb=document.getElementById('rosterBackBar'); if(bb) bb.style.display='none';
