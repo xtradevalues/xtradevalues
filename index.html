@@ -1251,7 +1251,7 @@ async function loadData() {
         if (!playerID || playerID === '0' || playerID === 'NaN') continue;
 
         const pos = String(row['Position'] || '').trim();
-        const age = parseFloat(row['Age']) || null;
+        const age = numOrNull(row['Age']);
         // col F: Jersey number
         const jerseyNumRaw = row['Jersey #'] != null ? String(row['Jersey #']).trim() : '--';
         // col G: Status — purely injury/roster status ("Active", "60-Day IL", "7-Day IL", "RM", etc.)
@@ -1264,15 +1264,15 @@ async function loadData() {
         const val2026 = val2026raw != null ? parseFloat(val2026raw) : null;
         if (val2026 === null || isNaN(val2026)) continue;
 
-        const val2027 = parseFloat(row['2027 Value']) || null;
-        const val2028 = parseFloat(row['2028 Value']) || null;
-        const val2029 = parseFloat(row['2029 Value']) || null;
-        const val2030 = parseFloat(row['2030 Value']) || null;
-        const val2031 = parseFloat(row['2031 Value']) || null;
+        const val2027 = numOrNull(row['2027 Value']);
+        const val2028 = numOrNull(row['2028 Value']);
+        const val2029 = numOrNull(row['2029 Value']);
+        const val2030 = numOrNull(row['2030 Value']);
+        const val2031 = numOrNull(row['2031 Value']);
         const ctrlYears = [val2026,val2027,val2028,val2029,val2030,val2031].filter(v=>v!=null&&!isNaN(v)&&v>0).length;
 
-        const avgVal = parseFloat(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']) || null;
-        const valueScore = parseFloat(row['Value Score']) || null;
+        const avgVal = numOrNull(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']);
+        const valueScore = numOrNull(row['Value Score']);
         // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
         const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
         const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
@@ -1335,12 +1335,12 @@ async function loadData() {
         if (!p) continue;
         const ab = parseFloat(row['AB']) || 0;
         const h = parseFloat(row['H']);
-        p.pa  = parseFloat(row['PA']) || null;
+        p.pa  = numOrNull(row['PA']);
         p.h   = isNaN(h) ? null : h;
-        p.hr  = parseFloat(row['HR']) || null;
-        p.rbi = parseFloat(colVal(row,'RBI',10)) || null;
-        p.obp = parseFloat(row['OBP']) || null;
-        p.slg = parseFloat(row['SLG']) || null;
+        p.hr  = numOrNull(row['HR']);
+        p.rbi = numOrNull(colVal(row,'RBI',10));
+        p.obp = numOrNull(row['OBP']);
+        p.slg = numOrNull(row['SLG']);
         p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARHit = vw; }
@@ -1352,14 +1352,14 @@ async function loadData() {
         const id = row['mlbam_id'] != null ? String(Math.round(Number(row['mlbam_id']))) : null;
         const p = id ? playerIndex[id] : null;
         if (!p) continue;
-        p.era  = parseFloat(row['ERA']) || null;
-        p.k    = parseFloat(row['K']) || null;
-        p.ip   = parseFloat(row['IP']) ? parseFloat(row['IP']) : null;
-        p.whip = parseFloat(row['WHIP']) || null;
-        p.k9   = parseFloat(row['K9']) || null;
+        p.era  = numOrNull(row['ERA']);
+        p.k    = numOrNull(row['K']);
+        p.ip   = numOrNull(row['IP']);
+        p.whip = numOrNull(row['WHIP']);
+        p.k9   = numOrNull(row['K9']);
         p.fip  = calcFIP(row['IP'], row['HR'], row['BB'], row['HBP'], row['K']);
-        p.w    = parseFloat(colVal(row,'W',4)) || null;
-        p.l    = parseFloat(colVal(row,'L',5)) || null;
+        p.w    = numOrNull(colVal(row,'W',4));
+        p.l    = numOrNull(colVal(row,'L',5));
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARPitch = vw; }
       }
@@ -1419,6 +1419,13 @@ async function loadStandings(){
 }
 
 // ===== SEASON & CAREER STAT LOADING =====
+// parseFloat(x)||null is wrong for legitimate zero stats (0 HR, 0 RBI, ...) since 0||null
+// evaluates to null — use this instead so a real 0 is preserved and only genuinely missing
+// non-numeric values become null (and format as "-" instead of "0").
+function numOrNull(v){
+  const n=parseFloat(v);
+  return isNaN(n)?null:n;
+}
 // Some sheet tabs use inconsistent header text for the same logical column (or the header
 // lookup collides), so prefer the named header but fall back to the column-letter index
 // (fetchSheetTab's '_N' fallback) when the named value is missing.
@@ -1816,17 +1823,17 @@ function computeMiLBHitterStats(r){
   const tb=singles+2*dbl+3*trpl+4*hr;
   const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
   return {
-    pa:parseFloat(r['plateAppearances'])||null, h:parseFloat(r['hits'])||null, hr:parseFloat(r['homeRuns'])||null,
-    rbi:parseFloat(colVal(r,'rbi',25))||null, avg, obp, slg, vWAR:parseFloat(r['vWAR'])||null
+    pa:numOrNull(r['plateAppearances']), h:numOrNull(r['hits']), hr:numOrNull(r['homeRuns']),
+    rbi:numOrNull(colVal(r,'rbi',25)), avg, obp, slg, vWAR:numOrNull(r['vWAR'])
   };
 }
 function computeMiLBPitcherStats(r){
   if(!r) return null;
   // 26 pPitchers: W is column F (index 5), L is column G (index 6)
   return {
-    ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null, era:parseFloat(r['ERA'])||null,
-    fip:parseFloat(r['FIP'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-    w:parseFloat(colVal(r,'W',5))||null, l:parseFloat(colVal(r,'L',6))||null, vWAR:parseFloat(r['vWAR'])||null
+    ip:numOrNull(r['IP']), k:numOrNull(r['K']), era:numOrNull(r['ERA']),
+    fip:numOrNull(r['FIP']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+    w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
 }
 function ppAddToTrade(){
@@ -1901,11 +1908,11 @@ async function ppRenderStats(){
     // FIP is computed with the sheet's own formula (calcFIP), not read from a column.
     const pRow=(season,r)=>{
       if(!r) return null;
-      return {season, ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null,
-        era:parseFloat(r['ERA'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-        vWAR:parseFloat(r['vWAR'])||null,
+      return {season, ip:numOrNull(r['IP']), k:numOrNull(r['K']),
+        era:numOrNull(r['ERA']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+        vWAR:numOrNull(r['vWAR']),
         fip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
-        w:parseFloat(colVal(r,'W',4))||null, l:parseFloat(colVal(r,'L',5))||null};
+        w:numOrNull(colVal(r,'W',4)), l:numOrNull(colVal(r,'L',5))};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
       const row=pRow(season,r); if(row) rows.push(row);
@@ -1923,14 +1930,14 @@ async function ppRenderStats(){
       const h=parseFloat(r['H'])||0, ab=parseFloat(r['AB'])||0, hr=parseFloat(r['HR'])||0;
       const dbl=parseFloat(r['2B'])||0, trpl=parseFloat(r['3B'])||0;
       const bb=parseFloat(r['BB'])||0, hbp=parseFloat(r['HBP'])||0, sf=parseFloat(r['SF'])||0;
-      const pa=parseFloat(r['PA'])||null;
-      const rbi=parseFloat(colVal(r,'RBI',10))||null;
+      const pa=numOrNull(r['PA']);
+      const rbi=numOrNull(colVal(r,'RBI',10));
       const avg=ab>0?h/ab:null;
       const obp=(ab+bb+hbp+sf)>0?(h+bb+hbp)/(ab+bb+hbp+sf):null;
       const singles=h-dbl-trpl-hr;
       const tb=singles+2*dbl+3*trpl+4*hr;
       const slg=ab>0?tb/ab:null;
-      const vwar=parseFloat(r['vWAR'])||null;
+      const vwar=numOrNull(r['vWAR']);
       return {season,pa,h,hr,rbi,avg,obp,slg,vWAR:vwar,ab,bb,hbp,sf,tb,dbl,trpl};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
@@ -1940,10 +1947,10 @@ async function ppRenderStats(){
     if(rCareer){
       const c=rCareer;
       rows.push({season:'Career',
-        pa:parseFloat(c['PA'])||null, h:parseFloat(c['H'])||null, hr:parseFloat(c['HR'])||null,
-        rbi:parseFloat(colVal(c,'RBI',10))||null,
-        avg:parseFloat(c['AVG'])||null, obp:parseFloat(c['OBP'])||null, slg:parseFloat(c['SLG'])||null,
-        vWAR:parseFloat(c['vWAR'])||null, isCareer:true});
+        pa:numOrNull(c['PA']), h:numOrNull(c['H']), hr:numOrNull(c['HR']),
+        rbi:numOrNull(colVal(c,'RBI',10)),
+        avg:numOrNull(c['AVG']), obp:numOrNull(c['OBP']), slg:numOrNull(c['SLG']),
+        vWAR:numOrNull(c['vWAR']), isCareer:true});
     }
     section.innerHTML=rows.length?ppHitterTable(rows):'<div class="pp-no-data">No stats available</div>';
   }
