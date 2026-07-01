@@ -1208,7 +1208,7 @@ async function loadData() {
         const levelUp = levelRaw.toUpperCase();
         const level = levelUp === 'MLB' ? 'mlb' : 'minors';
         // A player is a prospect if they have any ranking in AE or AF
-        const isProspect = !!(orgRank && orgRank > 0) || !!(mlbRank && mlbRank > 0);
+        const isProspect = !!(orgRank || mlbRank);
         // Injury comes solely from Status (col G): non-empty when any IL designation present
         const injuredRaw = statusRaw.toUpperCase().includes('IL') ? statusRaw : '';
         const status = parseStatus(levelRaw, mlbRank, orgRank);
