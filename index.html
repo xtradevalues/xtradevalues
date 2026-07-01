@@ -1052,7 +1052,7 @@ let _prevPage = 'trade';
 function showPage(p) {
   const _leavingPage = document.querySelector('.page.active')?.id?.replace('page-','') || '';
   // ── Leaving-page cleanup ──────────────────────────────────────────────────
-  if(_leavingPage==='trade' && p!=='trade'){
+  if(_leavingPage==='trade' && p!=='trade' && p!=='player'){
     selectedA=[]; selectedB=[];
     closeDrop('A'); closeDrop('B');
   }
@@ -1438,23 +1438,24 @@ async function loadMiLBStats(){
     fetchSheetTab('25 pHitters'), fetchSheetTab('25 pPitchers'),
     fetchSheetTab('26 pHitters'), fetchSheetTab('26 pPitchers'),
   ]);
-  const parseRows=(rows,dest,year)=>{
+  const parseRows=(rows,dest,year,label)=>{
     if(!rows) return;
     if(!dest[year]) dest[year]={};
+    if(rows.length>0) console.log('[MiLB cols]',label,Object.keys(rows[0]).filter(k=>!k.startsWith('_')));
     rows.forEach(r=>{
       const raw=r['playerID']!=null?r['playerID']:null;
       const id=raw!=null?String(Math.round(Number(raw))):null;
       if(id&&id!=='0'&&id!=='NaN') dest[year][id]=r;
     });
   };
-  parseRows(h23,miLBHittersByYear,'2023');
-  parseRows(p23,miLBPitchersByYear,'2023');
-  parseRows(h24,miLBHittersByYear,'2024');
-  parseRows(p24,miLBPitchersByYear,'2024');
-  parseRows(h25,miLBHittersByYear,'2025');
-  parseRows(p25,miLBPitchersByYear,'2025');
-  parseRows(h26,miLBHittersByYear,'2026');
-  parseRows(p26,miLBPitchersByYear,'2026');
+  parseRows(h23,miLBHittersByYear,'2023','23 pHitters');
+  parseRows(p23,miLBPitchersByYear,'2023','23 pPitchers');
+  parseRows(h24,miLBHittersByYear,'2024','24 pHitters');
+  parseRows(p24,miLBPitchersByYear,'2024','24 pPitchers');
+  parseRows(h25,miLBHittersByYear,'2025','25 pHitters');
+  parseRows(p25,miLBPitchersByYear,'2025','25 pPitchers');
+  parseRows(h26,miLBHittersByYear,'2026','26 pHitters');
+  parseRows(p26,miLBPitchersByYear,'2026','26 pPitchers');
   // Keep flat 2026 objects for backward compat (openPM modal stats)
   if(miLBHittersByYear['2026']) Object.assign(miLBHitters,miLBHittersByYear['2026']);
   if(miLBPitchersByYear['2026']) Object.assign(miLBPitchers,miLBPitchersByYear['2026']);
@@ -1589,7 +1590,7 @@ function playersSetSort(col,el){
 let _ppPlayer=null, _ppLevelView='mlb', _ppHitPitView='hit', _ppRenderToken=0;
 function showPlayerPage(p){
   _ppPlayer=p;
-  _ppLevelView='mlb';
+  _ppLevelView=p.level==='minors'?'minors':'mlb';
   _ppHitPitView='hit';
   // Mount jersey
   const jerseyEl=document.getElementById('ppJersey');
@@ -1606,11 +1607,12 @@ function showPlayerPage(p){
   }
   if(playerHasInjury(p)) badges+=`<span class="player-badge player-badge-injury">✚ ${esc(injuredLabel(p.injuredRaw))}</span>`;
   document.getElementById('ppBadges').innerHTML=badges;
-  // Toggle — reset to MLB active state
+  // Toggle — default to Minors tab for minor leaguers, MLB tab for MLB players
   const toggleWrap=document.getElementById('ppToggleWrap');
   const hitPitBtn=document.getElementById('ppHitPitToggle');
   const btns=toggleWrap.querySelectorAll('.pp-toggle-btn:not(#ppHitPitToggle)');
-  btns.forEach((b,i)=>{b.classList.toggle('active',i===0);});
+  const defaultMinors=p.level==='minors';
+  btns.forEach((b,i)=>{b.classList.toggle('active',defaultMinors?i===1:i===0);});
   // Ohtani gets hit/pitch toggle
   hitPitBtn.style.display=(p.name==='Shohei Ohtani')?'inline-flex':'none';
   // Render stats
