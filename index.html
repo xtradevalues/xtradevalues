@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <title>ValueSavant • MLB Trade Simulator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="jerseyfonts.css">
+    <link rel="stylesheet" href="jerseyfonts.css?v=2">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -1198,11 +1198,11 @@ async function loadData() {
         const val2031 = parseFloat(row['2031 Value']) || null;
         const ctrlYears = [val2026,val2027,val2028,val2029,val2030,val2031].filter(v=>v!=null&&!isNaN(v)&&v>0).length;
 
-        const avgVal = parseFloat(row['Avg Value']) || null;
+        const avgVal = parseFloat(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']) || null;
         const valueScore = parseFloat(row['Value Score']) || null;
-        // col AE: Org prospect rank; col AF: league-wide prospect rank
-        const orgRank = parseFloat(row['Org Rank']) || null;
-        const mlbRank = parseFloat(row['MLB Rank']) || null;
+        // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
+        const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
+        const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
 
         // Level (col I) determines baseball assignment — completely separate from injury
         const levelUp = levelRaw.toUpperCase();
@@ -1359,7 +1359,9 @@ async function fetchSheetTab(tabName){
     const rows=tableRows.map(r2=>{
       const obj={};
       r2.c&&r2.c.forEach((cell,i)=>{
-        if(headers[i]) obj[headers[i]]=cell&&cell.v!==null?cell.v:null;
+        const v=cell&&cell.v!==null?cell.v:null;
+        if(headers[i]) obj[headers[i]]=v;
+        obj['_'+i]=v; // always store by index as fallback
       });
       return obj;
     }).filter(o=>Object.values(o).some(v=>v!==null));
@@ -1556,11 +1558,11 @@ function showPlayerPage(p){
   document.getElementById('ppName').textContent=p.name;
   const levelLabel=p.level==='mlb'?'MLB':getPlayerDetailLevel(p);
   document.getElementById('ppMeta').innerHTML=`<span>${esc(p.team)}</span><span>${esc(p.pos||'?')}</span><span>${levelLabel}</span>`;
-  // Badges
+  // Badges — orgRank = "KC 8", mlbRank = "MLB 35" (raw strings from sheet)
   let badges='';
   if(p.isProspect){
-    if(p.mlbRank) badges+=`<span class="player-badge player-badge-prospect">MLB ${p.mlbRank}</span>`;
-    if(p.orgRank) badges+=`<span class="player-badge player-badge-prospect">${p.team} ${p.orgRank}</span>`;
+    if(p.mlbRank) badges+=`<span class="player-badge player-badge-prospect">${esc(p.mlbRank)}</span>`;
+    if(p.orgRank) badges+=`<span class="player-badge player-badge-prospect">${esc(p.orgRank)}</span>`;
   }
   if(playerHasInjury(p)) badges+=`<span class="player-badge player-badge-injury">✚ ${esc(injuredLabel(p.injuredRaw))}</span>`;
   document.getElementById('ppBadges').innerHTML=badges;
@@ -1850,14 +1852,14 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path id="pinstripe-layer-right" d="M 540 140 L 750 250 C 755 280 750 340 730 370 L 645 330 C 630 290 615 240 600 200 Z" fill="url(#pinstripes)" opacity="0"/>
     <path id="right-cuff-outer" d="M 730 370 L 645 330" stroke="#0a0d14" stroke-width="6" fill="none" opacity="0.95"/>
     <path id="right-cuff-inner" d="M 733 365 L 648 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
+    <!-- armpit/shoulder fills: bridge gap between sleeve inner edge and body edge, tinted base color -->
+    <path id="left-armpit" d="M 260 140 L 200 200 C 192 215 190 225 190 230 L 210 230 C 212 218 218 205 260 140 Z" fill="#1c2434"/>
+    <path id="right-armpit" d="M 540 140 C 582 205 588 218 590 230 L 610 230 C 610 225 608 215 600 200 Z" fill="#1c2434"/>
     <path id="jersey-body" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#jerseyBodyGrad)"/>
     <path id="pinstripe-layer" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#pinstripes)" opacity="0"/>
-    <path d="M 260 140 L 195 215" stroke="#111" stroke-width="2.5" fill="none"/>
-    <path d="M 260 140 L 195 215" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
-    <path d="M 263 142 L 198 217" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
-    <path d="M 540 140 L 605 215" stroke="#111" stroke-width="2.5" fill="none"/>
-    <path d="M 540 140 L 605 215" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
-    <path d="M 537 142 L 602 217" stroke="#2c3954" stroke-width="1.5" stroke-dasharray="3,2" fill="none"/>
+    <!-- shoulder seam stitching: colored to match jersey, no dark stripes -->
+    <path id="seam-left" d="M 260 140 L 195 215" stroke="#1c2434" stroke-width="1.5" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
+    <path id="seam-right" d="M 540 140 L 605 215" stroke="#1c2434" stroke-width="1.5" stroke-dasharray="3,2" fill="none" opacity="0.6"/>
     <path d="M 260 140 C 330 160 470 160 540 140 C 530 152 480 158 400 158 C 320 158 270 152 260 140 Z" fill="#0b0d13" stroke="#192233" stroke-width="1"/>
     <path d="M 263 143 C 330 161 470 161 537 143" stroke="#2c3954" stroke-width="1" stroke-dasharray="2,2" fill="none"/>
     <g id="mlb-patch" transform="translate(400, 180) scale(0.8)">
@@ -1868,12 +1870,12 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
       <circle cx="1" cy="-4" r="1.5" fill="#ffffff"/>
     </g>
     <path id="nameCurve" d="M 240 270 C 320 238 480 238 560 270" fill="none"/>
-    <text id="name-border" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12">
+    <text id="name-border" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="8">
       <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
         <tspan id="name-border-tspan" fill="#bc964c" stroke="#bc964c" stroke-width="3.5" stroke-linejoin="round">SAVANT</tspan>
       </textPath>
     </text>
-    <text id="name-fill" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="12">
+    <text id="name-fill" font-family="'Impact', 'Arial Black', sans-serif" font-weight="900" font-size="44" letter-spacing="8">
       <textPath href="#nameCurve" startOffset="50%" text-anchor="middle">
         <tspan id="name-fill-tspan" fill="#ffffff">SAVANT</tspan>
       </textPath>
@@ -1964,8 +1966,9 @@ function renderJersey(svgEl, config){
   const sleeveColor=isValidCssColor(config.sleeveColor)?config.sleeveColor:baseColor;
   const nameColor=isValidCssColor(config.nameColor)?config.nameColor:'#ffffff';
   const numberColor=isValidCssColor(config.numberColor)?config.numberColor:'#ffffff';
-  const nameBorderColor=isValidCssColor(config.nameBorderColor)?config.nameBorderColor:'#bc964c';
-  const numberBorderColor=isValidCssColor(config.numberBorderColor)?config.numberBorderColor:'#bc964c';
+  // Use exact hex given; if null/missing, match the fill color (invisible border)
+  const nameBorderColor=isValidCssColor(config.nameBorderColor)?config.nameBorderColor:nameColor;
+  const numberBorderColor=isValidCssColor(config.numberBorderColor)?config.numberBorderColor:numberColor;
   const hasOuterBorder=isValidCssColor(config.numberBorderColorOuter);
   const numberBorderColorOuter=hasOuterBorder?config.numberBorderColorOuter:numberBorderColor;
   const name=config.name!=null?String(config.name):'';
@@ -1997,17 +2000,44 @@ function renderJersey(svgEl, config){
   const rightCuffInner=q('right-cuff-inner'); if(rightCuffInner) rightCuffInner.setAttribute('stroke',numberBorderColor);
   const mlbPatchBorder=svgEl.querySelector('#mlb-patch rect'); if(mlbPatchBorder) mlbPatchBorder.setAttribute('stroke',numberBorderColor);
 
+  // armpit fills + seam stitching: match jersey base color, slight shadow for armpit
+  const armpitColor=jerseyShade(baseColor,-10);
+  const seamColor=jerseyShade(baseColor,6);
+  const leftArmpit=q('left-armpit'); if(leftArmpit) leftArmpit.setAttribute('fill',armpitColor);
+  const rightArmpit=q('right-armpit'); if(rightArmpit) rightArmpit.setAttribute('fill',armpitColor);
+  const seamL=q('seam-left'); if(seamL) seamL.setAttribute('stroke',seamColor);
+  const seamR=q('seam-right'); if(seamR) seamR.setAttribute('stroke',seamColor);
+
   // underglow + backglow: use team base color, brightened for glow effect
-  const glowColor=jerseyShade(baseColor,22);
-  const glowColorMid=jerseyShade(baseColor,10);
-  [['underglowStop0',glowColor,0.9],['underglowStop1',glowColorMid,0.5],['underglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
+  const glowColor=jerseyShade(baseColor,28);
+  const glowColorMid=jerseyShade(baseColor,14);
+  [['underglowStop0',glowColor,1.0],['underglowStop1',glowColorMid,0.65],['underglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
     const s=q(id); if(s){s.setAttribute('stop-color',col);s.setAttribute('stop-opacity',String(op));}
   });
-  [['backglowStop0',glowColor,0.30],['backglowStop1',glowColorMid,0.12],['backglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
+  [['backglowStop0',glowColor,0.35],['backglowStop1',glowColorMid,0.15],['backglowStop2','#000000',0.0]].forEach(([id,col,op])=>{
     const s=q(id); if(s){s.setAttribute('stop-color',col);s.setAttribute('stop-opacity',String(op));}
   });
 
-  // name -> flat fill + single flat border, no shadow/stitch texture
+  // name: adaptive sizing — widen curve and shrink font for longer names
+  const nameLen=name.length;
+  // base letter spacing and font size; reduce both for longer names
+  let nameFontSize, nameLetterSpacing, curveX1, curveX2;
+  if(nameLen<=6){nameFontSize=44;nameLetterSpacing=10;curveX1=240;curveX2=560;}
+  else if(nameLen<=8){nameFontSize=40;nameLetterSpacing=8;curveX1=225;curveX2=575;}
+  else if(nameLen<=10){nameFontSize=36;nameLetterSpacing=6;curveX1=210;curveX2=590;}
+  else if(nameLen<=12){nameFontSize=32;nameLetterSpacing=4;curveX1=195;curveX2=605;}
+  else if(nameLen<=14){nameFontSize=28;nameLetterSpacing=3;curveX1=180;curveX2=620;}
+  else{nameFontSize=24;nameLetterSpacing=2;curveX1=165;curveX2=635;}
+  // Arc: control points are inset 80px from endpoints, peak rises ~32px above baseline
+  const curveW=curveX2-curveX1;
+  const cp1x=Math.round(curveX1+curveW*0.25), cp2x=Math.round(curveX1+curveW*0.75);
+  const curveY=270, peakY=238;
+  const nameCurveEl=q('nameCurve');
+  if(nameCurveEl) nameCurveEl.setAttribute('d',`M ${curveX1} ${curveY} C ${cp1x} ${peakY} ${cp2x} ${peakY} ${curveX2} ${curveY}`);
+  ['name-border','name-fill'].forEach(id=>{
+    const el=q(id);
+    if(el){el.setAttribute('font-size',String(nameFontSize));el.setAttribute('letter-spacing',String(nameLetterSpacing));}
+  });
   ['name-border-tspan','name-fill-tspan'].forEach(id=>{
     const el=q(id); if(el) el.textContent=name;
   });
