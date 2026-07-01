@@ -1051,7 +1051,31 @@ let rosterSortCol = 'val2026', rosterSortDir = 1;
 let _prevPage = 'trade';
 function showPage(p) {
   const _leavingPage = document.querySelector('.page.active')?.id?.replace('page-','') || '';
-  if(_leavingPage==='trade' && p!=='trade'){ selectedA=[]; selectedB=[]; }
+  // ── Leaving-page cleanup ──────────────────────────────────────────────────
+  if(_leavingPage==='trade' && p!=='trade'){
+    selectedA=[]; selectedB=[];
+    closeDrop('A'); closeDrop('B');
+  }
+  if(_leavingPage==='finder'){
+    // Close any open finder dropdowns
+    ['finderTargetPlayerDrop','finderUntouchableDrop','finderPlayerDrop'].forEach(id=>{
+      const d=document.getElementById(id); if(d) d.classList.remove('open');
+    });
+  }
+  // ── Entering-page setup ───────────────────────────────────────────────────
+  if(p==='trade' && _leavingPage!=='trade'){
+    // Clear search inputs and close dropdowns when re-entering trade page
+    ['A','B'].forEach(s=>{
+      const inp=document.getElementById('search'+s); if(inp) inp.value='';
+      closeDrop(s);
+    });
+  }
+  if(p==='roster' && _leavingPage!=='standings'){
+    // Reset roster team and content when entering roster from anywhere but standings
+    const rt=document.getElementById('rosterTeam'); if(rt) rt.value='';
+    const rc=document.getElementById('rosterContent'); if(rc) rc.innerHTML='<div class="roster-placeholder">Select a team to view their roster</div>';
+    const bb=document.getElementById('rosterBackBar'); if(bb) bb.style.display='none';
+  }
   _prevPage = _leavingPage || 'trade';
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -1070,7 +1094,8 @@ function showPage(p) {
     }
   }
   if(p==='standings') renderStandingsPage();
-  if(p==='roster'){const bb=document.getElementById('rosterBackBar');if(bb&&_prevPage!=='standings')bb.style.display='none';}
+  // Reset finder to step 1 when navigating to it from any page except player (research flow)
+  if(p==='finder' && _leavingPage!=='player') finderRestart();
 }
 function openMenu(){document.getElementById('menuOverlay').classList.add('open')}
 function closeMenu(){document.getElementById('menuOverlay').classList.remove('open')}
