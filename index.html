@@ -1615,8 +1615,7 @@ async function ppRenderStats(){
     if(!isMinorLeaguer && !isOhtani){section.innerHTML='<div class="pp-no-data">No minor league data available</div>';return;}
     // Load MiLB data if needed
     if(!Object.keys(miLBHitters).length&&!Object.keys(miLBPitchers).length) await loadMiLBStats();
-    const miLookup=(dict)=>dict[p.playerID]||Object.values(dict).find(r=>(r['player_name']||r['playerName']||r['name']||'').toLowerCase()===p.name.toLowerCase())||null;
-    const miRow=isPitcher?miLookup(miLBPitchers):miLookup(miLBHitters);
+    const miRow=isPitcher?miLBPitchers[p.playerID]:miLBHitters[p.playerID];
     if(!miRow){section.innerHTML='<div class="pp-no-data">No MiLB data available</div>';return;}
     if(isPitcher){
       const ip=parseFloat(miRow['IP'])||null;
