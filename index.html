@@ -12,7 +12,7 @@
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <title>ValueSavant • MLB Trade Simulator</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="jerseyfonts.css?v=3">
+    <link rel="stylesheet" href="jerseyfonts.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -1852,8 +1852,8 @@ const JERSEY_CARD_TEMPLATE = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
     <path id="right-cuff-outer" d="M 730 370 L 645 330" stroke="#0a0d14" stroke-width="6" fill="none" opacity="0.95"/>
     <path id="right-cuff-inner" d="M 733 365 L 648 325" stroke="#bc964c" stroke-width="4" fill="none" opacity="0.9"/>
     <!-- armpit/shoulder fills: bridge gap between sleeve inner edge and body edge, tinted base color -->
-    <path id="left-armpit" d="M 260 140 L 195 210 C 190 222 189 235 190 250 L 210 252 C 211 236 214 222 260 140 Z" fill="#1c2434"/>
-    <path id="right-armpit" d="M 540 140 L 586 210 C 591 222 592 235 610 250 L 610 252 C 611 236 610 222 540 140 Z" fill="#1c2434"/>
+    <path id="left-armpit" d="M 262 138 L 198 198 L 188 232 L 192 232 L 202 200 L 262 142 Z" fill="#1c2434"/>
+    <path id="right-armpit" d="M 538 138 L 602 198 L 612 232 L 608 232 L 598 200 L 538 142 Z" fill="#1c2434"/>
     <path id="jersey-body" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#jerseyBodyGrad)"/>
     <path id="pinstripe-layer" d="M 260 140 C 330 160 470 160 540 140 L 610 230 C 590 400 615 650 635 920 C 500 945 300 945 165 920 C 185 650 210 400 190 230 Z" fill="url(#pinstripes)" opacity="0"/>
     <!-- shoulder seam stitching: colored to match jersey, no dark stripes -->
@@ -2085,9 +2085,9 @@ function getJerseyTeamConfig(team){
     sleeveColor: isValidCssColor(st.sleeveColor)?st.sleeveColor:null,
     nameColor: isValidCssColor(st.nameColor)?st.nameColor:DEFAULT_JERSEY_CONFIG.nameColor,
     numberColor: isValidCssColor(st.numberColor)?st.numberColor:DEFAULT_JERSEY_CONFIG.numberColor,
-    nameBorderColor: isValidCssColor(st.nameBorderColor)?st.nameBorderColor:DEFAULT_JERSEY_CONFIG.nameBorderColor,
-    // numberInnerBorderColor → maps to numberBorderColor (inner ring)
-    numberBorderColor: isValidCssColor(st.numberInnerBorderColor)?st.numberInnerBorderColor:DEFAULT_JERSEY_CONFIG.numberBorderColor,
+    nameBorderColor: isValidCssColor(st.nameBorderColor)?st.nameBorderColor:null,
+    // numberInnerBorderColor → maps to numberBorderColor (inner ring); null → match numberColor (invisible)
+    numberBorderColor: isValidCssColor(st.numberInnerBorderColor)?st.numberInnerBorderColor:null,
     numberBorderColorOuter: isValidCssColor(st.numberOuterBorderColor)?st.numberOuterBorderColor:'',
     pinstripeColor: isValidCssColor(st.pinstripeColor)?st.pinstripeColor:null,
     nameFont: st.nameFont||DEFAULT_JERSEY_CONFIG.nameFont,
