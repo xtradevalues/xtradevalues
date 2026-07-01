@@ -918,22 +918,21 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <script>
 // ===== CONFIG =====
 const SHEET_ID = '18J4A6a80jBSEpWUM4Dy_lFpFD3-d9mxA0SYtbHQyj6I';
-const DATA_TAB = 'PLAYERS';
-const TEAMS = ['ARI', 'ATH', 'ATL', 'BAL', 'BOS', 'CHC', 'CHW', 'CIN', 'CLE', 'COL', 'DET', 'HOU', 'KCR', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY', 'PHI', 'PIT', 'SDP', 'SEA', 'SFG', 'STL', 'TBR', 'TEX', 'TOR', 'WSN'];
+const TEAMS = ['AZ','ATH','ATL','BAL','BOS','CHC','CWS','CIN','CLE','COL','DET','HOU','KC','LAA','LAD','MIA','MIL','MIN','NYM','NYY','PHI','PIT','SD','SEA','SF','STL','TB','TEX','TOR','WSH'];
 let allPlayers = [], selectedA = [], selectedB = [], rankSortCol = 'val2026', rankSortDir = -1;
 
 // ===== JERSEY CONFIG (replaces Google Sheet lookup) =====
 const MLB_JERSEY_CONFIG = {
   NYY:{baseColor:"#FFFFFF",pinstripeColor:"#0C2340",numberColor:"#0C2340",numberInnerBorderColor:null,numberOuterBorderColor:null,nameColor:"#0C2340",nameBorderColor:null,nameFont:"VarsityTeam-Bold",numberFont:"VarsityTeam-Bold"},
-  TBR:{baseColor:"#8FBCE6",pinstripeColor:null,numberColor:"#092C5C",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#092C5C",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
+  TB:{baseColor:"#8FBCE6",pinstripeColor:null,numberColor:"#092C5C",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#092C5C",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   TOR:{baseColor:"#134A8E",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#134A8E",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"MLBBJV__",numberFont:"MLBBJV__"},
   BAL:{baseColor:"#DF4601",pinstripeColor:null,numberColor:"#000000",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#000000",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   BOS:{baseColor:"#BD3039",pinstripeColor:null,numberColor:"#0C2340",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#0C2340",nameBorderColor:"#FFFFFF",nameFont:"MLBRS___",numberFont:"MLBRS___"},
-  CHW:{baseColor:"#CE1141",pinstripeColor:"#27251F",numberColor:"#27251F",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"NBA_Bulls",numberFont:"NBA_Bulls"},
+  CWS:{baseColor:"#CE1141",pinstripeColor:"#27251F",numberColor:"#27251F",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"NBA_Bulls",numberFont:"NBA_Bulls"},
   CLE:{baseColor:"#E50022",pinstripeColor:null,numberColor:"#00385D",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#00385D",nameBorderColor:"#FFFFFF",nameFont:"NFL_Jacksonville_Jaguars_1_",numberFont:"MLBBLOCK"},
   MIN:{baseColor:"#002B5C",pinstripeColor:null,numberColor:"#D31145",numberInnerBorderColor:null,numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"Montserrat-Medium",numberFont:"MLBBLOCK"},
   DET:{baseColor:"#0C2340",pinstripeColor:null,numberColor:"#DF4601",numberInnerBorderColor:"#0C2340",numberOuterBorderColor:"#FFFFFF",nameColor:"#DF4601",nameBorderColor:"#FFFFFF",nameFont:"VarsityTeam-Bold",numberFont:"MLBBLOCK"},
-  KCR:{baseColor:"#7BB2DD",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:null,numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
+  KC:{baseColor:"#7BB2DD",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:null,numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:null,nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   SEA:{baseColor:"#005C5C",pinstripeColor:null,numberColor:"#C4CED4",numberInnerBorderColor:"#0C2C56",numberOuterBorderColor:null,nameColor:"#C4CED4",nameBorderColor:"#0C2C56",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   ATH:{baseColor:"#EFB21E",pinstripeColor:null,numberColor:"#003831",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#003831",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   TEX:{baseColor:"#003278",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#C0111F",numberOuterBorderColor:"#003278",nameColor:"#FFFFFF",nameBorderColor:"#C0111F",nameFont:"MLBTUSCA",numberFont:"MLBTUSCA"},
@@ -941,7 +940,7 @@ const MLB_JERSEY_CONFIG = {
   LAA:{baseColor:"#BA0021",pinstripeColor:null,numberColor:"#BA0021",numberInnerBorderColor:"#002D62",numberOuterBorderColor:"#FFFFFF",nameColor:"#BA0021",nameBorderColor:"#FFFFFF",nameFont:"MLBANGEL",numberFont:"MLBANGEL"},
   ATL:{baseColor:"#CE1141",pinstripeColor:null,numberColor:"#002D62",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#FFFFFF",nameFont:"VarsityTeam-Bold",numberFont:"MLBBLOCK"},
   PHI:{baseColor:"#E81828",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#002D72",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#002D72",nameFont:"MLBPHILL",numberFont:"MLBPHILL"},
-  WSN:{baseColor:"#AB0003",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#002D62",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#002D62",nameFont:"MLBNRB__",numberFont:"MLBNRB__"},
+  WSH:{baseColor:"#AB0003",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#002D62",numberOuterBorderColor:null,nameColor:"#FFFFFF",nameBorderColor:"#002D62",nameFont:"MLBNRB__",numberFont:"MLBNRB__"},
   MIA:{baseColor:"#27251F",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#00A3E0",numberOuterBorderColor:"#EF3340",nameColor:"#FFFFFF",nameBorderColor:"#00A3E0",nameFont:"Mlbdia07",numberFont:"MLBBLOCK"},
   NYM:{baseColor:"#002D72",pinstripeColor:null,numberColor:"#002D72",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:"#DF4601",nameColor:"#002D72",nameBorderColor:"#DF4601",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
   MIL:{baseColor:"#12284B",pinstripeColor:null,numberColor:"#FFC52F",numberInnerBorderColor:"#12284B",numberOuterBorderColor:"#12284B",nameColor:"#FFC52F",nameBorderColor:"#12284B",nameFont:"VarsityTeam-Bold",numberFont:"VarsityTeam-Bold"},
@@ -950,9 +949,9 @@ const MLB_JERSEY_CONFIG = {
   PIT:{baseColor:"#FFC52F",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#27251F",numberOuterBorderColor:"#FFFFFF",nameColor:"#27251F",nameBorderColor:null,nameFont:"MLBPIRAT",numberFont:"MLBPIRAT"},
   CIN:{baseColor:"#C6011F",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#C6011F",numberOuterBorderColor:"#27251F",nameColor:"#FFFFFF",nameBorderColor:"#27251F",nameFont:"MLBREDS2",numberFont:"MLBREDS2"},
   LAD:{baseColor:"#005A9C",pinstripeColor:null,numberColor:"#FFFFFF",numberInnerBorderColor:"#005A9C",numberOuterBorderColor:"#FFFFFF",nameColor:"#FFFFFF",nameBorderColor:"#005A9C",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
-  SDP:{baseColor:"#2F241D",pinstripeColor:null,numberColor:"#FFC52F",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:"#2F241D",nameColor:"#FFC52F",nameBorderColor:"#FFFFFF",nameFont:"MLBPADRE",numberFont:"MLBPADRE"},
-  ARI:{baseColor:"#A71930",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#30CED8",numberOuterBorderColor:"#A71930",nameColor:"#30CED8",nameBorderColor:"#27251F",nameFont:"Mlbdia07",numberFont:"Mlbdia07"},
-  SFG:{baseColor:"#FD5A1E",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#EFD19F",numberOuterBorderColor:"#FD5A1E",nameColor:"#27251F",nameBorderColor:"#EFD19F",nameFont:"MLBGIANT",numberFont:"MLBGIANT"},
+  SD:{baseColor:"#2F241D",pinstripeColor:null,numberColor:"#FFC52F",numberInnerBorderColor:"#FFFFFF",numberOuterBorderColor:"#2F241D",nameColor:"#FFC52F",nameBorderColor:"#FFFFFF",nameFont:"MLBPADRE",numberFont:"MLBPADRE"},
+  AZ:{baseColor:"#A71930",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#30CED8",numberOuterBorderColor:"#A71930",nameColor:"#30CED8",nameBorderColor:"#27251F",nameFont:"Mlbdia07",numberFont:"Mlbdia07"},
+  SF:{baseColor:"#FD5A1E",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#EFD19F",numberOuterBorderColor:"#FD5A1E",nameColor:"#27251F",nameBorderColor:"#EFD19F",nameFont:"MLBGIANT",numberFont:"MLBGIANT"},
   COL:{baseColor:"#333366",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#C4CED4",numberOuterBorderColor:"#FFFFFF",nameColor:"#27251F",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
 };
 
@@ -967,12 +966,12 @@ const teamLevelMap = {};       // player name+team -> level string (AAA/AA/A+/A/
 
 // ===== DIVISIONS (for In-Division Tax) =====
 const TEAM_DIVISIONS = {
-  'BOS':'AL East','NYY':'AL East','TBR':'AL East','TOR':'AL East','BAL':'AL East',
-  'CHW':'AL Central','DET':'AL Central','MIN':'AL Central','KCR':'AL Central','CLE':'AL Central',
+  'BOS':'AL East','NYY':'AL East','TB':'AL East','TOR':'AL East','BAL':'AL East',
+  'CWS':'AL Central','DET':'AL Central','MIN':'AL Central','KC':'AL Central','CLE':'AL Central',
   'HOU':'AL West','SEA':'AL West','TEX':'AL West','LAA':'AL West','ATH':'AL West',
-  'ATL':'NL East','PHI':'NL East','NYM':'NL East','WSN':'NL East','MIA':'NL East',
+  'ATL':'NL East','PHI':'NL East','NYM':'NL East','WSH':'NL East','MIA':'NL East',
   'CHC':'NL Central','MIL':'NL Central','STL':'NL Central','CIN':'NL Central','PIT':'NL Central',
-  'LAD':'NL West','SDP':'NL West','ARI':'NL West','SFG':'NL West','COL':'NL West'
+  'LAD':'NL West','SD':'NL West','AZ':'NL West','SF':'NL West','COL':'NL West'
 };
 function finderIsSameDivision(teamA, teamB){
   return TEAM_DIVISIONS[teamA] && TEAM_DIVISIONS[teamA]===TEAM_DIVISIONS[teamB];
@@ -1019,7 +1018,7 @@ function finderAvailabilityWarningHtml(p){
 }
 
 // ===== COMP PICKS =====
-const COMP_A_TEAMS = ['SFG','KCR','ARI','STL','TBR','PIT','NYY','PHI','COL'];
+const COMP_A_TEAMS = ['SF','KC','AZ','STL','TB','PIT','NYY','PHI','COL'];
 const COMP_B_TEAMS = ['BOS','STL','DET','CIN','MIA','STL','ATH','MIN'];
 function getCompPicksForTeam(team){
   const picks=[];
@@ -1072,11 +1071,12 @@ function setProgress(pct, name) {
 }
 
 // ===== STATUS PARSING =====
-function parseStatus(aa) {
-  const s=(aa||'').toLowerCase();
-  if(s.includes('mlb') && s.includes('prospect')) return 'top100';
-  if(s.includes('mlb') && !s.includes('prospect')) return 'mlb';
-  if(s.includes('prospect')) return 'org';
+// New schema: levelRaw = MLB/AAA/AA/A+/A/Rk; mlbRank = top-100 rank; orgRank = org rank
+function parseStatus(levelRaw, mlbRank, orgRank) {
+  const lv=(levelRaw||'').trim().toUpperCase();
+  if(mlbRank) return 'top100';
+  if(lv==='MLB') return 'mlb';
+  if(orgRank) return 'org';
   return 'minors';
 }
 function dotClass(status){
@@ -1092,20 +1092,17 @@ function matchesGroup(p, g) {
   if(g==='prospects') return !!p.isProspect;
   if(g==='comppicks') return p.status==='comppick';
   if(g==='cash') return false;
-  // Granular minor league levels - from teamLevelMap if loaded, else fall back to level field
-  const levelKey=p.name+'|'+p.team;
-  const detailLevel=(teamLevelMap[levelKey]||'').toUpperCase();
-  if(g==='aaa') return p.level==='minors' && (detailLevel==='AAA' || (!detailLevel && false));
-  if(g==='aa') return p.level==='minors' && detailLevel==='AA';
-  if(g==='aplus') return p.level==='minors' && (detailLevel==='A+' || detailLevel==='HIGH-A');
-  if(g==='a') return p.level==='minors' && (detailLevel==='A' || detailLevel==='LOW-A');
-  if(g==='rk') return p.level==='minors' && (detailLevel==='RK' || detailLevel==='ROK' || detailLevel==='ROOKIE');
+  const dl=(p.levelRaw||'').toUpperCase();
+  if(g==='aaa') return p.level==='minors' && dl==='AAA';
+  if(g==='aa') return p.level==='minors' && dl==='AA';
+  if(g==='aplus') return p.level==='minors' && (dl==='A+' || dl==='HIGH-A');
+  if(g==='a') return p.level==='minors' && (dl==='A' || dl==='LOW-A');
+  if(g==='rk') return p.level==='minors' && (dl==='RK' || dl==='ROK' || dl==='ROOKIE');
   return true;
 }
 function getPlayerDetailLevel(p){
-  const key=p.name+'|'+p.team;
-  const dl=(teamLevelMap[key]||'').toUpperCase();
   if(p.level==='mlb') return 'MLB';
+  const dl=(p.levelRaw||'').toUpperCase();
   if(!dl) return p.isProspect?'Prospect':'MiLB';
   return dl;
 }
@@ -1126,103 +1123,151 @@ function ensureDataLoaded(){
   }
   return dataLoadPromise;
 }
+// Map full team names (from roster Team column) → abbreviation
+const TEAM_NAME_TO_ABBR = {
+  'Arizona Diamondbacks':'AZ','Atlanta Braves':'ATL','Baltimore Orioles':'BAL',
+  'Boston Red Sox':'BOS','Chicago Cubs':'CHC','Chicago White Sox':'CWS',
+  'Cincinnati Reds':'CIN','Cleveland Guardians':'CLE','Colorado Rockies':'COL',
+  'Detroit Tigers':'DET','Houston Astros':'HOU','Kansas City Royals':'KC',
+  'Los Angeles Angels':'LAA','Los Angeles Dodgers':'LAD','Miami Marlins':'MIA',
+  'Milwaukee Brewers':'MIL','Minnesota Twins':'MIN','New York Mets':'NYM',
+  'New York Yankees':'NYY','Athletics':'ATH','Philadelphia Phillies':'PHI',
+  'Pittsburgh Pirates':'PIT','San Diego Padres':'SD','San Francisco Giants':'SF',
+  'Seattle Mariners':'SEA','St. Louis Cardinals':'STL','Tampa Bay Rays':'TB',
+  'Texas Rangers':'TEX','Toronto Blue Jays':'TOR','Washington Nationals':'WSH',
+};
+
 async function loadData() {
   try {
-    setProgress(5, 'Loading player data...');
-    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(DATA_TAB)}&_cb=${Date.now()}`;
-    const r=await fetch(url, {cache: 'no-store'});
-    if(!r.ok) throw new Error('Could not reach the data sheet (HTTP '+r.status+')');
-    const text=await r.text();
-    const match=text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-    if(!match) throw new Error('Unexpected response from the data sheet — raw response started with: '+esc(text.slice(0,200)));
-    const json=JSON.parse(match[1]);
-    if(json.status==='error'){
-      const reason=(json.errors&&json.errors[0]&&(json.errors[0].detailed_message||json.errors[0].message))||'unknown error';
-      throw new Error('Google Sheets rejected the tab name "'+DATA_TAB+'" — '+reason);
+    setProgress(5, 'Loading team rosters...');
+
+    // 1. Fetch all 30 team roster tabs in parallel
+    const teamDataArr = await Promise.all(TEAMS.map(t => fetchSheetTab(t)));
+
+    // playerIndex keyed by playerID string for stat joining
+    const playerIndex = {};
+
+    for (let ti = 0; ti < TEAMS.length; ti++) {
+      const orgAbbr = TEAMS[ti];
+      const rows = teamDataArr[ti];
+      if (!rows) continue;
+
+      for (const row of rows) {
+        const name = String(row['Name'] || '').trim();
+        if (!name || name === 'Name') continue;
+
+        const playerIDRaw = row['Player ID'];
+        const playerID = playerIDRaw != null ? String(Math.round(Number(playerIDRaw))) : null;
+        if (!playerID || playerID === '0' || playerID === 'NaN') continue;
+
+        const pos = String(row['Position'] || '').trim();
+        const age = parseFloat(row['Age']) || null;
+        const jerseyNumRaw = row['Jersey #'] != null ? String(row['Jersey #']).trim() : '--';
+        const statusRaw = String(row['Status'] || '').trim();
+        const levelRaw = String(row['Level'] || '').trim();
+
+        // Value columns
+        const val2026raw = row['2026 Value'];
+        const val2026 = val2026raw != null ? parseFloat(val2026raw) : null;
+        if (val2026 === null || isNaN(val2026)) continue;
+
+        const val2027 = parseFloat(row['2027 Value']) || null;
+        const val2028 = parseFloat(row['2028 Value']) || null;
+        const val2029 = parseFloat(row['2029 Value']) || null;
+        const val2030 = parseFloat(row['2030 Value']) || null;
+        const val2031 = parseFloat(row['2031 Value']) || null;
+        const ctrlYears = [val2026,val2027,val2028,val2029,val2030,val2031].filter(v=>v!=null&&!isNaN(v)&&v>0).length;
+
+        const avgVal = parseFloat(row['Avg Value']) || null;
+        const valueScore = parseFloat(row['Value Score']) || null;
+        const orgRank = parseFloat(row['Org Rank']) || null;
+        const mlbRank = parseFloat(row['MLB Rank']) || null;
+
+        const levelUp = levelRaw.toUpperCase();
+        const level = levelUp === 'MLB' ? 'mlb' : 'minors';
+        const isProspect = !!(orgRank && orgRank > 0);
+        const injuredRaw = statusRaw.toUpperCase().includes('IL') ? statusRaw : '';
+        const status = parseStatus(levelRaw, mlbRank, orgRank);
+
+        const p = {
+          playerID, name,
+          team: orgAbbr,       // org abbreviation (tab name)
+          pos, age,
+          jerseyNumRaw,
+          statusRaw,           // raw Status column value ("Active", "60-Day IL", etc.)
+          injuredRaw,          // non-empty when on IL
+          aaRaw: statusRaw,    // legacy field used in some display code
+          etaRaw: (()=>{const lv=levelRaw.toUpperCase();if(lv==='MLB'||lv==='AAA')return'2026';if(lv==='AA')return'2027';if(lv==='A+'||lv==='HIGH-A')return'2028';return'2029';})(),
+          srvTime: null,
+          level, levelRaw,
+          isProspect, status,
+          val2026, avgVal, ctrlYears,
+          perfVal: valueScore,
+          orgRank, mlbRank,
+          // Stats enriched after stat sheets load
+          obp: null, slg: null, wrcPlus: null,
+          era: null, fip: null, k9: null,
+          hr: null, k: null, vWAR: null,
+          ip: null, whip: null, pa: null, h: null, avg26: null,
+          fgUrl: null,
+        };
+
+        allPlayers.push(p);
+        playerIndex[playerID] = p;
+      }
+
+      setProgress(Math.min(50, 5 + Math.round(((ti + 1) / TEAMS.length) * 40)), orgAbbr);
     }
-    const rows=(json.table&&json.table.rows)||[];
-    const totalDataRows=Math.max(0, rows.length-1); // minus header row
-    let skippedNoName=0, skippedBadTeam=0, skippedBadVal=0;
-    let sampleBadTeam=null, sampleBadVal=null;
-    const colLetters=['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','AA','AB','AC'];
-    function rowSnapshot(row){
-      return colLetters.map((L,idx)=> L+'='+(row[idx]&&row[idx].v!==null?row[idx].v:'(blank)')).slice(0,29).join(', ');
-    }
-    if(rows.length){
-      for(let ri=1;ri<rows.length;ri++){
-        const row=rows[ri].c;
-        if(!row||!row[1]||!row[1].v) continue;
-        const getV=idx=>row[idx]&&row[idx].v!==null?parseFloat(row[idx].v):null;
-        const getS=idx=>row[idx]&&row[idx].v!==null?String(row[idx].v).trim():'';
-        const name=getS(1);   // col B
-        if(!name||name==='Name'){ skippedNoName++; continue; }
-        const teamCol=getS(2);  // col C - team abbrev now lives on every row
-        if(!teamCol || !TEAMS.includes(teamCol)){
-          skippedBadTeam++;
-          if(!sampleBadTeam) sampleBadTeam=rowSnapshot(row);
-          continue; // skip header/blank/unrecognized rows
-        }
-        const pos=getS(3);      // col D
-        const age=getV(4);      // col E
-        const perfVal=getV(14);  // col O - overall skill score
-        const srvTime=getV(15);  // col P
-        const val2026=getV(16);  // col Q
-        if(val2026===null||isNaN(val2026)){
-          skippedBadVal++;
-          if(!sampleBadVal) sampleBadVal=rowSnapshot(row);
-          continue;
-        }
-        // Individual year columns Q-V (2026-2031) used to compute years of control
-        const yrQ=row[16]&&row[16].v!==null;
-        const yrR=row[17]&&row[17].v!==null;
-        const yrS=row[18]&&row[18].v!==null;
-        const yrT=row[19]&&row[19].v!==null;
-        const yrU=row[20]&&row[20].v!==null;
-        const yrV=row[21]&&row[21].v!==null;
-        const ctrlYears=[yrQ,yrR,yrS,yrT,yrU,yrV].filter(Boolean).length;
-        const avgVal=getV(24);   // col Y
-        const injuredRaw=getS(25);// col Z
-        const aaRaw=getS(26);     // col AA - status text (drives parseStatus, unchanged)
-        const etaRaw=getS(27);    // col AB
-        const levelRaw=getS(28);  // col AC - MLB-level flag: primary MLB/Minors placement, and trade-finder eligibility
-        const obp=getV(29);      // col AD
-        const slg=getV(30);      // col AE
-        const wrcPlus=getV(31);  // col AF
-        const era=getV(32);      // col AG
-        const fip=getV(33);      // col AH
-        const k9=getV(34);       // col AI
-        // Additional stat columns (AL+) - present in PLAYERS tab if available
-        const hr=getV(37);       // col AL (homeRuns)
-        const k=getV(38);        // col AM (strikeouts / K)
-        const vWAR=getV(39);     // col AN (vWAR)
-        const ip=getV(40);       // col AO (IP)
-        const whip=getV(41);     // col AP (WHIP)
-        const pa=getV(42);       // col AQ (PA)
-        const h=getV(43);        // col AR (Hits)
-        const avg26=getV(44);    // col AS (AVG)
-        const status=parseStatus(aaRaw);
-        // level: every player is either 'mlb' or 'minors', driven purely by col AC
-        const level=levelRaw.trim().toUpperCase()==='MLB' ? 'mlb' : 'minors';
-        // isProspect: cross-cutting flag (independent of level) - true whenever col AA mentions "Prospect"
-        const isProspect=aaRaw.toLowerCase().includes('prospect');
-        const jerseyNumRaw=getS(35); // col AJ - "--" means not on the 40-man roster yet
-        const fgUrl=getS(36);        // col AK
-        allPlayers.push({name,team:teamCol,pos,age,srvTime,val2026,ctrlYears,avgVal,perfVal,aaRaw,etaRaw,levelRaw,status,level,isProspect,obp,slg,wrcPlus,era,fip,k9,fgUrl,jerseyNumRaw,injuredRaw,hr,k,vWAR,ip,whip,pa,h,avg26});
-        if(ri%25===0) setProgress(Math.min(95, 5+Math.round((ri/rows.length)*90)), teamCol);
+
+    if (!allPlayers.length) throw new Error('No players loaded from team roster tabs.');
+
+    setProgress(55, 'Loading 2026 stats...');
+
+    // 2. Load 2026 stat sheets and enrich allPlayers via playerID join
+    const [hitters26, pitchers26] = await Promise.all([
+      fetchSheetTab('MLB Hitters 2026'),
+      fetchSheetTab('MLB Pitchers 2026'),
+    ]);
+
+    if (hitters26) {
+      for (const row of hitters26) {
+        const id = row['playerID'] != null ? String(Math.round(Number(row['playerID']))) : null;
+        const p = id ? playerIndex[id] : null;
+        if (!p) continue;
+        const ab = parseFloat(row['AB']) || 0;
+        const h = parseFloat(row['H']);
+        p.pa  = parseFloat(row['PA']) || null;
+        p.h   = isNaN(h) ? null : h;
+        p.hr  = parseFloat(row['HR']) || null;
+        p.obp = parseFloat(row['OBP']) || null;
+        p.slg = parseFloat(row['SLG']) || null;
+        p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
+        const vw = parseFloat(row['vWAR']);
+        if (!isNaN(vw)) p.vWAR = vw;
       }
     }
-    setProgress(100,'Done!');
-    if(!allPlayers.length){
-      let detail='Sheet returned '+totalDataRows+' data row(s) total. ';
-      detail+=skippedNoName+' skipped (no name), '+skippedBadTeam+' skipped (team not recognized), '+skippedBadVal+' skipped (2026 Val blank/invalid). ';
-      if(sampleBadTeam) detail+='<br><br>Sample row that failed the TEAM check — raw values: '+sampleBadTeam;
-      if(sampleBadVal) detail+='<br><br>Sample row that failed the 2026 VAL check — raw values: '+sampleBadVal;
-      throw new Error('No players loaded from the "'+DATA_TAB+'" tab.<br>'+detail);
+
+    if (pitchers26) {
+      for (const row of pitchers26) {
+        const id = row['mlbam_id'] != null ? String(Math.round(Number(row['mlbam_id']))) : null;
+        const p = id ? playerIndex[id] : null;
+        if (!p) continue;
+        p.era  = parseFloat(row['ERA']) || null;
+        p.k    = parseFloat(row['K']) || null;
+        p.ip   = parseFloat(row['IP']) ? parseFloat(row['IP']) : null;
+        p.whip = parseFloat(row['WHIP']) || null;
+        p.k9   = parseFloat(row['K9']) || null;
+        p.fip  = parseFloat(row['xERA']) || null;
+        const vw = parseFloat(row['vWAR']);
+        if (!isNaN(vw)) p.vWAR = vw;
+      }
     }
+
+    setProgress(100, 'Done!');
     await loadStandings();
     buildPercentiles();
-  } catch(e){
-    if(allPlayers.length > 0) {
+  } catch(e) {
+    if (allPlayers.length > 0) {
       buildPercentiles();
     } else {
       throw e;
@@ -1320,8 +1365,16 @@ async function loadCareerStats(){
     fetchSheetTab('Career Hitting Stats'),
     fetchSheetTab('Career Pitching Stats')
   ]);
-  if(hRows) hRows.forEach(r=>{const id=r['mlbam_id']||r['player_name']; if(id) careerStatsHitters[String(id)]=r;});
-  if(pRows) pRows.forEach(r=>{const id=r['mlbam_id']||r['player_name']; if(id) careerStatsPitchers[String(id)]=r;});
+  if(hRows) hRows.forEach(r=>{
+    const raw=r['playerID']!=null?r['playerID']:(r['mlbam_id']!=null?r['mlbam_id']:null);
+    const id=raw!=null?String(Math.round(Number(raw))):null;
+    if(id&&id!=='0'&&id!=='NaN') careerStatsHitters[id]=r;
+  });
+  if(pRows) pRows.forEach(r=>{
+    const raw=r['mlbam_id']!=null?r['mlbam_id']:(r['playerID']!=null?r['playerID']:null);
+    const id=raw!=null?String(Math.round(Number(raw))):null;
+    if(id&&id!=='0'&&id!=='NaN') careerStatsPitchers[id]=r;
+  });
 }
 
 async function loadMiLBStats(){
@@ -1329,8 +1382,16 @@ async function loadMiLBStats(){
     fetchSheetTab('26 pHitters'),
     fetchSheetTab('26 pPitchers')
   ]);
-  if(hRows) hRows.forEach(r=>{const n=r['player_name']||r['name']||''; if(n) miLBHitters[n]=r;});
-  if(pRows) pRows.forEach(r=>{const n=r['player_name']||r['name']||''; if(n) miLBPitchers[n]=r;});
+  if(hRows) hRows.forEach(r=>{
+    const raw=r['playerID']!=null?r['playerID']:null;
+    const id=raw!=null?String(Math.round(Number(raw))):null;
+    if(id&&id!=='0'&&id!=='NaN') miLBHitters[id]=r;
+  });
+  if(pRows) pRows.forEach(r=>{
+    const raw=r['playerID']!=null?r['playerID']:null;
+    const id=raw!=null?String(Math.round(Number(raw))):null;
+    if(id&&id!=='0'&&id!=='NaN') miLBPitchers[id]=r;
+  });
 }
 
 // ===== STANDINGS PAGE =====
@@ -1524,7 +1585,7 @@ async function ppRenderStats(){
     if(!isMinorLeaguer && !isOhtani){section.innerHTML='<div class="pp-no-data">No minor league data available</div>';return;}
     // Load MiLB data if needed
     if(!Object.keys(miLBHitters).length&&!Object.keys(miLBPitchers).length) await loadMiLBStats();
-    const miRow=isPitcher?miLBPitchers[p.name]:miLBHitters[p.name];
+    const miRow=isPitcher?miLBPitchers[p.playerID]:miLBHitters[p.playerID];
     if(!miRow){section.innerHTML='<div class="pp-no-data">No MiLB data available</div>';return;}
     if(isPitcher){
       const ip=parseFloat(miRow['IP'])||null;
@@ -1563,7 +1624,18 @@ async function ppRenderStats(){
     fetchSheetTab(seasonTabs[3]),
     fetchSheetTab(careerTab)
   ]);
-  const findRow=(rows)=>rows&&rows.find(r=>(r['player_name']||r['name']||'').toLowerCase()===p.name.toLowerCase());
+  const findRow=(rows)=>{
+    if(!rows||!p.playerID) return null;
+    // Primary: match by numeric playerID / mlbam_id
+    const found=rows.find(r=>{
+      const rid=r['playerID']!=null?String(Math.round(Number(r['playerID']))):null;
+      const rid2=r['mlbam_id']!=null?String(Math.round(Number(r['mlbam_id']))):null;
+      return rid===p.playerID||rid2===p.playerID;
+    });
+    if(found) return found;
+    // Fallback: name match
+    return rows.find(r=>(r['player_name']||r['playerName']||r['name']||'').toLowerCase()===p.name.toLowerCase());
+  };
   const r23=findRow(s23), r24=findRow(s24), r25=findRow(s25), r26=findRow(s26);
   const rCareer=findRow(careerRows);
   if(isPitcher){
@@ -3371,13 +3443,11 @@ function buildPercentiles(){
 }
 
 // Convert raw injuredRaw value to display label
-// Raw values from sheet: "10IL", "60IL", "Inj" (or empty)
+// Raw values from new schema: "7-Day IL", "10-Day IL", "60-Day IL", or similar
 function injuredLabel(injuredRaw){
   if(!injuredRaw) return '';
-  const v=injuredRaw.trim().toUpperCase();
-  if(v==='10IL') return '10 Day IL';
-  if(v==='60IL') return '60 Day IL';
-  if(v.includes('IL')) return v+' IL';
+  const v=injuredRaw.trim();
+  if(v.toUpperCase().includes('IL')) return v;
   return 'Injured';
 }
 
