@@ -1055,7 +1055,9 @@ let rosterSortCol = 'val2026', rosterSortDir = 1;
 // ===== NAV =====
 let _prevPage = 'trade';
 function showPage(p) {
-  _prevPage = document.querySelector('.page.active')?.id?.replace('page-','') || 'trade';
+  const _leavingPage = document.querySelector('.page.active')?.id?.replace('page-','') || '';
+  if(_leavingPage==='trade' && p!=='trade'){ selectedA=[]; selectedB=[]; }
+  _prevPage = _leavingPage || 'trade';
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.menu-item[id^="menu-"]').forEach(x=>x.classList.remove('active'));
@@ -1613,8 +1615,7 @@ async function ppRenderStats(){
     if(!isMinorLeaguer && !isOhtani){section.innerHTML='<div class="pp-no-data">No minor league data available</div>';return;}
     // Load MiLB data if needed
     if(!Object.keys(miLBHitters).length&&!Object.keys(miLBPitchers).length) await loadMiLBStats();
-    const miLookup=(dict)=>dict[p.playerID]||Object.values(dict).find(r=>(r['player_name']||r['playerName']||r['name']||'').toLowerCase()===p.name.toLowerCase())||null;
-    const miRow=isPitcher?miLookup(miLBPitchers):miLookup(miLBHitters);
+    const miRow=isPitcher?miLBPitchers[p.playerID]:miLBHitters[p.playerID];
     if(!miRow){section.innerHTML='<div class="pp-no-data">No MiLB data available</div>';return;}
     if(isPitcher){
       const ip=parseFloat(miRow['IP'])||null;
