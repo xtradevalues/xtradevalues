@@ -1561,7 +1561,7 @@ function playersSetSort(col,el){
 }
 
 // ===== PLAYER PAGE =====
-let _ppPlayer=null, _ppLevelView='mlb', _ppHitPitView='hit';
+let _ppPlayer=null, _ppLevelView='mlb', _ppHitPitView='hit', _ppRenderToken=0;
 function showPlayerPage(p){
   _ppPlayer=p;
   _ppLevelView='mlb';
@@ -1581,10 +1581,11 @@ function showPlayerPage(p){
   }
   if(playerHasInjury(p)) badges+=`<span class="player-badge player-badge-injury">✚ ${esc(injuredLabel(p.injuredRaw))}</span>`;
   document.getElementById('ppBadges').innerHTML=badges;
-  // Toggle
+  // Toggle — reset to MLB active state
   const toggleWrap=document.getElementById('ppToggleWrap');
   const hitPitBtn=document.getElementById('ppHitPitToggle');
   const btns=toggleWrap.querySelectorAll('.pp-toggle-btn:not(#ppHitPitToggle)');
+  btns.forEach((b,i)=>{b.classList.toggle('active',i===0);});
   // Ohtani gets hit/pitch toggle
   hitPitBtn.style.display=(p.name==='Shohei Ohtani')?'inline-flex':'none';
   // Render stats
@@ -1615,14 +1616,17 @@ function ppAddToTrade(){
   addPlayer('A',p);
 }
 async function ppRenderStats(){
+  const token=++_ppRenderToken;
   const p=_ppPlayer;
   if(!p) return;
   const section=document.getElementById('ppStatSection');
+  const stale=()=>token!==_ppRenderToken||_ppPlayer!==p;
   const isPitcher=['SP','RP'].includes(finderFirstPos(p.pos))||(p.name==='Shohei Ohtani'&&_ppHitPitView==='pitch');
   const isOhtani=p.name==='Shohei Ohtani';
   const isMinorLeaguer=p.level==='minors';
   if(_ppLevelView==='minors'){
     if(!Object.keys(miLBHitters).length&&!Object.keys(miLBPitchers).length) await loadMiLBStats();
+    if(stale()) return;
     const miYears=[['2023',miLBHittersByYear['2023'],miLBPitchersByYear['2023']],
                    ['2024',miLBHittersByYear['2024'],miLBPitchersByYear['2024']],
                    ['2025',miLBHittersByYear['2025'],miLBPitchersByYear['2025']],
@@ -1666,6 +1670,7 @@ async function ppRenderStats(){
     fetchSheetTab(seasonTabs[3]),
     fetchSheetTab(careerTab)
   ]);
+  if(stale()) return;
   const findRow=(rows)=>{
     if(!rows||!p.playerID) return null;
     // Primary: match by numeric playerID / mlbam_id
