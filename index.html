@@ -366,14 +366,14 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .player-page-inner{max-width:680px;margin:0 auto;width:100%;padding:0 0 40px}
 .player-back-btn{display:flex;align-items:center;gap:7px;padding:14px 16px;color:var(--text-muted);font-size:12px;cursor:pointer;transition:color 0.15s;border:none;background:none;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
 .player-back-btn:hover{color:var(--accent)}
-.player-page-header{padding:16px;display:flex;gap:16px;align-items:flex-start;border-bottom:1px solid var(--border-light)}
+.player-page-header{padding:16px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;border-bottom:1px solid var(--border-light)}
 .player-page-jersey{width:72px;height:84px;flex-shrink:0;filter:drop-shadow(0 6px 14px rgba(0,0,0,0.55))}
-.player-page-info{flex:1;min-width:0}
+.player-page-info{flex:1;min-width:160px}
 .player-page-values{display:flex;gap:8px;flex-shrink:0}
 .pp-value-box{border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;text-align:center;min-width:64px}
 .pp-value-box .pp-value-val{font-size:17px;font-weight:600;color:var(--text-primary);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .pp-value-box .pp-value-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-top:3px}
-.player-page-name{font-size:22px;font-weight:500;color:var(--text-primary);letter-spacing:-0.01em;font-family:'Space Grotesk','Inter',sans-serif;line-height:1.2;overflow-wrap:break-word}
+.player-page-name{font-size:22px;font-weight:500;color:var(--text-primary);letter-spacing:-0.01em;font-family:'Space Grotesk','Inter',sans-serif;line-height:1.2}
 .player-page-name.long{font-size:17px}
 .player-page-name.vlong{font-size:14px}
 .player-page-meta{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap}
@@ -448,7 +448,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   .players-table th{padding:14px 14px}
   .players-table td{padding:14px 14px;font-size:13px}
   .player-page-inner{padding:0 0 60px}
-  .player-page-header{padding:24px 24px}
+  .player-page-header{padding:24px 24px;flex-wrap:nowrap}
   .player-page-jersey{width:96px;height:112px}
   .player-page-name{font-size:26px}
   .player-page-name.long{font-size:20px}
@@ -1329,7 +1329,7 @@ async function loadData() {
         p.pa  = parseFloat(row['PA']) || null;
         p.h   = isNaN(h) ? null : h;
         p.hr  = parseFloat(row['HR']) || null;
-        p.rbi = parseFloat(row['RBI']) || null;
+        p.rbi = parseFloat(colVal(row,'RBI',10)) || null;
         p.obp = parseFloat(row['OBP']) || null;
         p.slg = parseFloat(row['SLG']) || null;
         p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
@@ -1349,8 +1349,8 @@ async function loadData() {
         p.whip = parseFloat(row['WHIP']) || null;
         p.k9   = parseFloat(row['K9']) || null;
         p.fip  = parseFloat(row['xERA']) || null;
-        p.w    = parseFloat(row['W']) || null;
-        p.l    = parseFloat(row['L']) || null;
+        p.w    = parseFloat(colVal(row,'W',4)) || null;
+        p.l    = parseFloat(colVal(row,'L',5)) || null;
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) p.vWAR = vw;
       }
@@ -1410,6 +1410,21 @@ async function loadStandings(){
 }
 
 // ===== SEASON & CAREER STAT LOADING =====
+// Some sheet tabs use inconsistent header text for the same logical column (or the header
+// lookup collides), so prefer the named header but fall back to the column-letter index
+// (fetchSheetTab's '_N' fallback) when the named value is missing.
+function colVal(r,name,idx){
+  const v=r[name];
+  return (v!=null&&v!=='')?v:r['_'+idx];
+}
+// Org Rank / MLB Top 100 Rank cells are formatted like "ATH 1" or "MLB 35" (team/league
+// prefix + rank), matching the same convention as the team roster sheet's Org/MLB Rank
+// columns — pull the trailing number out rather than parsing the whole string.
+function extractRank(v){
+  if(v==null||v==='') return NaN;
+  const m=String(v).match(/(\d+(?:\.\d+)?)/);
+  return m?parseFloat(m[1]):NaN;
+}
 async function fetchSheetTab(tabName){
   if(seasonStatsCache[tabName]) return seasonStatsCache[tabName];
   try {
@@ -1662,16 +1677,15 @@ async function renderProspects(){
   // Column C (index 2) is the join key on 2026 Pipeline Rankings, not column A
   let list=allPlayers.map(p=>({p,row:pipelineRankings[p.playerID]})).filter(x=>x.row);
   if(scope==='__top100'){
-    list=list.filter(({row})=>row['_21']!=null&&row['_21']!==''&&!isNaN(parseFloat(row['_21'])));
-    list.sort((a,b)=>parseFloat(a.row['_21'])-parseFloat(b.row['_21']));
+    list=list.map(x=>({...x,rank:extractRank(colVal(x.row,'MLB Top 100 Rank',21))})).filter(x=>!isNaN(x.rank));
+    list.sort((a,b)=>a.rank-b.rank);
   } else {
-    list=list.filter(({p})=>p.team===scope);
+    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',20))}));
     list.sort((a,b)=>{
-      const av=parseFloat(a.row['_20']), bv=parseFloat(b.row['_20']);
-      if(isNaN(av)&&isNaN(bv)) return 0;
-      if(isNaN(av)) return 1;
-      if(isNaN(bv)) return -1;
-      return av-bv;
+      if(isNaN(a.rank)&&isNaN(b.rank)) return 0;
+      if(isNaN(a.rank)) return 1;
+      if(isNaN(b.rank)) return -1;
+      return a.rank-b.rank;
     });
   }
 
@@ -1767,15 +1781,16 @@ function computeMiLBHitterStats(r){
   const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
   return {
     pa:parseFloat(r['plateAppearances'])||null, h:parseFloat(r['hits'])||null, hr:parseFloat(r['homeRuns'])||null,
-    rbi:parseFloat(r['rbi'])||null, avg, obp, slg, vWAR:parseFloat(r['vWAR'])||null
+    rbi:parseFloat(colVal(r,'rbi',25))||null, avg, obp, slg, vWAR:parseFloat(r['vWAR'])||null
   };
 }
 function computeMiLBPitcherStats(r){
   if(!r) return null;
+  // 26 pPitchers: W is column F (index 5), L is column G (index 6)
   return {
     ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null, era:parseFloat(r['ERA'])||null,
     fip:parseFloat(r['FIP'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-    w:parseFloat(r['W'])||null, l:parseFloat(r['L'])||null, vWAR:parseFloat(r['vWAR'])||null
+    w:parseFloat(colVal(r,'W',5))||null, l:parseFloat(colVal(r,'L',6))||null, vWAR:parseFloat(r['vWAR'])||null
   };
 }
 function ppAddToTrade(){
@@ -1847,27 +1862,23 @@ async function ppRenderStats(){
   const rCareer=findRow(careerRows);
   if(isPitcher){
     const rows=[];
+    // MLB Pitchers / Updated Career Pitching have no dedicated FIP column — column U (xERA)
+    // is the value displayed under the "FIP" label, matching the loadData() convention.
     const pRow=(season,r)=>{
       if(!r) return null;
       return {season, ip:parseFloat(r['IP'])||null, k:parseFloat(r['K'])||null,
         era:parseFloat(r['ERA'])||null, whip:parseFloat(r['WHIP'])||null, k9:parseFloat(r['K9'])||null,
-        er:parseFloat(r['ER'])||null, hr:parseFloat(r['HR'])||null, bb:parseFloat(r['BB'])||null,
-        hbp:parseFloat(r['HBP'])||null, vWAR:parseFloat(r['vWAR'])||null,
-        fip:parseFloat(r['FIP'])||null,
-        w:parseFloat(r['W'])||null, l:parseFloat(r['L'])||null};
-    };
-    const pfip=row=>{
-      if(!row||!row.ip||row.ip<=0) return null;
-      if(row.fip!==null&&!isNaN(row.fip)) return row.fip;
-      return ((13*(row.hr||0)+3*((row.bb||0)+(row.hbp||0))-2*(row.k||0))/row.ip)+3.10;
+        vWAR:parseFloat(r['vWAR'])||null,
+        fip:parseFloat(colVal(r,'xERA',20))||null,
+        w:parseFloat(colVal(r,'W',4))||null, l:parseFloat(colVal(r,'L',5))||null};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
-      const row=pRow(season,r); if(row){row.fip=pfip(row);rows.push(row);}
+      const row=pRow(season,r); if(row) rows.push(row);
     });
     // Career row is pre-blended server-side — read it directly, no frontend blending.
     if(rCareer){
       const cRow=pRow('Career',rCareer);
-      if(cRow){cRow.fip=pfip(cRow);cRow.isCareer=true;rows.push(cRow);}
+      if(cRow){cRow.isCareer=true;rows.push(cRow);}
     }
     section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No stats available</div>';
   } else {
@@ -1878,7 +1889,7 @@ async function ppRenderStats(){
       const dbl=parseFloat(r['2B'])||0, trpl=parseFloat(r['3B'])||0;
       const bb=parseFloat(r['BB'])||0, hbp=parseFloat(r['HBP'])||0, sf=parseFloat(r['SF'])||0;
       const pa=parseFloat(r['PA'])||null;
-      const rbi=parseFloat(r['RBI'])||null;
+      const rbi=parseFloat(colVal(r,'RBI',10))||null;
       const avg=ab>0?h/ab:null;
       const obp=(ab+bb+hbp+sf)>0?(h+bb+hbp)/(ab+bb+hbp+sf):null;
       const singles=h-dbl-trpl-hr;
@@ -1895,7 +1906,7 @@ async function ppRenderStats(){
       const c=rCareer;
       rows.push({season:'Career',
         pa:parseFloat(c['PA'])||null, h:parseFloat(c['H'])||null, hr:parseFloat(c['HR'])||null,
-        rbi:parseFloat(c['RBI'])||null,
+        rbi:parseFloat(colVal(c,'RBI',10))||null,
         avg:parseFloat(c['AVG'])||null, obp:parseFloat(c['OBP'])||null, slg:parseFloat(c['SLG'])||null,
         vWAR:parseFloat(c['vWAR'])||null, isCareer:true});
     }
