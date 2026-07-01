@@ -1658,20 +1658,19 @@ async function ppRenderStats(){
                    ['2024',miLBHittersByYear['2024'],miLBPitchersByYear['2024']],
                    ['2025',miLBHittersByYear['2025'],miLBPitchersByYear['2025']],
                    ['2026',miLBHittersByYear['2026'],miLBPitchersByYear['2026']]];
-    // Flexible field getter — tries multiple common column name variants
-    const gf=(r,...names)=>{for(const n of names){const v=r[n];if(v!=null&&v!=='')return v;}return null;};
     if(isPitcher){
       const rows=[];
       miYears.forEach(([yr,hMap,pMap])=>{
         const r=pMap&&pMap[p.playerID];
         if(!r) return;
-        const ip=parseFloat(gf(r,'IP','Innings Pitched','innings_pitched'))||null;
-        const k=parseFloat(gf(r,'K','SO','Strikeouts','K','strikeouts'))||null;
-        const era=parseFloat(gf(r,'ERA','era'))||null;
-        const fip=parseFloat(gf(r,'FIP','xFIP','fip'))||null;
-        const whip=parseFloat(gf(r,'WHIP','whip'))||null;
-        const k9=parseFloat(gf(r,'K9','K/9','SO9','SO/9','k9'))||null;
-        rows.push({season:yr+' (MiLB)',ip,k,era,fip,whip,k9,vWAR:parseFloat(r['vWAR'])||null});
+        rows.push({season:yr+' (MiLB)',
+          ip:parseFloat(r['IP'])||null,
+          k:parseFloat(r['K'])||null,
+          era:parseFloat(r['ERA'])||null,
+          fip:parseFloat(r['FIP'])||null,
+          whip:parseFloat(r['WHIP'])||null,
+          k9:parseFloat(r['K9'])||null,
+          vWAR:parseFloat(r['vWAR'])||null});
       });
       section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No MiLB data available</div>';
     } else {
@@ -1679,23 +1678,24 @@ async function ppRenderStats(){
       miYears.forEach(([yr,hMap,pMap])=>{
         const r=hMap&&hMap[p.playerID];
         if(!r) return;
-        const pa=parseFloat(gf(r,'PA','Plate Appearances','plate_appearances'))||null;
-        const h=parseFloat(gf(r,'H','Hits','hits'))||null;
-        const ab=parseFloat(gf(r,'AB','At Bats','at_bats'))||0;
-        const hr=parseFloat(gf(r,'HR','Home Runs','home_runs'))||null;
-        const bb=parseFloat(gf(r,'BB','Walks','walks'))||0;
-        const hbp=parseFloat(gf(r,'HBP','Hit By Pitch','hbp'))||0;
-        const sf=parseFloat(gf(r,'SF','Sacrifice Flies','sf'))||0;
-        const dbl=parseFloat(gf(r,'2B','Doubles','doubles'))||0;
-        const trpl=parseFloat(gf(r,'3B','Triples','triples'))||0;
-        // Use pre-computed values if present, otherwise compute from components
-        const preAvg=parseFloat(gf(r,'AVG','BA','Batting Average','batting_avg','avg','ba'));
-        const preObp=parseFloat(gf(r,'OBP','On Base %','OBP%','obp'));
-        const preSlg=parseFloat(gf(r,'SLG','Slugging','SLG%','slg'));
+        // pHitters sheet uses camelCase column names
+        const pa=parseFloat(r['plateAppearances'])||null;
+        const h=parseFloat(r['hits'])||null;
+        const ab=parseFloat(r['atBats'])||0;
+        const hr=parseFloat(r['homeRuns'])||null;
+        const bb=parseFloat(r['baseOnBalls'])||0;
+        const hbp=parseFloat(r['hitByPitch'])||0;
+        const sf=parseFloat(r['sacFlies'])||0;
+        const dbl=parseFloat(r['doubles'])||0;
+        const trpl=parseFloat(r['triples'])||0;
         const hVal=h||0;
+        // Use pre-computed avg/obp/slg from sheet (already camelCase)
+        const preAvg=parseFloat(r['avg']);
+        const preObp=parseFloat(r['obp']);
+        const preSlg=parseFloat(r['slg']);
         const avg=(!isNaN(preAvg)&&preAvg)?preAvg:(ab>0?hVal/ab:null);
         const obp=(!isNaN(preObp)&&preObp)?preObp:((ab+bb+hbp+sf)>0?(hVal+bb+hbp)/(ab+bb+hbp+sf):null);
-        const singles=hVal-hr-(dbl||0)-(trpl||0);
+        const singles=hVal-(hr||0)-dbl-trpl;
         const tb=singles+2*dbl+3*trpl+4*(hr||0);
         const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
         rows.push({season:yr+' (MiLB)',pa,h,hr,avg,obp,slg,vWAR:parseFloat(r['vWAR'])||null});
