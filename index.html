@@ -1294,20 +1294,27 @@ function buildTrades(rows){
     const tradeNumber=String(colVal(row,'Trade Number',0)||'').trim();
     if(!tradeNumber || tradeNumber==='Trade Number') continue;
     const playerIDRaw=colVal(row,'Player ID',1);
-    const playerID=playerIDRaw!=null?String(Math.round(Number(playerIDRaw))):null;
+    const playerIDCandidate=playerIDRaw!=null?String(Math.round(Number(playerIDRaw))):null;
+    const playerID=(playerIDCandidate && playerIDCandidate!=='0' && playerIDCandidate!=='NaN')?playerIDCandidate:null;
     const playerName=String(colVal(row,'Player Name',2)||'').trim();
-    if(!playerID || !playerName) continue;
+    if(!playerName) continue;
+    // Rows with no Player ID aren't real roster players — they're a comp pick or cash
+    // consideration. Identify which from the Player Name text; anything else unrecognized
+    // without an ID is skipped, same as before.
+    const asset=playerID?null:classifyTradeAsset(playerName);
+    if(!playerID && !asset) continue;
     const tradingTeam=normTeamAbbr(colVal(row,'Trading Team',3));
     const receivingTeam=normTeamAbbr(colVal(row,'Receiving Team',4));
     const description=String(colVal(row,'Trade Description',5)||'').trim();
     const date=parseGvizDate(colVal(row,'Date',6));
     const val2026=numOrNull(colVal(row,'2026 Value',7));
     const avgVal=numOrNull(colVal(row,'Avg Value',8));
+    const cashAmount=asset==='cash'?parseCashAmount(playerName):null;
     if(!byNum[tradeNumber]){
       byNum[tradeNumber]={tradeNumber,description,date,players:[]};
       order.push(tradeNumber);
     }
-    byNum[tradeNumber].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal});
+    byNum[tradeNumber].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal,asset,cashAmount});
   }
   // Most recent trade first; ties (same date) break by Trade Number descending, since trade
   // numbers are assigned in chronological order.
@@ -1345,6 +1352,34 @@ function groupTradeSides(trade){
 function liveTradePlayerValues(playerID){
   const p=allPlayers.find(x=>x.playerID===playerID);
   return p ? {val2026:p.val2026, avgVal:p.avgVal} : null;
+}
+function classifyTradeAsset(name){
+  const n=String(name||'').toLowerCase();
+  if(/comp\s*pick\s*a/.test(n)) return 'compA';
+  if(/comp\s*pick\s*b/.test(n)) return 'compB';
+  if(/cash/.test(n)) return 'cash';
+  return null;
+}
+function parseCashAmount(name){
+  const m=String(name||'').match(/\$\s*([\d,]+)/);
+  if(!m) return null;
+  const dollars=parseInt(m[1].replace(/,/g,''),10);
+  return (dollars>0 && !isNaN(dollars)) ? dollars : null;
+}
+// Same conversion trade sim's addCash() uses: dollars -> trade value.
+function cashDollarsToValue(dollars){
+  return Math.round((dollars/100000)*0.01*100)/100;
+}
+// Comp picks and cash aren't real roster players, so there's no live team-sheet lookup for their
+// "current" value — comp picks carry the same fixed value trade sim assigns them
+// (getCompPicksForTeam(): Comp Pick A = 1.7, Comp Pick B = 1.3, unaffected by time or team), and
+// cash only has a computable current value when a specific dollar amount was actually noted on
+// the trade (mirrors addCash()) — we don't invent one otherwise.
+function liveTradeAssetValue(p){
+  if(p.asset==='compA') return {val2026:1.7, avgVal:1.7};
+  if(p.asset==='compB') return {val2026:1.3, avgVal:1.3};
+  if(p.asset==='cash') return {val2026:p.cashAmount?cashDollarsToValue(p.cashAmount):null, avgVal:null};
+  return liveTradePlayerValues(p.playerID);
 }
 function renderTradeTrackerList(trades){
   const c=document.getElementById('tradeTrackerContent');
@@ -4601,7 +4636,12 @@ function tbBlockHtml(dateLabel, sides, unavailable){
   </div>`;
 }
 function tbSideStatsHtml(sides){
-  const playerLine=(p)=>`<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+  // Cash considerations don't carry a meaningful Avg Value — same display rule trade sim's own
+  // share-player line uses for isCash entries.
+  const playerLine=(p)=>{
+    if(p.asset==='cash') return `<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
+    return `<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+  };
   return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
 }
 function tbVerdictBox(cls,headline,detail){
@@ -4626,17 +4666,19 @@ function tbVerdictHtml(atTradeSides, currentSides, unavailable){
 function renderTradeBreakdown(trade, liveOk){
   const sides=groupTradeSides(trade);
 
-  // liveTradePlayerValues() already searches the full 30-team merged roster (allPlayers), so a
-  // miss here means the player genuinely isn't findable anywhere yet (traded off-system, or the
-  // roster sheet just hasn't caught up to a very recent move) — grey out the Current block rather
-  // than blend in a misleading partial total.
+  // liveTradeAssetValue() searches the full 30-team merged roster (allPlayers) for real players —
+  // a miss there means the player genuinely isn't findable anywhere yet (traded off-system, or
+  // the roster sheet just hasn't caught up to a very recent move) — grey out the Current block
+  // rather than blend in a misleading partial total. Comp picks always resolve (fixed value); an
+  // unspecified cash amount resolves to a zero-ish contribution without forcing the grey-out,
+  // since that's a "nothing to add" case rather than a lookup failure.
   let currentSides=sides, unavailable=!liveOk;
   if(liveOk){
     let anyMissing=false;
     currentSides=sides.map(s=>({
       receivingTeam:s.receivingTeam,
       players:s.players.map(p=>{
-        const live=liveTradePlayerValues(p.playerID);
+        const live=liveTradeAssetValue(p);
         if(!live) anyMissing=true;
         return {...p, val2026:live?live.val2026:null, avgVal:live?live.avgVal:null};
       })
