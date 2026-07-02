@@ -6248,6 +6248,278 @@ vsFinderWhySection = function (giveList, getList, giveTeam, getTeam) {
   }
   return html;
 };
+
+/* =====================================================================================
+   VALUE SAVANT — REALISM PATCH v3.2
+   =====================================================================================
+   Three realism upgrades on top of v3.1: untouchable-prospect rejection, need-for-need
+   contender-to-contender trades, and salary-dump recognition. Loaded last — overrides
+   chain in load order.
+   ===================================================================================== */
+
+/* ============================== SHARED HELPERS ============================== */
+
+// Robust rank parse: "CWS 1" → 1, "MLB 12" → 12, 3 → 3, "" → null
+function vsParseRank(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+  const m = String(raw).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function vsOrgRankNum(p) { return vsParseRank(p.orgRank); }
+function vsMlbRankNum(p) { return vsParseRank(p.mlbRank); }
+
+// Is the target side a controlled superstar (the Soto shape that unlocks everyone)?
+//   superstar-tier 2026 value AND controlled beyond next season.
+function vsTargetIsControlledSuperstar(targetList) {
+  return targetList.some(t => !t.isComp && !t.isCash && t.level === 'mlb' &&
+    (t.val2026 || 0) >= VS_TIER.SUPERSTAR_26 && vsControlThrough(t) >= 2028);
+}
+function vsTargetIsRental(targetList) {
+  return targetList.some(t => !t.isComp && !t.isCash && t.level === 'mlb' &&
+    vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+}
+
+// MLB-ready: on the MLB roster, or AAA with a 2026 ETA.
+function vsIsMlbReady(p) {
+  if (p.level === 'mlb') return true;
+  const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+  return (String(p.levelRaw || '').toUpperCase() === 'AAA') && eta <= 2026;
+}
+
+/* =====================================================================================
+   PART 1 — UNTOUCHABLES
+   ===================================================================================== */
+
+// Returns rejection reason or null.
+function vsFinderUntouchableCheck(combo, givingTeam, targetList) {
+  const superstarReturn = vsTargetIsControlledSuperstar(targetList);
+  if (superstarReturn) return null;                      // Soto shape: everyone's available
+  const rental = vsTargetIsRental(targetList);
+
+  for (const p of combo) {
+    if (p.isComp || p.isCash) continue;
+    const orgN = vsOrgRankNum(p);
+    const mlbN = vsMlbRankNum(p);
+    const isTop2Org = orgN != null && orgN <= 2;
+    const isTop30Mlb = mlbN != null && mlbN <= 30;
+
+    if (rental && (isTop2Org || isTop30Mlb)) {
+      return `${p.name} is untouchable for a rental — ${isTop30Mlb ? 'MLB top-30 prospect' : givingTeam + "'s top-" + orgN + ' org prospect'}. No front office moves that tier for a pure rental; they hang up.`;
+    }
+    if (!rental && orgN === 1) {
+      // #1 org prospect only moves for a controlled superstar (handled above) — not for
+      // ordinary controlled players.
+      return `${p.name} is ${givingTeam}'s #1 prospect — only movable in a controlled-superstar blockbuster, and this target isn't one.`;
+    }
+  }
+  return null;
+}
+
+// Verdict-side note (manual sim trades aren't rejected, but the verdict says the quiet
+// part out loud). Returns {severity, text} or null.
+function vsUntouchableVerdictNote(listA, listB, teamA, teamB) {
+  const notes = [];
+  for (const [give, team, targets] of [[listA, teamA, listB], [listB, teamB, listA]]) {
+    const fail = vsFinderUntouchableCheck(give, team, targets);
+    if (fail) notes.push({ severity: 'major', text: fail + ' In a real negotiation this package doesn\'t get past the first phone call.' });
+  }
+  return notes;
+}
+
+/* =====================================================================================
+   PART 2 — CONTENDER-TO-CONTENDER NEED-FOR-NEED
+   ===================================================================================== */
+
+// Validates a buyer↔buyer trade shape. Returns { ok, reasons:[...] }.
+//   comboOut = what givingTeam sends; targetList = what receivingTeam sends back.
+function vsB2BCheck(comboOut, givingTeam, receivingTeam, targetList) {
+  const reasons = [];
+
+  // (a) MLB value both ways — contenders don't raid each other's farms mid-race.
+  const outReady26 = comboOut.filter(vsIsMlbReady).reduce((s, p) => s + (p.val2026 || 0), 0);
+  const outTotal26 = comboOut.reduce((s, p) => s + (p.val2026 || 0), 0);
+  if (outTotal26 > 0 && outReady26 / outTotal26 < 0.6) {
+    reasons.push(`${givingTeam}'s side is mostly far-off prospect value — contender-to-contender trades move MLB-ready pieces, not futures`);
+  }
+  const inReady26 = targetList.filter(vsIsMlbReady).reduce((s, p) => s + (p.val2026 || 0), 0);
+  const inTotal26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  if (inTotal26 > 0 && inReady26 / inTotal26 < 0.6) {
+    reasons.push(`${receivingTeam}'s side is mostly far-off prospect value — same standard both ways`);
+  }
+
+  // (b) Each side must trade from surplus — neither contender opens a hole in-season.
+  const holeOut = vsFinderCreatesOwnHole(comboOut, givingTeam);
+  if (holeOut) reasons.push(holeOut + ' — a contender doesn\'t open an in-season hole');
+  const holeIn = vsFinderCreatesOwnHole(targetList, receivingTeam);
+  if (holeIn) reasons.push(holeIn + ' — a contender doesn\'t open an in-season hole');
+
+  // (c) Need-for-need: each side should receive at a position of structural need OR a
+  //     clear upgrade at the spot. We accept either a hole-fill or a receive-side piece
+  //     stronger than the incumbent.
+  function fillsOrUpgrades(incoming, team) {
+    for (const p of incoming) {
+      if (p.isComp || p.isCash) continue;
+      const b = finderPosBucket(p.pos);
+      if (!b) continue;
+      const needs = vsFinderSellerNeeds(team);
+      if (needs.holeBuckets.has(b)) return true;
+      const incumbentBest = Math.max(0, ...allPlayers
+        .filter(x => x.team === team && x.level === 'mlb' && finderPosBucket(x.pos) === b)
+        .map(x => x.val2026 || 0));
+      if ((p.val2026 || 0) > incumbentBest + 0.5) return true;
+    }
+    return false;
+  }
+  if (!fillsOrUpgrades(targetList, givingTeam)) reasons.push(`${givingTeam} isn't receiving at a position of need or clear upgrade — no reason to make this call`);
+  if (!fillsOrUpgrades(comboOut, receivingTeam)) reasons.push(`${receivingTeam} isn't receiving at a position of need or clear upgrade — no reason to take this call`);
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+// OVERRIDE the direction check: buyer↔buyer is now legal when the B2B shape validates.
+const _vsFinderDirectionCheck_v2 = vsFinderDirectionCheck;
+
+vsFinderDirectionCheck = function (buyerTeam, sellerTeam, targetList) {
+  const aCtx = vsTeamContext(buyerTeam);
+  const bCtx = vsTeamContext(sellerTeam);
+  if (aCtx.role === 'buyer' && bCtx.role === 'buyer') {
+    // B2B lane: shape must validate (checked with full combo context in the gate below;
+    // here we only clear the categorical rejection).
+    return null;
+  }
+  return _vsFinderDirectionCheck_v2(buyerTeam, sellerTeam, targetList);
+};
+
+/* ============================== MASTER GATE (v3.2 chain) ============================== */
+
+const _vsFinderGateCombo_v31 = vsFinderGateCombo;
+
+vsFinderGateCombo = function (combo, givingTeam, receivingTeam, targetList, bandName) {
+  // (0) Untouchables — cheapest, most decisive check first.
+  const unt = vsFinderUntouchableCheck(combo, givingTeam, targetList);
+  if (unt) return unt;
+
+  // (1) B2B shape validation when both sides are buyers.
+  const gCtx = vsTeamContext(givingTeam), rCtx = vsTeamContext(receivingTeam);
+  if (gCtx.role === 'buyer' && rCtx.role === 'buyer') {
+    const b2b = vsB2BCheck(combo, givingTeam, receivingTeam, targetList);
+    if (!b2b.ok) return 'contender-to-contender shape fails: ' + b2b.reasons[0];
+  }
+
+  // (2) Everything from v3.1 (value bounds, blocking, diversity, holes, rental band,
+  //     direction — now B2B-aware).
+  return _vsFinderGateCombo_v31(combo, givingTeam, receivingTeam, targetList, bandName);
+};
+
+/* =====================================================================================
+   PART 3 — SALARY-DUMP RECOGNITION
+   ===================================================================================== */
+
+// Underwater contract detection — reads ONLY the user's own surplus-value math.
+// Surplus value applies to 2027+ (2026 is salary-blind), so the contract signal is:
+//   (a) forward value (sum of 2027–2031) meaningfully negative → albatross going
+//       forward, even if the player is productive in 2026, or
+//   (b) avgVal itself negative → fully underwater across the blend.
+// A negative 2026 value alone is a PERFORMANCE signal, not a contract signal, and is
+// deliberately ignored here.
+function vsForwardValue(p) {
+  if (!p.valByYear) return null;
+  let s = 0, any = false;
+  for (let y = 2027; y <= 2031; y++) {
+    const v = p.valByYear[y];
+    if (v != null && !isNaN(v)) { s += v; any = true; }
+  }
+  return any ? s : null;
+}
+function vsNegativeContracts(list) {
+  return list.filter(p => {
+    if (p.isComp || p.isCash || p.level !== 'mlb') return false;
+    const fwd = vsForwardValue(p);
+    if (fwd != null && fwd < -0.25) return true;           // albatross forward
+    if (p.avgVal != null && p.avgVal < -0.25) return true; // fully underwater
+    return false;
+  });
+}
+
+// Detects the dump shape on either side: negative contract + sweetener piece(s) moving
+// together for a lesser return. Returns a verdict section body or null.
+function vsSalaryDumpSection(listA, listB, teamA, teamB) {
+  const lines = [];
+  for (const [give, team, other, otherTeam] of [[listA, teamA, listB, teamB], [listB, teamB, listA, teamA]]) {
+    const dumps = vsNegativeContracts(give);
+    if (!dumps.length) continue;
+    const sweeteners = give.filter(p => !p.isComp && !p.isCash && (p.avgVal || 0) > 0.5 && !dumps.includes(p));
+    const giveNet = give.reduce((s, p) => s + (p.avgVal || 0), 0);
+    const otherNet = other.reduce((s, p) => s + (p.avgVal || 0), 0);
+    const dumpNames = dumps.map(d => {
+      const fwd = vsForwardValue(d);
+      const shape = (fwd != null && fwd < -0.25 && (d.val2026 || 0) > 0)
+        ? `productive now (${fmtVs(d.val2026)} in 2026) but ${fmtVs(fwd)} across 2027+ — albatross going forward`
+        : `${fmtVs(d.avgVal)} Avg — underwater contract`;
+      return `<span>${d.name}</span> (${shape})`;
+    }).join(', ');
+    if (sweeteners.length && otherNet < give.filter(p => !dumps.includes(p)).reduce((s, p) => s + (p.avgVal || 0), 0)) {
+      lines.push(`<span>${team}</span> is executing a salary dump: ${dumpNames} moves only because ${sweeteners.map(s => `<span>${s.name}</span>`).join(' and ')} sweeten${sweeteners.length === 1 ? 's' : ''} the deal. <span>${otherTeam}</span> is being paid in prospect capital to absorb the contract — the correct read is a paydown, not a value loss. Judge it by whether the sweetener outweighs the negative value absorbed (net here: ${fmtVs(giveNet)} given vs ${fmtVs(otherNet)} received).`);
+    } else {
+      lines.push(`${dumpNames} carries negative surplus value — any acquirer is doing the sender a favor, and the return should reflect that (lesser pieces back, or sweeteners attached).`);
+    }
+  }
+  return lines.length ? lines.join('<br>') : null;
+}
+
+/* =====================================================================================
+   VERDICT OVERRIDE (v3.2 chain) — adds Untouchable notes, Contender Swap section,
+   Salary Dump section.
+   ===================================================================================== */
+
+const _vsGenerateSmartVerdict_v3 = vsGenerateSmartVerdict;
+
+vsGenerateSmartVerdict = function (listA, listB, teamA, teamB) {
+  const base = _vsGenerateSmartVerdict_v3(listA, listB, teamA, teamB);
+  const ctxA = vsTeamContext(teamA), ctxB = vsTeamContext(teamB);
+  let html = base.html, grade = base.grade, headline = base.headline;
+  let extra = '';
+
+  const section = (title, body) =>
+    `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+
+  // Untouchables — flags on manual sim trades; hard problem.
+  const untNotes = vsUntouchableVerdictNote(listA, listB, teamA, teamB);
+  if (untNotes.length) {
+    extra += section('Untouchables', untNotes.map(n => '✕ ' + n.text).join('<br>'));
+    grade = 'warn';
+    headline = '✕ Real Front Offices Hang Up Here';
+  }
+
+  // Contender-to-contender framing.
+  if (ctxA.role === 'buyer' && ctxB.role === 'buyer') {
+    const b2b = vsB2BCheck(listA, teamA, teamB, listB);
+    const body = b2b.ok
+      ? `✓ Valid need-for-need contender swap: MLB value moves both ways, both sides trade from surplus into a need. These deals are rarer than deadline trades but real — judged on fit and balance, not buyer/seller leverage.`
+      : b2b.reasons.map(r => '⚠ ' + r).join('<br>');
+    extra += section('Contender-to-Contender Swap', body);
+    if (!b2b.ok && grade === 'fair') { grade = 'warn'; headline = '⚠ Contender Swap Shape Doesn\'t Hold'; }
+  }
+
+  // Salary-dump structure.
+  const dump = vsSalaryDumpSection(listA, listB, teamA, teamB);
+  if (dump) extra += section('Contract Structure', dump);
+
+  if (extra) {
+    // Insert before Historical Comparable when present; else append.
+    const marker = '>Historical Comparable';
+    const idx = html.indexOf(marker);
+    if (idx >= 0) {
+      const divStart = html.lastIndexOf('<div style="margin-bottom:9px">', idx);
+      html = html.slice(0, divStart) + extra + html.slice(divStart);
+    } else {
+      html += extra;
+    }
+  }
+  return { grade, headline, html };
+};
 </script>
 </body>
 </html>
