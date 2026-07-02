@@ -807,6 +807,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <!-- PLAYERS PAGE -->
 <div id="page-players" class="page">
   <div class="rankings-controls">
+    <input type="text" id="playersSearch" placeholder="Search players..." oninput="playersFilterChanged()" style="margin-bottom:6px">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       <select id="playersLevel" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
         <option value="">All Levels</option>
@@ -1753,10 +1754,13 @@ function playersFilterChanged(){renderPlayers();}
 function renderPlayers(){
   const levelF=document.getElementById('playersLevel').value;
   const posF=document.getElementById('playersPos').value;
+  const searchF=document.getElementById('playersSearch').value.trim().toLowerCase();
   // Determine if viewing hitters or pitchers based on pos filter
   if(posF==='pitcher'||posF==='SP'||posF==='RP') playersViewHitters=false;
   else if(posF==='hitter'||['C','1B','2B','3B','SS','OF','DH'].includes(posF)) playersViewHitters=true;
   let pl=[...allPlayers];
+  // Name search
+  if(searchF) pl=pl.filter(x=>x.name.toLowerCase().includes(searchF));
   // Level filter
   if(levelF) pl=pl.filter(x=>matchesGroup(x,levelF));
   // Position filter — Ohtani (pos:"TWP") belongs on both the Hitters and Pitchers views
