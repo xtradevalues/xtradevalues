@@ -353,13 +353,16 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .players-table-wrap{overflow-x:auto;flex:1}
 .players-table{width:100%;border-collapse:collapse;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;transition:background 0.15s,color 0.15s}
-.players-table th:first-child{text-align:left;min-width:150px}
+.players-table th.rank-col{text-align:center;width:1%;padding-left:6px;padding-right:6px}
+.players-table th.player-col{text-align:left;min-width:150px}
 .players-table th.sort-active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
 .players-table tbody tr{background:var(--bg-card)}
 .players-table tbody tr:nth-child(even){background:var(--row-alt)}
 .players-table td{padding:12px 10px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.players-table td:first-child{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
-.players-table td:first-child:hover{color:var(--accent)}
+.players-table td.rank-col{text-align:center;color:var(--text-muted);padding-left:6px;padding-right:6px}
+.players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
+.players-table td.player-col:hover{color:var(--accent)}
+.mini-jersey{display:inline-block;vertical-align:middle;margin-right:6px;flex-shrink:0}
 
 /* PLAYER PAGE */
 .player-page-wrap{flex:1;display:flex;flex-direction:column;overflow-y:auto}
@@ -1002,6 +1005,13 @@ const MLB_JERSEY_CONFIG = {
   SF:{baseColor:"#FD5A1E",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#EFD19F",numberOuterBorderColor:"#FD5A1E",nameColor:"#27251F",nameBorderColor:"#EFD19F",nameFont:"MLBGIANT",numberFont:"MLBGIANT"},
   COL:{baseColor:"#333366",pinstripeColor:null,numberColor:"#27251F",numberInnerBorderColor:"#C4CED4",numberOuterBorderColor:"#FFFFFF",nameColor:"#27251F",nameBorderColor:"#FFFFFF",nameFont:"MLBBLOCK",numberFont:"MLBBLOCK"},
 };
+
+// Small team-colored jersey glyph for table rows — a lightweight silhouette instead of the
+// full detailed jersey SVG, since rows can number in the hundreds (Players/Prospects tables).
+function miniJerseySvg(team){
+  const color=(MLB_JERSEY_CONFIG[team]&&MLB_JERSEY_CONFIG[team].baseColor)||'#555';
+  return `<svg class="mini-jersey" width="13" height="15" viewBox="0 0 13 15"><rect x="0" y="2" width="3.5" height="5" rx="1" fill="${color}"/><rect x="9.5" y="2" width="3.5" height="5" rx="1" fill="${color}"/><rect x="3" y="1.5" width="7" height="13" rx="1.2" fill="${color}"/><path d="M4.6 1.5 Q6.5 3.3 8.4 1.5" stroke="#000" stroke-opacity="0.28" stroke-width="0.9" fill="none"/></svg>`;
+}
 
 // Caches for season stat data loaded on demand
 const seasonStatsCache = {};   // key: tab name -> array of row objects
@@ -1646,7 +1656,8 @@ function renderPlayers(){
   cols.forEach(c=>{
     const sc=thSort[c]||null;
     const isActive=sc===playersSortCol;
-    thead+=`<th class="${isActive?'sort-active':''}" style="${c==='Player'?'text-align:left':''}" ${sc?`onclick="playersSetSort('${sc}',this)"`:''} >${c}${isActive?(playersSortDir===-1?' ↓':' ↑'):''}</th>`;
+    const colClass=c==='#'?'rank-col':c==='Player'?'player-col':'';
+    thead+=`<th class="${colClass} ${isActive?'sort-active':''}" ${sc?`onclick="playersSetSort('${sc}',this)"`:''} >${c}${isActive?(playersSortDir===-1?' ↓':' ↑'):''}</th>`;
   });
   thead+='</tr>';
   document.getElementById('playersTableHead').innerHTML=thead;
@@ -1657,12 +1668,13 @@ function renderPlayers(){
   const body=pl.slice(0,500).map((p,idx)=>{
     const inj=playerHasInjury(p)?'<span style="color:#D72229">✚</span>':'';
     const teamB=`<span class="team-pill">${p.team}</span>`;
+    const nameCell=`<td class="player-col">${miniJerseySvg(p.team)}${esc(p.name)}${inj}${teamB}</td>`;
     const vWARDisp=fmtF(effVWAR(p));
     let cells;
     if(isHitter){
       cells=[
-        `<td>${idx+1}</td>`,
-        `<td style="text-align:left">${esc(p.name)}${inj}${teamB}</td>`,
+        `<td class="rank-col">${idx+1}</td>`,
+        nameCell,
         `<td>${esc(p.pos||'—')}</td>`,
         `<td>${fmtI(p.pa)}</td>`,
         `<td>${fmtI(p.h)}</td>`,
@@ -1676,8 +1688,8 @@ function renderPlayers(){
       ];
     } else {
       cells=[
-        `<td>${idx+1}</td>`,
-        `<td style="text-align:left">${esc(p.name)}${inj}${teamB}</td>`,
+        `<td class="rank-col">${idx+1}</td>`,
+        nameCell,
         `<td>${esc(p.pos||'—')}</td>`,
         `<td>${fmtF(p.ip)}</td>`,
         `<td>${fmtI(p.k)}</td>`,
@@ -1709,7 +1721,7 @@ async function renderProspects(){
     if(document.getElementById('prospectsScope').value!==scope) return; // scope changed mid-load
   }
   const cols=['Age','ETA','Hit','Power','Speed','Fielding','Proj vWAR (Hit)','Fastball','Changeup','Slider','Curveball','Command','Proj vWAR (Pitch)'];
-  document.getElementById('prospectsTableHead').innerHTML='<tr><th>#</th><th style="text-align:left">Player</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.getElementById('prospectsTableHead').innerHTML='<tr><th class="rank-col">#</th><th class="player-col">Player</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
 
   // Column C (index 2) is the join key on 2026 Pipeline Rankings, not column A
   let list=allPlayers.map(p=>({p,row:pipelineRankings[p.playerID]})).filter(x=>x.row);
@@ -1731,8 +1743,8 @@ async function renderProspects(){
   const fmtS=v=>v!=null&&v!==''?esc(String(v)):'-';
   const body=list.map(({p,row,rank})=>{
     const cells=[
-      `<td>${!isNaN(rank)?rank:'-'}</td>`,
-      `<td style="text-align:left">${esc(p.name)}<span class="team-pill">${esc(p.team)}</span></td>`,
+      `<td class="rank-col">${!isNaN(rank)?rank:'-'}</td>`,
+      `<td class="player-col">${miniJerseySvg(p.team)}${esc(p.name)}<span class="team-pill">${esc(p.team)}</span></td>`,
       `<td>${fmtI(row['_7'])}</td>`,
       `<td>${fmtS(row['_6'])}</td>`,
       `<td>${fmtI(row['_8'])}</td>`,
@@ -1829,11 +1841,11 @@ function computeMiLBHitterStats(r){
 }
 function computeMiLBPitcherStats(r){
   if(!r) return null;
-  // 26 pPitchers: W is column F (index 5), L is column G (index 6)
-  // Prefer the sheet's own FIP column when it's populated; older MiLB seasons (23/24/25
-  // pPitchers) don't have one, so fall back to computing it with the same formula used
-  // for MLB pitchers.
-  const sheetFip=numOrNull(r['FIP']);
+  // 26 pPitchers: W is column F (index 5), L is column G (index 6), FIP is column T (index 19)
+  // on all four pPitchers sheets. Prefer the sheet's own FIP column (by name, falling back to
+  // the index since header text isn't always consistent across tabs); if it's genuinely blank
+  // fall back to computing it with the same formula used for MLB pitchers.
+  const sheetFip=numOrNull(colVal(r,'FIP',19));
   return {
     ip:numOrNull(r['IP']), k:numOrNull(r['K']), era:numOrNull(r['ERA']),
     fip:sheetFip!==null?sheetFip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
