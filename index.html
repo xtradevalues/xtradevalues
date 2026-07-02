@@ -4654,21 +4654,191 @@ function tbSideStatsHtml(sides){
 function tbVerdictBox(cls,headline,detail){
   return `<div class="${cls}" style="margin-top:14px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${detail}</div></div></div>`;
 }
-function tbVerdictHtml(atTradeSides, currentSides, unavailable){
-  const atWin=tbSideWinner(atTradeSides, p=>p.val2026);
+/* Per-player movement since the deal. Pairs at-trade rows with current rows by index
+   (currentSides is built as a map over the same arrays, so order is stable). */
+function vsTbDeltas(atTradeSides, currentSides) {
+  const sides = [];
+  for (let i = 0; i < atTradeSides.length; i++) {
+    const atS = atTradeSides[i], curS = currentSides[i];
+    const movers = [];
+    for (let j = 0; j < atS.players.length; j++) {
+      const a = atS.players[j], c = curS.players[j];
+      if (a.asset) continue;                                   // cash/comp: fixed by definition
+      if (c.val2026 == null && c.avgVal == null) continue;     // no live data for this player
+      const d26 = (c.val2026 != null && a.val2026 != null) ? c.val2026 - a.val2026 : null;
+      const dAvg = (c.avgVal != null && a.avgVal != null) ? c.avgVal - a.avgVal : null;
+      movers.push({ name: a.playerName, d26, dAvg,
+        mag: Math.max(Math.abs(d26 || 0), Math.abs(dAvg || 0)) });
+    }
+    movers.sort((x, y) => y.mag - x.mag);
+    sides.push({ receivingTeam: atS.receivingTeam, movers });
+  }
+  return sides;
+}
 
-  if(unavailable){
-    if(!atWin) return tbVerdictBox('verdict-box v-neutral','Trade looked even at the time','Both sides gave up comparable 2026 value in this deal. Current value data isn’t available yet for every player involved, so we can’t say how it looks today.');
-    return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} appeared to win this trade at the time`, `<span>${esc(atWin.team)}</span> received the larger share of 2026 value in this deal (${Math.round(atWin.pct)}%). Current value data isn’t available yet for every player involved, so we can’t say how it looks today.`);
+/* Side ledger: total Avg value received at the time vs what those same assets are
+   worth now (Avg is the right retrospective clock — it captures realized future). */
+function vsTbLedger(atTradeSides, currentSides) {
+  return atTradeSides.map((atS, i) => {
+    const then = atS.players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+    const now = currentSides[i].players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+    const pct = then > 0 ? Math.round(((now - then) / then) * 100) : null;
+    return { team: atS.receivingTeam, then, now, pct };
+  });
+}
+
+function vsTbSection(title, body) {
+  return `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+}
+
+function vsTbArrow(d) {
+  if (d == null || isNaN(d)) return '';
+  const v = Math.round(d * 100) / 100;
+  if (v > 0.05) return `<span>▲ +${v.toFixed(2)}</span>`;
+  if (v < -0.05) return `▼ ${v.toFixed(2)}`;
+  return `— ${v.toFixed(2)}`;
+}
+
+/* Raw share helper: returns per-side percentage share for a metric, or null. */
+function vsTbShares(sides, getVal) {
+  const { grand, pcts } = tbSideTotals(sides, getVal);
+  return grand > 0 && pcts ? pcts : null;
+}
+
+/* Aligned deadline shape, detected from raw shares: one side holds a decisive
+   long-term (Avg) premium (>=58%) while NOT also holding a decisive 2026 edge
+   (<=55%, i.e. inside the fair band). Covers both the strict two-winner case and the rental-premium case
+   where 2026 sits inside the fair band. Returns {avgIdx, avgPct, nowIdx, nowPct}
+   or null. */
+function vsTbAlignedShape(sides) {
+  const s26 = vsTbShares(sides, p => p.val2026);
+  const sAvg = vsTbShares(sides, p => p.avgVal);
+  if (!s26 || !sAvg || sides.length !== 2) return null;
+  for (let i = 0; i < 2; i++) {
+    if (sAvg[i] >= 58 && s26[i] <= 55) {
+      const o = 1 - i;
+      return { avgIdx: i, avgPct: sAvg[i], avgTeam: sides[i].receivingTeam,
+               nowIdx: o, nowPct: s26[o], nowTeam: sides[o].receivingTeam };
+    }
+  }
+  return null;
+}
+
+/* Overall winner on a "both clocks" read: the side whose AVERAGE share across the
+   two metrics clears 56%. Returns {idx, team, pct} or null (fair). */
+function vsTbOverallWinner(sides) {
+  const s26 = vsTbShares(sides, p => p.val2026);
+  const sAvg = vsTbShares(sides, p => p.avgVal);
+  if (!s26 && !sAvg) return null;
+  const n = sides.length;
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    const parts = [];
+    if (s26) parts.push(s26[i]);
+    if (sAvg) parts.push(sAvg[i]);
+    const avg = parts.reduce((a, b) => a + b, 0) / parts.length;
+    if (!best || avg > best.pct) best = { idx: i, team: sides[i].receivingTeam, pct: avg };
+  }
+  return best && best.pct >= 56 ? best : null;
+}
+
+function tbVerdictHtml(atTradeSides, currentSides, unavailable) {
+  const alignedAt = vsTbAlignedShape(atTradeSides);
+  const atOverall = vsTbOverallWinner(atTradeSides);
+
+  /* ---------- Section 1: AT THE TIME ---------- */
+  let atBody, atGradeHint = 'fair';
+  if (alignedAt) {
+    atBody = `Structured deadline shape: <span>${esc(alignedAt.nowTeam)}</span> took the 2026 production side (${Math.round(alignedAt.nowPct)}% of this season's value) while <span>${esc(alignedAt.avgTeam)}</span> took the long-term premium (${Math.round(alignedAt.avgPct)}% of Avg value). Both sides got the currency they were shopping for — the day-one question was never "who won," it was whose clock pays off.`;
+  } else if (!atOverall) {
+    atBody = `Even on both clocks at the time — comparable 2026 production and comparable long-term value moved in each direction.`;
+  } else {
+    atBody = `<span>${esc(atOverall.team)}</span> took the larger share on day one — ${Math.round(atOverall.pct)}% of combined value across both clocks. A day-one edge by the numbers.`;
+    atGradeHint = 'warn';
   }
 
-  const curWin=tbSideWinner(currentSides, p=>p.val2026);
+  /* ---------- Unavailable: at-time only ---------- */
+  if (unavailable) {
+    const headline = atGradeHint === 'fair' ? 'Trade looked balanced at the time' : `${esc(atOverall.team)} appeared to win this trade at the time`;
+    return tbVerdictBox('verdict-box ' + (atGradeHint === 'fair' ? 'v-neutral' : 'v-warn'), headline,
+      vsTbSection('At The Time', atBody) +
+      vsTbSection('Where It Stands', 'Current value data isn’t available yet for every player involved, so the retrospective half of this verdict has to wait. Check back soon.'));
+  }
 
-  if(!atWin && !curWin) return tbVerdictBox('verdict-box v-fair','Fair trade, then and now','Both sides gave up comparable 2026 value at the time of the deal, and the trade remains balanced today.');
-  if(atWin && curWin && atWin.idx===curWin.idx) return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} has won this trade from day one`, `<span>${esc(atWin.team)}</span> received the better value at the time of the deal (${Math.round(atWin.pct)}%) and still holds the edge today (${Math.round(curWin.pct)}%).`);
-  if(atWin && curWin && atWin.idx!==curWin.idx) return tbVerdictBox('verdict-box v-warn','The verdict has flipped since the trade', `It appeared <span>${esc(atWin.team)}</span> won this trade at the time (${Math.round(atWin.pct)}% of the value), but <span>${esc(curWin.team)}</span> has received more value since, now holding ${Math.round(curWin.pct)}% of the combined value.`);
-  if(!atWin && curWin) return tbVerdictBox('verdict-box v-warn', `${esc(curWin.team)} has since pulled ahead`, `This trade looked even at the time, but <span>${esc(curWin.team)}</span> has picked up more value since (now ${Math.round(curWin.pct)}% of the combined value).`);
-  return tbVerdictBox('verdict-box v-fair','The gap has closed since the trade', `<span>${esc(atWin.team)}</span> appeared to win this trade at the time (${Math.round(atWin.pct)}%), but the two sides have evened out since.`);
+  /* ---------- Section 2: WHAT'S MOVED ---------- */
+  const deltas = vsTbDeltas(atTradeSides, currentSides);
+  const moveLines = [];
+  for (const side of deltas) {
+    const top = side.movers.filter(m => m.mag >= 0.15).slice(0, 3);
+    if (!top.length) continue;
+    moveLines.push(`<span>${esc(side.receivingTeam)}</span> side: ` + top.map(m => {
+      const bits = [];
+      if (m.dAvg != null) bits.push(`${vsTbArrow(m.dAvg)} Avg`);
+      if (m.d26 != null) bits.push(`${vsTbArrow(m.d26)} 2026`);
+      return `<span>${esc(m.name)}</span> (${bits.join(', ')})`;
+    }).join(' · '));
+  }
+  const allMovers = deltas.flatMap(s => s.movers.map(m => ({ ...m, team: s.receivingTeam })));
+  allMovers.sort((x, y) => y.mag - x.mag);
+  const swing = allMovers.length && allMovers[0].mag >= 0.5 ? allMovers[0] : null;
+  const moveBody = moveLines.length
+    ? moveLines.join('<br>') + (swing ? `<br>The swing piece: <span>${esc(swing.name)}</span> has ${((swing.dAvg ?? swing.d26) >= 0 ? 'gained' : 'lost')} the most value since the deal — the single biggest reason this verdict reads the way it does.` : '')
+    : 'No meaningful value movement since the deal — every piece is worth roughly what it was on trade day.';
+
+  /* ---------- Section 3: WHERE IT STANDS ---------- */
+  const alignedCur = vsTbAlignedShape(currentSides);
+  const curOverall = vsTbOverallWinner(currentSides);
+  const ledger = vsTbLedger(atTradeSides, currentSides);
+  const ledgerLine = ledger.map(l =>
+    `<span>${esc(l.team)}</span>: received ${l.then.toFixed(2)} Avg on trade day → worth ${l.now.toFixed(2)} today${l.pct != null ? ` (${l.pct >= 0 ? '+' : ''}${l.pct}%)` : ''}`).join('<br>');
+
+  let cls = 'verdict-box v-fair', headline, standsBody;
+  const flipDriver = swing ? ` The swing runs through <span>${esc(swing.name)}</span>.` : '';
+
+  if (alignedAt) {
+    // Aligned deal: judge each side's bet by its own clock, plus the ledger.
+    const avgSide = ledger[alignedAt.avgIdx];
+    const nowSide = ledger[alignedAt.nowIdx];
+    const avgBetPaying = (avgSide.pct != null && avgSide.pct >= 5);
+    const avgBetFading = (avgSide.pct != null && avgSide.pct <= -5);
+    if (avgBetPaying) {
+      cls = 'verdict-box v-warn';
+      headline = `${esc(avgSide.team)}'s side of the bet is paying off`;
+      standsBody = `Both sides got what they shopped for on day one, but <span>${esc(avgSide.team)}</span>'s long-term currency has appreciated (${avgSide.pct >= 0 ? '+' : ''}${avgSide.pct}% since the deal) while <span>${esc(nowSide.team)}</span>'s win-now asset is static by design — a rental's value only converts if the season does.${flipDriver}`;
+    } else if (avgBetFading) {
+      cls = 'verdict-box v-warn';
+      headline = `${esc(nowSide.team)}'s win-now side is aging better`;
+      standsBody = `<span>${esc(avgSide.team)}</span>'s long-term haul has shed value since the deal (${avgSide.pct}%) — the classic risk of prospect currency. <span>${esc(nowSide.team)}</span>'s production bet looks stronger by the day.${flipDriver}`;
+    } else {
+      headline = 'Both bets are still live';
+      standsBody = `Neither side's currency has meaningfully appreciated or faded yet — the deal is still being decided on the field.`;
+    }
+  } else if (!atOverall && !curOverall) {
+    headline = 'Fair trade, then and now';
+    standsBody = 'Balanced on trade day, balanced today, on both clocks.';
+  } else if (atOverall && curOverall && atOverall.idx === curOverall.idx) {
+    cls = 'verdict-box v-warn';
+    headline = `${esc(atOverall.team)} has won this trade from day one`;
+    standsBody = `<span>${esc(atOverall.team)}</span> took the better combined value at the time (${Math.round(atOverall.pct)}%) and still holds the edge today (${Math.round(curOverall.pct)}%).`;
+  } else if (atOverall && curOverall && atOverall.idx !== curOverall.idx) {
+    cls = 'verdict-box v-warn';
+    headline = 'The verdict has flipped since the trade';
+    standsBody = `<span>${esc(atOverall.team)}</span> looked like the winner on trade day (${Math.round(atOverall.pct)}%), but <span>${esc(curOverall.team)}</span> now holds ${Math.round(curOverall.pct)}% of the combined value.${flipDriver}`;
+  } else if (!atOverall && curOverall) {
+    cls = 'verdict-box v-warn';
+    headline = `${esc(curOverall.team)} has since pulled ahead`;
+    standsBody = `Even on trade day; <span>${esc(curOverall.team)}</span> has picked up the edge since (${Math.round(curOverall.pct)}%).${flipDriver}`;
+  } else {
+    headline = 'The gap has closed since the trade';
+    standsBody = `<span>${esc(atOverall.team)}</span> appeared to win at the time (${Math.round(atOverall.pct)}%), but the sides have evened out.`;
+  }
+
+  const detail =
+    vsTbSection('At The Time', atBody) +
+    vsTbSection('What’s Moved', moveBody) +
+    vsTbSection('Where It Stands', standsBody + '<br>' + ledgerLine);
+
+  return tbVerdictBox(cls, headline, detail);
 }
 // Convert a trade record's side (comp picks / cash / real players, with refreshed
 // live val2026/avgVal) into full player objects the smart verdict engine understands.
