@@ -3084,14 +3084,8 @@ function finderBuildGiveScenarios(targets, userTeam){
   if (sellerTeam) eligibleAll.sort(vsFinderNeedAwareSort(sellerTeam));
 
   if(!eligibleAll.length){
-    // Absolute last resort: the team has nothing meeting normal eligibility thresholds at all.
-    // Still always surface something — any non-RP minors player on the roster, ignoring the
-    // usual age/control/value floors, so a buyer's specific request is never left empty.
-    const anyMinors=allPlayers.filter(p=>p.team===userTeam && p.level==='minors' && finderFirstPos(p.pos)!=='RP');
-    if(anyMinors.length){
-      const scrub=anyMinors.reduce((cheapest,p)=>(p.avgVal||0)<(cheapest.avgVal||0)?p:cheapest, anyMinors[0]);
-      return [{players:[scrub], label:'Scrub Throw-In', isInDivision:false, tax:0}];
-    }
+    // v3.1: under the methodology, when nothing meets eligibility thresholds the finder
+    // returns no offers rather than a non-compliant scrub package (formerly "Scrub Throw-In").
     return [];
   }
 
@@ -3308,30 +3302,9 @@ function finderBuildGiveScenarios(targets, userTeam){
     }
   }
 
-  // ===== 7: Guaranteed Scrub Throw-In =====
-  // A buyer asking about a specific player should never come back empty-handed, even if nothing
-  // fit the fairness bands above. Fall back to a low-level minors scrub closest in value to the
-  // target (skipping top prospects), or as a last resort the cheapest eligible piece of any kind.
-  if(!scenarios.length){
-    const scrubPool=eligibleMinors.filter(p=>!usedNames.has(p.name));
-    let scrub=null;
-    if(scrubPool.length){
-      scrub=scrubPool.reduce((best,p)=>{
-        const diff=Math.abs((p.avgVal||0)-targetAvg);
-        const bestDiff=Math.abs((best.avgVal||0)-targetAvg);
-        return diff<bestDiff?p:best;
-      }, scrubPool[0]);
-    } else {
-      const leftover=availablePool();
-      if(leftover.length){
-        scrub=leftover.reduce((cheapest,p)=>(p.avgVal||0)<(cheapest.avgVal||0)?p:cheapest, leftover[0]);
-      }
-    }
-    if(scrub){
-      markUsed([scrub]);
-      scenarios.push({players:[scrub], label:'Scrub Throw-In', isInDivision, tax});
-    }
-  }
+  // v3.1: the "Guaranteed Scrub Throw-In" fallback that used to run here has been removed.
+  // Under the methodology, when no compliant package exists the finder returns fewer/no
+  // offers — never a non-compliant one. (See FINDER HOTFIX v3.1 notes.)
 
   return scenarios;
 }
@@ -3846,6 +3819,21 @@ async function generateOffers(){
   } else {
     offers=finderGenerateSellerOffers();
   }
+  // v3.1 hotfix: belt-and-suspenders gate check on the FINAL offers array, right before
+  // the empty-state check / rendering, so no scenario-generation path (fair/future-skewed/
+  // blockbuster/scrub/1-for-1, buyer or seller intent) can slip a non-compliant package
+  // onto a card. Runs ahead of the empty-state branch below so a fully-filtered result
+  // still shows the existing "No trade found" message instead of a blank card list.
+  offers = offers.filter(o=>{
+    const userTeam=finderState.team;
+    let combo, givingTeam, receivingTeam, targetList;
+    if(finderState.intent==='buyer'){
+      combo=o.givePlayers; givingTeam=userTeam; receivingTeam=o.targetTeam; targetList=o.targetPlayers;
+    } else {
+      combo=o.returnPlayers; givingTeam=o.buyerTeam; receivingTeam=userTeam; targetList=o.sellPlayers;
+    }
+    return vsFinderPostFilter([{players:combo, label:o.label}], givingTeam, receivingTeam, targetList||[]).length>0;
+  });
   if(!offers.length){
     const intent=finderState.intent;
     let msg='';
@@ -4666,21 +4654,230 @@ function tbSideStatsHtml(sides){
 function tbVerdictBox(cls,headline,detail){
   return `<div class="${cls}" style="margin-top:14px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${detail}</div></div></div>`;
 }
-function tbVerdictHtml(atTradeSides, currentSides, unavailable){
-  const atWin=tbSideWinner(atTradeSides, p=>p.val2026);
+/* Per-player movement since the deal. Pairs at-trade rows with current rows by index
+   (currentSides is built as a map over the same arrays, so order is stable). */
+function vsTbDeltas(atTradeSides, currentSides) {
+  const sides = [];
+  for (let i = 0; i < atTradeSides.length; i++) {
+    const atS = atTradeSides[i], curS = currentSides[i];
+    const movers = [];
+    for (let j = 0; j < atS.players.length; j++) {
+      const a = atS.players[j], c = curS.players[j];
+      if (a.asset) continue;                                   // cash/comp: fixed by definition
+      if (c.val2026 == null && c.avgVal == null) continue;     // no live data for this player
+      const d26 = (c.val2026 != null && a.val2026 != null) ? c.val2026 - a.val2026 : null;
+      const dAvg = (c.avgVal != null && a.avgVal != null) ? c.avgVal - a.avgVal : null;
+      movers.push({ name: a.playerName, d26, dAvg,
+        mag: Math.max(Math.abs(d26 || 0), Math.abs(dAvg || 0)) });
+    }
+    movers.sort((x, y) => y.mag - x.mag);
+    sides.push({ receivingTeam: atS.receivingTeam, movers });
+  }
+  return sides;
+}
 
-  if(unavailable){
-    if(!atWin) return tbVerdictBox('verdict-box v-neutral','Trade looked even at the time','Both sides gave up comparable 2026 value in this deal. Current value data isn’t available yet for every player involved, so we can’t say how it looks today.');
-    return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} appeared to win this trade at the time`, `<span>${esc(atWin.team)}</span> received the larger share of 2026 value in this deal (${Math.round(atWin.pct)}%). Current value data isn’t available yet for every player involved, so we can’t say how it looks today.`);
+/* Side ledger: total Avg value received at the time vs what those same assets are
+   worth now (Avg is the right retrospective clock — it captures realized future). */
+function vsTbLedger(atTradeSides, currentSides) {
+  return atTradeSides.map((atS, i) => {
+    const then = atS.players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+    const now = currentSides[i].players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+    const pct = then > 0 ? Math.round(((now - then) / then) * 100) : null;
+    return { team: atS.receivingTeam, then, now, pct };
+  });
+}
+
+function vsTbSection(title, body) {
+  return `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+}
+
+function vsTbArrow(d) {
+  if (d == null || isNaN(d)) return '';
+  const v = Math.round(d * 100) / 100;
+  if (v > 0.05) return `<span>▲ +${v.toFixed(2)}</span>`;
+  if (v < -0.05) return `▼ ${v.toFixed(2)}`;
+  return `— ${v.toFixed(2)}`;
+}
+
+/* Raw share helper: returns per-side percentage share for a metric, or null. */
+function vsTbShares(sides, getVal) {
+  const { grand, pcts } = tbSideTotals(sides, getVal);
+  return grand > 0 && pcts ? pcts : null;
+}
+
+/* Aligned deadline shape, detected from raw shares: one side holds a decisive
+   long-term (Avg) premium (>=58%) while NOT also holding a decisive 2026 edge
+   (<=55%, i.e. inside the fair band). Covers both the strict two-winner case and the rental-premium case
+   where 2026 sits inside the fair band. Returns {avgIdx, avgPct, nowIdx, nowPct}
+   or null. */
+function vsTbAlignedShape(sides) {
+  const s26 = vsTbShares(sides, p => p.val2026);
+  const sAvg = vsTbShares(sides, p => p.avgVal);
+  if (!s26 || !sAvg || sides.length !== 2) return null;
+  for (let i = 0; i < 2; i++) {
+    if (sAvg[i] >= 58 && s26[i] <= 55) {
+      const o = 1 - i;
+      return { avgIdx: i, avgPct: sAvg[i], avgTeam: sides[i].receivingTeam,
+               nowIdx: o, nowPct: s26[o], nowTeam: sides[o].receivingTeam };
+    }
+  }
+  return null;
+}
+
+/* Overall winner on a "both clocks" read: the side whose AVERAGE share across the
+   two metrics clears 56%. Returns {idx, team, pct} or null (fair). */
+function vsTbOverallWinner(sides) {
+  const s26 = vsTbShares(sides, p => p.val2026);
+  const sAvg = vsTbShares(sides, p => p.avgVal);
+  if (!s26 && !sAvg) return null;
+  const n = sides.length;
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    const parts = [];
+    if (s26) parts.push(s26[i]);
+    if (sAvg) parts.push(sAvg[i]);
+    const avg = parts.reduce((a, b) => a + b, 0) / parts.length;
+    if (!best || avg > best.pct) best = { idx: i, team: sides[i].receivingTeam, pct: avg };
+  }
+  return best && best.pct >= 56 ? best : null;
+}
+
+function tbVerdictHtml(atTradeSides, currentSides, unavailable) {
+  const alignedAt = vsTbAlignedShape(atTradeSides);
+  const atOverall = vsTbOverallWinner(atTradeSides);
+
+  /* ---------- Section 1: AT THE TIME ---------- */
+  let atBody, atGradeHint = 'fair';
+  if (alignedAt) {
+    atBody = `Structured deadline shape: <span>${esc(alignedAt.nowTeam)}</span> took the 2026 production side (${Math.round(alignedAt.nowPct)}% of this season's value) while <span>${esc(alignedAt.avgTeam)}</span> took the long-term premium (${Math.round(alignedAt.avgPct)}% of Avg value). Both sides got the currency they were shopping for — the day-one question was never "who won," it was whose clock pays off.`;
+  } else if (!atOverall) {
+    atBody = `Even on both clocks at the time — comparable 2026 production and comparable long-term value moved in each direction.`;
+  } else {
+    atBody = `<span>${esc(atOverall.team)}</span> took the larger share on day one — ${Math.round(atOverall.pct)}% of combined value across both clocks. A day-one edge by the numbers.`;
+    atGradeHint = 'warn';
   }
 
-  const curWin=tbSideWinner(currentSides, p=>p.val2026);
+  /* ---------- Unavailable: at-time only ---------- */
+  if (unavailable) {
+    const headline = atGradeHint === 'fair' ? 'Trade looked balanced at the time' : `${esc(atOverall.team)} appeared to win this trade at the time`;
+    return tbVerdictBox('verdict-box ' + (atGradeHint === 'fair' ? 'v-neutral' : 'v-warn'), headline,
+      vsTbSection('At The Time', atBody) +
+      vsTbSection('Where It Stands', 'Current value data isn’t available yet for every player involved, so the retrospective half of this verdict has to wait. Check back soon.'));
+  }
 
-  if(!atWin && !curWin) return tbVerdictBox('verdict-box v-fair','Fair trade, then and now','Both sides gave up comparable 2026 value at the time of the deal, and the trade remains balanced today.');
-  if(atWin && curWin && atWin.idx===curWin.idx) return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} has won this trade from day one`, `<span>${esc(atWin.team)}</span> received the better value at the time of the deal (${Math.round(atWin.pct)}%) and still holds the edge today (${Math.round(curWin.pct)}%).`);
-  if(atWin && curWin && atWin.idx!==curWin.idx) return tbVerdictBox('verdict-box v-warn','The verdict has flipped since the trade', `It appeared <span>${esc(atWin.team)}</span> won this trade at the time (${Math.round(atWin.pct)}% of the value), but <span>${esc(curWin.team)}</span> has received more value since, now holding ${Math.round(curWin.pct)}% of the combined value.`);
-  if(!atWin && curWin) return tbVerdictBox('verdict-box v-warn', `${esc(curWin.team)} has since pulled ahead`, `This trade looked even at the time, but <span>${esc(curWin.team)}</span> has picked up more value since (now ${Math.round(curWin.pct)}% of the combined value).`);
-  return tbVerdictBox('verdict-box v-fair','The gap has closed since the trade', `<span>${esc(atWin.team)}</span> appeared to win this trade at the time (${Math.round(atWin.pct)}%), but the two sides have evened out since.`);
+  /* ---------- Section 2: WHAT'S MOVED ---------- */
+  const deltas = vsTbDeltas(atTradeSides, currentSides);
+  const moveLines = [];
+  for (const side of deltas) {
+    const top = side.movers.filter(m => m.mag >= 0.15).slice(0, 3);
+    if (!top.length) continue;
+    moveLines.push(`<span>${esc(side.receivingTeam)}</span> side: ` + top.map(m => {
+      const bits = [];
+      if (m.dAvg != null) bits.push(`${vsTbArrow(m.dAvg)} Avg`);
+      if (m.d26 != null) bits.push(`${vsTbArrow(m.d26)} 2026`);
+      return `<span>${esc(m.name)}</span> (${bits.join(', ')})`;
+    }).join(' · '));
+  }
+  const allMovers = deltas.flatMap(s => s.movers.map(m => ({ ...m, team: s.receivingTeam })));
+  allMovers.sort((x, y) => y.mag - x.mag);
+  const swing = allMovers.length && allMovers[0].mag >= 0.5 ? allMovers[0] : null;
+  const moveBody = moveLines.length
+    ? moveLines.join('<br>') + (swing ? `<br>The swing piece: <span>${esc(swing.name)}</span> has ${((swing.dAvg ?? swing.d26) >= 0 ? 'gained' : 'lost')} the most value since the deal — the single biggest reason this verdict reads the way it does.` : '')
+    : 'No meaningful value movement since the deal — every piece is worth roughly what it was on trade day.';
+
+  /* ---------- Section 3: WHERE IT STANDS ---------- */
+  const alignedCur = vsTbAlignedShape(currentSides);
+  const curOverall = vsTbOverallWinner(currentSides);
+  const ledger = vsTbLedger(atTradeSides, currentSides);
+  const ledgerLine = ledger.map(l =>
+    `<span>${esc(l.team)}</span>: received ${l.then.toFixed(2)} Avg on trade day → worth ${l.now.toFixed(2)} today${l.pct != null ? ` (${l.pct >= 0 ? '+' : ''}${l.pct}%)` : ''}`).join('<br>');
+
+  let cls = 'verdict-box v-fair', headline, standsBody;
+  const flipDriver = swing ? ` The swing runs through <span>${esc(swing.name)}</span>.` : '';
+
+  if (alignedAt) {
+    // Aligned deal: judge each side's bet by its own clock, plus the ledger.
+    const avgSide = ledger[alignedAt.avgIdx];
+    const nowSide = ledger[alignedAt.nowIdx];
+    const avgBetPaying = (avgSide.pct != null && avgSide.pct >= 5);
+    const avgBetFading = (avgSide.pct != null && avgSide.pct <= -5);
+    if (avgBetPaying) {
+      cls = 'verdict-box v-warn';
+      headline = `${esc(avgSide.team)}'s side of the bet is paying off`;
+      standsBody = `Both sides got what they shopped for on day one, but <span>${esc(avgSide.team)}</span>'s long-term currency has appreciated (${avgSide.pct >= 0 ? '+' : ''}${avgSide.pct}% since the deal) while <span>${esc(nowSide.team)}</span>'s win-now asset is static by design — a rental's value only converts if the season does.${flipDriver}`;
+    } else if (avgBetFading) {
+      cls = 'verdict-box v-warn';
+      headline = `${esc(nowSide.team)}'s win-now side is aging better`;
+      standsBody = `<span>${esc(avgSide.team)}</span>'s long-term haul has shed value since the deal (${avgSide.pct}%) — the classic risk of prospect currency. <span>${esc(nowSide.team)}</span>'s production bet looks stronger by the day.${flipDriver}`;
+    } else {
+      headline = 'Both bets are still live';
+      standsBody = `Neither side's currency has meaningfully appreciated or faded yet — the deal is still being decided on the field.`;
+    }
+  } else if (!atOverall && !curOverall) {
+    headline = 'Fair trade, then and now';
+    standsBody = 'Balanced on trade day, balanced today, on both clocks.';
+  } else if (atOverall && curOverall && atOverall.idx === curOverall.idx) {
+    cls = 'verdict-box v-warn';
+    headline = `${esc(atOverall.team)} has won this trade from day one`;
+    standsBody = `<span>${esc(atOverall.team)}</span> took the better combined value at the time (${Math.round(atOverall.pct)}%) and still holds the edge today (${Math.round(curOverall.pct)}%).`;
+  } else if (atOverall && curOverall && atOverall.idx !== curOverall.idx) {
+    cls = 'verdict-box v-warn';
+    headline = 'The verdict has flipped since the trade';
+    standsBody = `<span>${esc(atOverall.team)}</span> looked like the winner on trade day (${Math.round(atOverall.pct)}%), but <span>${esc(curOverall.team)}</span> now holds ${Math.round(curOverall.pct)}% of the combined value.${flipDriver}`;
+  } else if (!atOverall && curOverall) {
+    cls = 'verdict-box v-warn';
+    headline = `${esc(curOverall.team)} has since pulled ahead`;
+    standsBody = `Even on trade day; <span>${esc(curOverall.team)}</span> has picked up the edge since (${Math.round(curOverall.pct)}%).${flipDriver}`;
+  } else {
+    headline = 'The gap has closed since the trade';
+    standsBody = `<span>${esc(atOverall.team)}</span> appeared to win at the time (${Math.round(atOverall.pct)}%), but the sides have evened out.`;
+  }
+
+  const detail =
+    vsTbSection('At The Time', atBody) +
+    vsTbSection('What’s Moved', moveBody) +
+    vsTbSection('Where It Stands', standsBody + '<br>' + ledgerLine);
+
+  return tbVerdictBox(cls, headline, detail);
+}
+// Convert a trade record's side (comp picks / cash / real players, with refreshed
+// live val2026/avgVal) into full player objects the smart verdict engine understands.
+// Comp/cash entries mirror the exact shape addCash()/getCompPicksForTeam() already use
+// elsewhere so vsGenerateSmartVerdict's isComp/isCash checks work the same way. Real
+// players are looked up fresh from allPlayers (not the thin val2026/avgVal snapshot)
+// since the engine needs pos/level/isProspect/age/valByYear/etc. A player who no longer
+// resolves (traded off-system) is simply omitted from this list.
+function tbBuildVsListFromTradeSide(players, team){
+  const list=[];
+  for(const p of players){
+    if(p.asset==='compA'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.7,avgVal:1.7,ctrlYears:null,perfVal:null,isComp:true}); continue; }
+    if(p.asset==='compB'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.3,avgVal:1.3,ctrlYears:null,perfVal:null,isComp:true}); continue; }
+    if(p.asset==='cash'){ list.push({name:p.playerName,team,pos:'CASH',age:null,val2026:p.val2026,avgVal:null,ctrlYears:null,perfVal:null,isCash:true}); continue; }
+    const live=allPlayers.find(x=>x.playerID===p.playerID);
+    if(live) list.push(live);
+  }
+  return list;
+}
+// Full methodology verdict (same engine as Submit Trade / Trade Finder) applied to a
+// historical trade's CURRENT rosters. Only runs for a clean 2-side trade with fully
+// resolved live data — the "at the time" comparison above already covers what the deal
+// looked like on the day it happened, which the engine can't reconstruct (it needs live
+// roster context: positions, control years, prospect status).
+function tbSmartVerdictHtml(currentSides, unavailable){
+  if(unavailable || currentSides.length!==2) return '';
+  const teamA=currentSides[1].receivingTeam, teamB=currentSides[0].receivingTeam;
+  if(!teamA || !teamB) return '';
+  const listA=tbBuildVsListFromTradeSide(currentSides[0].players, teamA);
+  const listB=tbBuildVsListFromTradeSide(currentSides[1].players, teamB);
+  if(!listA.length || !listB.length) return '';
+  try{
+    const result=vsGenerateSmartVerdict(listA, listB, teamA, teamB);
+    const cls='verdict-box '+(result.grade==='fair'?'v-fair':result.grade==='warn'?'v-warn':'v-neutral');
+    return `<div style="margin-top:14px"><div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Today's Full Trade Analysis</div>${tbVerdictBox(cls, result.headline, result.html)}</div>`;
+  } catch(e){
+    console.error('Trade Tracker smart verdict error:', e);
+    return '';
+  }
 }
 function renderTradeBreakdown(trade, liveOk){
   const sides=groupTradeSides(trade);
@@ -4709,7 +4906,8 @@ function renderTradeBreakdown(trade, liveOk){
     + tbBlockHtml(fmtDate(trade.date), sides, false)
     + `<div style="margin-top:14px">${tbSideStatsHtml(currentSides)}</div>`
     + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable)
-    + tbVerdictHtml(sides, currentSides, unavailable);
+    + tbVerdictHtml(sides, currentSides, unavailable)
+    + tbSmartVerdictHtml(currentSides, unavailable);
 }
 
 // ===== SCORE MODAL =====
@@ -6049,6 +6247,449 @@ function finderBuildVerdictHtml(giveList, getList, giveTeam, getTeam) {
   const cls = 'verdict-box ' + (grade === 'fair' ? 'v-fair' : grade === 'warn' ? 'v-warn' : 'v-neutral');
   return `<div class="${cls}" style="margin-top:10px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${body}</div></div></div>`;
 }
+
+/* =====================================================================================
+   VALUE SAVANT — FINDER HOTFIX v3.1
+   =====================================================================================
+   Fixes the "Scrub Throw-In" incident: legacy finder fallback paths bypassed the
+   methodology gate. This file (loaded last, after verdict_patch_v3.js) adds a
+   belt-and-suspenders post-filter, hard value-share bounds, comp return-quality
+   checks, and a verified "Why" section.
+   ===================================================================================== */
+
+/* ============================== 1. TUNABLE BOUNDS ============================== */
+
+const VS_BANDS = {
+  // Give-side share of combined 2026 Value must land inside this window.
+  V26_MIN: 0.45, V26_MAX: 0.55,
+  // Give-side share of combined Avg Value for NON-rental targets.
+  AVG_MIN: 0.42, AVG_MAX: 0.62,
+  // Rental targets: seller must extract a long-term premium — give side's Avg share
+  // must be at least this (the buyer pays MORE long-term value than they receive).
+  RENTAL_AVG_MIN: 0.58,
+  // And a rental's give side can never be a scrub package: minimum absolute Avg total
+  // relative to the rental's 2026 value.
+  RENTAL_AVG_FLOOR_MULT: 1.15,   // give Avg total >= 1.15 x rental 2026 Value
+};
+
+/* ============================== 2. VALUE-SHARE GATE ============================== */
+
+// Hard bounds on a candidate give-side combo vs the target list. Returns rejection
+// reason or null. This runs inside the master gate AND the post-filter.
+function vsFinderValueBoundsCheck(combo, targetList) {
+  const g26 = combo.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const gAv = combo.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const t26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const tAv = targetList.reduce((s, p) => s + (p.avgVal || 0), 0);
+
+  const share26 = (g26 + t26) > 0 ? g26 / (g26 + t26) : 0.5;
+  const shareAv = (gAv + tAv) > 0 ? gAv / (gAv + tAv) : 0.5;
+
+  if (share26 < VS_BANDS.V26_MIN || share26 > VS_BANDS.V26_MAX) {
+    return `2026 value share ${Math.round(share26 * 100)}% is outside the 45–55% band`;
+  }
+
+  const rental = targetList.some(t => t.level === 'mlb' && vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+  if (rental) {
+    if (shareAv < VS_BANDS.RENTAL_AVG_MIN) {
+      return `rental target requires a seller Avg premium — give side is only ${Math.round(shareAv * 100)}% of combined Avg (needs ≥ ${Math.round(VS_BANDS.RENTAL_AVG_MIN * 100)}%)`;
+    }
+    const rental26 = targetList.filter(t => vsControlThrough(t) <= 2026).reduce((s, t) => s + (t.val2026 || 0), 0);
+    if (gAv < rental26 * VS_BANDS.RENTAL_AVG_FLOOR_MULT) {
+      return `rental floor: give Avg total ${gAv.toFixed(2)} is below ${(rental26 * VS_BANDS.RENTAL_AVG_FLOOR_MULT).toFixed(2)} (1.15x the rental's 2026 value)`;
+    }
+  } else {
+    if (shareAv < VS_BANDS.AVG_MIN || shareAv > VS_BANDS.AVG_MAX) {
+      return `Avg value share ${Math.round(shareAv * 100)}% is outside the ${Math.round(VS_BANDS.AVG_MIN * 100)}–${Math.round(VS_BANDS.AVG_MAX * 100)}% band`;
+    }
+  }
+  return null;
+}
+
+/* ============================== 3. MASTER GATE OVERRIDE ============================== */
+
+// Extends the v2 gate with the value bounds AND a general blocking rejection (not just
+// catchers): any incoming prospect hard/moderately blocked on the receiving side by a
+// player NOT leaving in the deal is a rejection at finder level (users can still build
+// such trades manually in the sim — the verdict will flag them — but the finder should
+// never RECOMMEND one).
+const _vsFinderGateCombo_v2 = vsFinderGateCombo;
+
+vsFinderGateCombo = function (combo, givingTeam, receivingTeam, targetList, bandName) {
+  // (0) NEW: hard value-share bounds — catches scrub packages regardless of path
+  const vb = vsFinderValueBoundsCheck(combo, targetList);
+  if (vb) return vb;
+
+  // (1) NEW: full blocking rejection using the in-trade-aware scan.
+  //     targetList are the players leaving the receiving team in this same deal.
+  const blocks = vsBlockingAnalysis2(combo, receivingTeam, targetList);
+  const hard = blocks.find(b => b.severity === 'major' || b.severity === 'moderate');
+  if (hard) {
+    return 'blocked prospect: ' + hard.text.replace(/<[^>]+>/g, '');
+  }
+
+  // (2) Everything from v2 (diversity, C-block, own-hole, rental band, direction)
+  return _vsFinderGateCombo_v2(combo, givingTeam, receivingTeam, targetList, bandName);
+};
+
+/* ============================== 4. POST-FILTER (belt & suspenders) ============================== */
+
+// Filters the FINAL offers array immediately before rendering. Works on the offer
+// objects the card renderer consumes ({players, label, ...}). Any offer failing the
+// master gate is dropped and the reason logged. This closes every bypass path,
+// including legacy fallbacks and future scenario types.
+function vsFinderPostFilter(offers, givingTeam, receivingTeam, targetList) {
+  if (!Array.isArray(offers)) return offers;
+  const kept = [];
+  for (const offer of offers) {
+    const combo = offer.players || [];
+    if (!combo.length) continue;
+    // Never allow the legacy scrub fallback through, regardless of gate result.
+    if (/scrub/i.test(offer.label || '')) {
+      console.debug('[finder-v3.1] dropped legacy scrub fallback offer');
+      continue;
+    }
+    const fail = vsFinderGateCombo(combo, givingTeam, receivingTeam, targetList, offer.bandName || 'future');
+    if (fail) {
+      console.debug('[finder-v3.1] post-filter dropped offer "' + (offer.label || '') + '":', fail);
+      continue;
+    }
+    kept.push(offer);
+  }
+  return kept;
+}
+
+/* ============================== 5. COMP RETURN-QUALITY CHECKS ============================== */
+
+// A historical comp is only valid when the RETURN side resembles the historical return.
+// All six curated comps involved premium prospect capital going back; a package headlined
+// by an unranked low-value piece must never inherit their precedent.
+function vsReturnHeadlinerQuality(returnList) {
+  const real = returnList.filter(p => !p.isComp && !p.isCash);
+  if (!real.length) return { ranked: false, topAvg: 0 };
+  const top = real.reduce((b, p) => ((p.avgVal || 0) > (b.avgVal || 0) ? p : b), real[0]);
+  const ranked = !!(top.mlbRank || (top.orgRank && parseInt(String(top.orgRank).replace(/\D/g, ''), 10) <= 10));
+  return { ranked, topAvg: top.avgVal || 0, top };
+}
+
+const _vsFindHistoricalComp_v2 = vsFindHistoricalComp;
+
+vsFindHistoricalComp = function (listA, listB, ctxA, ctxB) {
+  const match = _vsFindHistoricalComp_v2(listA, listB, ctxA, ctxB);
+  if (!match) return null;
+  // Determine the return side: the list NOT containing the matched star.
+  const starInA = listA.some(p => p.name === match.star.name);
+  const returnList = starInA ? listB : listA;
+  const q = vsReturnHeadlinerQuality(returnList);
+  // Premium-return comps require a ranked headliner OR a premium-value one (Avg >= 5).
+  const premiumComps = new Set(['darvish2017', 'chapman2016', 'miller2016', 'soto2022', 'quintana2017']);
+  if (premiumComps.has(match.comp.id) && !q.ranked && q.topAvg < 5) {
+    console.debug('[comp] suppressed', match.comp.id, '— return headliner is unranked/low-value; precedent not comparable');
+    return null;
+  }
+  // Machado 2018 (quantity-of-mids warning) is allowed for mid-tier returns — that's its point —
+  // but still requires at least 3 real pieces to resemble the historical package.
+  if (match.comp.id === 'machado2018' && returnList.filter(p => !p.isComp && !p.isCash).length < 3) {
+    return null;
+  }
+  return match;
+};
+
+/* ============================== 6. VERIFIED "WHY" SECTION ============================== */
+
+// Override: the Why section now RUNS the gate and reports the actual result. If somehow
+// a non-compliant offer reaches rendering (it shouldn't, post-filter), the section says
+// so instead of asserting compliance.
+const _vsFinderWhySection_v3 = vsFinderWhySection;
+
+vsFinderWhySection = function (giveList, getList, giveTeam, getTeam) {
+  let html = _vsFinderWhySection_v3(giveList, getList, giveTeam, getTeam);
+  const gateResult = (function () {
+    try { return vsFinderGateCombo(giveList, giveTeam, getTeam, getList, 'future'); }
+    catch (e) { return null; }
+  })();
+  const assertLine = /Passed all construction gates[^<]*<br>|Passed all construction gates[^<]*$/;
+  if (gateResult) {
+    html = html.replace(assertLine, '');
+    html += `<br>⚠ Gate check: this package does <span>not</span> clear all methodology gates (${gateResult}). It should not have been recommended — if you're seeing this, report it.`;
+  } else {
+    // Replace the asserted line with the verified one (same text, now actually checked).
+    html = html.replace('Passed all construction gates', 'Verified against all construction gates');
+  }
+  return html;
+};
+
+/* =====================================================================================
+   VALUE SAVANT — REALISM PATCH v3.2
+   =====================================================================================
+   Three realism upgrades on top of v3.1: untouchable-prospect rejection, need-for-need
+   contender-to-contender trades, and salary-dump recognition. Loaded last — overrides
+   chain in load order.
+   ===================================================================================== */
+
+/* ============================== SHARED HELPERS ============================== */
+
+// Robust rank parse: "CWS 1" → 1, "MLB 12" → 12, 3 → 3, "" → null
+function vsParseRank(raw) {
+  if (raw == null || raw === '') return null;
+  if (typeof raw === 'number') return isNaN(raw) ? null : raw;
+  const m = String(raw).match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function vsOrgRankNum(p) { return vsParseRank(p.orgRank); }
+function vsMlbRankNum(p) { return vsParseRank(p.mlbRank); }
+
+// Is the target side a controlled superstar (the Soto shape that unlocks everyone)?
+//   superstar-tier 2026 value AND controlled beyond next season.
+function vsTargetIsControlledSuperstar(targetList) {
+  return targetList.some(t => !t.isComp && !t.isCash && t.level === 'mlb' &&
+    (t.val2026 || 0) >= VS_TIER.SUPERSTAR_26 && vsControlThrough(t) >= 2028);
+}
+function vsTargetIsRental(targetList) {
+  return targetList.some(t => !t.isComp && !t.isCash && t.level === 'mlb' &&
+    vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+}
+
+// MLB-ready: on the MLB roster, or AAA with a 2026 ETA.
+function vsIsMlbReady(p) {
+  if (p.level === 'mlb') return true;
+  const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+  return (String(p.levelRaw || '').toUpperCase() === 'AAA') && eta <= 2026;
+}
+
+/* =====================================================================================
+   PART 1 — UNTOUCHABLES
+   ===================================================================================== */
+
+// Returns rejection reason or null.
+function vsFinderUntouchableCheck(combo, givingTeam, targetList) {
+  const superstarReturn = vsTargetIsControlledSuperstar(targetList);
+  if (superstarReturn) return null;                      // Soto shape: everyone's available
+  const rental = vsTargetIsRental(targetList);
+
+  for (const p of combo) {
+    if (p.isComp || p.isCash) continue;
+    const orgN = vsOrgRankNum(p);
+    const mlbN = vsMlbRankNum(p);
+    const isTop2Org = orgN != null && orgN <= 2;
+    const isTop30Mlb = mlbN != null && mlbN <= 30;
+
+    if (rental && (isTop2Org || isTop30Mlb)) {
+      return `${p.name} is untouchable for a rental — ${isTop30Mlb ? 'MLB top-30 prospect' : givingTeam + "'s top-" + orgN + ' org prospect'}. No front office moves that tier for a pure rental; they hang up.`;
+    }
+    if (!rental && orgN === 1) {
+      // #1 org prospect only moves for a controlled superstar (handled above) — not for
+      // ordinary controlled players.
+      return `${p.name} is ${givingTeam}'s #1 prospect — only movable in a controlled-superstar blockbuster, and this target isn't one.`;
+    }
+  }
+  return null;
+}
+
+// Verdict-side note (manual sim trades aren't rejected, but the verdict says the quiet
+// part out loud). Returns {severity, text} or null.
+function vsUntouchableVerdictNote(listA, listB, teamA, teamB) {
+  const notes = [];
+  for (const [give, team, targets] of [[listA, teamA, listB], [listB, teamB, listA]]) {
+    const fail = vsFinderUntouchableCheck(give, team, targets);
+    if (fail) notes.push({ severity: 'major', text: fail + ' In a real negotiation this package doesn\'t get past the first phone call.' });
+  }
+  return notes;
+}
+
+/* =====================================================================================
+   PART 2 — CONTENDER-TO-CONTENDER NEED-FOR-NEED
+   ===================================================================================== */
+
+// Validates a buyer↔buyer trade shape. Returns { ok, reasons:[...] }.
+//   comboOut = what givingTeam sends; targetList = what receivingTeam sends back.
+function vsB2BCheck(comboOut, givingTeam, receivingTeam, targetList) {
+  const reasons = [];
+
+  // (a) MLB value both ways — contenders don't raid each other's farms mid-race.
+  const outReady26 = comboOut.filter(vsIsMlbReady).reduce((s, p) => s + (p.val2026 || 0), 0);
+  const outTotal26 = comboOut.reduce((s, p) => s + (p.val2026 || 0), 0);
+  if (outTotal26 > 0 && outReady26 / outTotal26 < 0.6) {
+    reasons.push(`${givingTeam}'s side is mostly far-off prospect value — contender-to-contender trades move MLB-ready pieces, not futures`);
+  }
+  const inReady26 = targetList.filter(vsIsMlbReady).reduce((s, p) => s + (p.val2026 || 0), 0);
+  const inTotal26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  if (inTotal26 > 0 && inReady26 / inTotal26 < 0.6) {
+    reasons.push(`${receivingTeam}'s side is mostly far-off prospect value — same standard both ways`);
+  }
+
+  // (b) Each side must trade from surplus — neither contender opens a hole in-season.
+  const holeOut = vsFinderCreatesOwnHole(comboOut, givingTeam);
+  if (holeOut) reasons.push(holeOut + ' — a contender doesn\'t open an in-season hole');
+  const holeIn = vsFinderCreatesOwnHole(targetList, receivingTeam);
+  if (holeIn) reasons.push(holeIn + ' — a contender doesn\'t open an in-season hole');
+
+  // (c) Need-for-need: each side should receive at a position of structural need OR a
+  //     clear upgrade at the spot. We accept either a hole-fill or a receive-side piece
+  //     stronger than the incumbent.
+  function fillsOrUpgrades(incoming, team) {
+    for (const p of incoming) {
+      if (p.isComp || p.isCash) continue;
+      const b = finderPosBucket(p.pos);
+      if (!b) continue;
+      const needs = vsFinderSellerNeeds(team);
+      if (needs.holeBuckets.has(b)) return true;
+      const incumbentBest = Math.max(0, ...allPlayers
+        .filter(x => x.team === team && x.level === 'mlb' && finderPosBucket(x.pos) === b)
+        .map(x => x.val2026 || 0));
+      if ((p.val2026 || 0) > incumbentBest + 0.5) return true;
+    }
+    return false;
+  }
+  if (!fillsOrUpgrades(targetList, givingTeam)) reasons.push(`${givingTeam} isn't receiving at a position of need or clear upgrade — no reason to make this call`);
+  if (!fillsOrUpgrades(comboOut, receivingTeam)) reasons.push(`${receivingTeam} isn't receiving at a position of need or clear upgrade — no reason to take this call`);
+
+  return { ok: reasons.length === 0, reasons };
+}
+
+// OVERRIDE the direction check: buyer↔buyer is now legal when the B2B shape validates.
+const _vsFinderDirectionCheck_v2 = vsFinderDirectionCheck;
+
+vsFinderDirectionCheck = function (buyerTeam, sellerTeam, targetList) {
+  const aCtx = vsTeamContext(buyerTeam);
+  const bCtx = vsTeamContext(sellerTeam);
+  if (aCtx.role === 'buyer' && bCtx.role === 'buyer') {
+    // B2B lane: shape must validate (checked with full combo context in the gate below;
+    // here we only clear the categorical rejection).
+    return null;
+  }
+  return _vsFinderDirectionCheck_v2(buyerTeam, sellerTeam, targetList);
+};
+
+/* ============================== MASTER GATE (v3.2 chain) ============================== */
+
+const _vsFinderGateCombo_v31 = vsFinderGateCombo;
+
+vsFinderGateCombo = function (combo, givingTeam, receivingTeam, targetList, bandName) {
+  // (0) Untouchables — cheapest, most decisive check first.
+  const unt = vsFinderUntouchableCheck(combo, givingTeam, targetList);
+  if (unt) return unt;
+
+  // (1) B2B shape validation when both sides are buyers.
+  const gCtx = vsTeamContext(givingTeam), rCtx = vsTeamContext(receivingTeam);
+  if (gCtx.role === 'buyer' && rCtx.role === 'buyer') {
+    const b2b = vsB2BCheck(combo, givingTeam, receivingTeam, targetList);
+    if (!b2b.ok) return 'contender-to-contender shape fails: ' + b2b.reasons[0];
+  }
+
+  // (2) Everything from v3.1 (value bounds, blocking, diversity, holes, rental band,
+  //     direction — now B2B-aware).
+  return _vsFinderGateCombo_v31(combo, givingTeam, receivingTeam, targetList, bandName);
+};
+
+/* =====================================================================================
+   PART 3 — SALARY-DUMP RECOGNITION
+   ===================================================================================== */
+
+// Underwater contract detection — reads ONLY the user's own surplus-value math.
+// Surplus value applies to 2027+ (2026 is salary-blind), so the contract signal is:
+//   (a) forward value (sum of 2027–2031) meaningfully negative → albatross going
+//       forward, even if the player is productive in 2026, or
+//   (b) avgVal itself negative → fully underwater across the blend.
+// A negative 2026 value alone is a PERFORMANCE signal, not a contract signal, and is
+// deliberately ignored here.
+function vsForwardValue(p) {
+  if (!p.valByYear) return null;
+  let s = 0, any = false;
+  for (let y = 2027; y <= 2031; y++) {
+    const v = p.valByYear[y];
+    if (v != null && !isNaN(v)) { s += v; any = true; }
+  }
+  return any ? s : null;
+}
+function vsNegativeContracts(list) {
+  return list.filter(p => {
+    if (p.isComp || p.isCash || p.level !== 'mlb') return false;
+    const fwd = vsForwardValue(p);
+    if (fwd != null && fwd < -0.25) return true;           // albatross forward
+    if (p.avgVal != null && p.avgVal < -0.25) return true; // fully underwater
+    return false;
+  });
+}
+
+// Detects the dump shape on either side: negative contract + sweetener piece(s) moving
+// together for a lesser return. Returns a verdict section body or null.
+function vsSalaryDumpSection(listA, listB, teamA, teamB) {
+  const lines = [];
+  for (const [give, team, other, otherTeam] of [[listA, teamA, listB, teamB], [listB, teamB, listA, teamA]]) {
+    const dumps = vsNegativeContracts(give);
+    if (!dumps.length) continue;
+    const sweeteners = give.filter(p => !p.isComp && !p.isCash && (p.avgVal || 0) > 0.5 && !dumps.includes(p));
+    const giveNet = give.reduce((s, p) => s + (p.avgVal || 0), 0);
+    const otherNet = other.reduce((s, p) => s + (p.avgVal || 0), 0);
+    const dumpNames = dumps.map(d => {
+      const fwd = vsForwardValue(d);
+      const shape = (fwd != null && fwd < -0.25 && (d.val2026 || 0) > 0)
+        ? `productive now (${fmtVs(d.val2026)} in 2026) but ${fmtVs(fwd)} across 2027+ — albatross going forward`
+        : `${fmtVs(d.avgVal)} Avg — underwater contract`;
+      return `<span>${d.name}</span> (${shape})`;
+    }).join(', ');
+    if (sweeteners.length && otherNet < give.filter(p => !dumps.includes(p)).reduce((s, p) => s + (p.avgVal || 0), 0)) {
+      lines.push(`<span>${team}</span> is executing a salary dump: ${dumpNames} moves only because ${sweeteners.map(s => `<span>${s.name}</span>`).join(' and ')} sweeten${sweeteners.length === 1 ? 's' : ''} the deal. <span>${otherTeam}</span> is being paid in prospect capital to absorb the contract — the correct read is a paydown, not a value loss. Judge it by whether the sweetener outweighs the negative value absorbed (net here: ${fmtVs(giveNet)} given vs ${fmtVs(otherNet)} received).`);
+    } else {
+      lines.push(`${dumpNames} carries negative surplus value — any acquirer is doing the sender a favor, and the return should reflect that (lesser pieces back, or sweeteners attached).`);
+    }
+  }
+  return lines.length ? lines.join('<br>') : null;
+}
+
+/* =====================================================================================
+   VERDICT OVERRIDE (v3.2 chain) — adds Untouchable notes, Contender Swap section,
+   Salary Dump section.
+   ===================================================================================== */
+
+const _vsGenerateSmartVerdict_v3 = vsGenerateSmartVerdict;
+
+vsGenerateSmartVerdict = function (listA, listB, teamA, teamB) {
+  const base = _vsGenerateSmartVerdict_v3(listA, listB, teamA, teamB);
+  const ctxA = vsTeamContext(teamA), ctxB = vsTeamContext(teamB);
+  let html = base.html, grade = base.grade, headline = base.headline;
+  let extra = '';
+
+  const section = (title, body) =>
+    `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+
+  // Untouchables — flags on manual sim trades; hard problem.
+  const untNotes = vsUntouchableVerdictNote(listA, listB, teamA, teamB);
+  if (untNotes.length) {
+    extra += section('Untouchables', untNotes.map(n => '✕ ' + n.text).join('<br>'));
+    grade = 'warn';
+    headline = '✕ Real Front Offices Hang Up Here';
+  }
+
+  // Contender-to-contender framing.
+  if (ctxA.role === 'buyer' && ctxB.role === 'buyer') {
+    const b2b = vsB2BCheck(listA, teamA, teamB, listB);
+    const body = b2b.ok
+      ? `✓ Valid need-for-need contender swap: MLB value moves both ways, both sides trade from surplus into a need. These deals are rarer than deadline trades but real — judged on fit and balance, not buyer/seller leverage.`
+      : b2b.reasons.map(r => '⚠ ' + r).join('<br>');
+    extra += section('Contender-to-Contender Swap', body);
+    if (!b2b.ok && grade === 'fair') { grade = 'warn'; headline = '⚠ Contender Swap Shape Doesn\'t Hold'; }
+  }
+
+  // Salary-dump structure.
+  const dump = vsSalaryDumpSection(listA, listB, teamA, teamB);
+  if (dump) extra += section('Contract Structure', dump);
+
+  if (extra) {
+    // Insert before Historical Comparable when present; else append.
+    const marker = '>Historical Comparable';
+    const idx = html.indexOf(marker);
+    if (idx >= 0) {
+      const divStart = html.lastIndexOf('<div style="margin-bottom:9px">', idx);
+      html = html.slice(0, divStart) + extra + html.slice(divStart);
+    } else {
+      html += extra;
+    }
+  }
+  return { grade, headline, html };
+};
 </script>
 </body>
 </html>
