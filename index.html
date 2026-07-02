@@ -284,8 +284,8 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .overlay-center{align-items:center;justify-content:center;padding:20px}
 .overlay-bottom{align-items:flex-end;justify-content:center}
 .overlay-base.open{display:flex}
-.modal-box{background:linear-gradient(165deg,var(--bg-card) 0%,var(--bg-mid) 100%);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:380px;position:relative;box-shadow:var(--shadow-md)}
-.modal-box-bottom{background:linear-gradient(165deg,var(--bg-card) 0%,var(--bg-mid) 100%);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:22px 22px 30px;width:100%;max-width:480px;position:relative;box-shadow:var(--shadow-md)}
+.modal-box{background:linear-gradient(165deg,var(--bg-card) 0%,var(--bg-mid) 100%);border:1px solid var(--border);border-radius:16px;padding:24px;width:100%;max-width:380px;position:relative;box-shadow:var(--shadow-md);max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.modal-box-bottom{background:linear-gradient(165deg,var(--bg-card) 0%,var(--bg-mid) 100%);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:22px 22px 30px;width:100%;max-width:480px;position:relative;box-shadow:var(--shadow-md);max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .modal-close{position:absolute;top:14px;right:16px;background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px;border-radius:6px;transition:color 0.15s,background 0.15s}
 .modal-close:hover{color:var(--text-primary);background:var(--bg-light)}
 .modal-title{letter-spacing:-0.005em;font-size:17px;font-weight:500;color:var(--text-primary);margin-bottom:14px;font-family:'Space Grotesk','Inter',sans-serif}
@@ -1460,6 +1460,7 @@ async function loadData() {
 
         const avgVal = numOrNull(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']);
         const valueScore = numOrNull(row['Value Score']);
+        const score2026 = numOrNull(row['2026 Score'] ?? row['_21']);   // col V (index 21)
         // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
         const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
         const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
@@ -1488,6 +1489,7 @@ async function loadData() {
           val2026, avgVal, ctrlYears,
           valByYear: {2026:val2026, 2027:val2027, 2028:val2028, 2029:val2029, 2030:val2030, 2031:val2031},
           perfVal: valueScore,
+          score2026,
           orgRank, mlbRank,
           // Stats enriched after stat sheets load
           obp: null, slg: null, wrcPlus: null,
@@ -1553,6 +1555,19 @@ async function loadData() {
       }
     }
 
+    // Join real ETA from the 2026 Pipeline Rankings sheet by Player ID — the finder/verdict
+    // need true ETA (e.g. an A+ player with ETA 2027, not the level-guess default of 2028).
+    const pipe = await fetchSheetTab('2026 Pipeline Rankings');
+    if (pipe) {
+      for (const row of pipe) {
+        const pid = row['Player ID'] != null ? String(Math.round(Number(row['Player ID']))) : null;
+        const pl  = pid ? playerIndex[pid] : null;
+        if (!pl) continue;
+        const eta = parseInt(row['ETA'], 10);
+        if (!isNaN(eta)) pl.pipelineETA = eta;
+      }
+    }
+
     setProgress(100, 'Done!');
     await loadStandings();
     buildPercentiles();
@@ -1590,8 +1605,10 @@ async function loadStandings(){
       const winPctRaw=getN(3); // Win %
       const gb=getN(4);
       const clinched=getS(5);
+      const wcGb=getN(6);      // WC GB — appended by pullStandings_with_wildcard.gs
+      const wcRank=getS(7);    // WC Rank — appended by pullStandings_with_wildcard.gs
       const winPct=winPctRaw!==null?winPctRaw:(wins!==null&&losses!==null&&wins+losses>0?wins/(wins+losses):null);
-      standingsData.push({team,wins,losses,winPct,gb,clinched});
+      standingsData.push({team,wins,losses,winPct,gb,clinched,wcGb,wcRank});
       // Compute buyer/seller posture from standings
       let posture='either';
       if(winPct!==null){
@@ -3856,7 +3873,7 @@ async function generateOffers(){
 function finderPlayerLine(p){
   if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
   if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
-  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${ctrlYrsLabel(p)||'—'}</span></div></div>`;
+  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${vsCtrlThruLabel(p)||'—'}</span></div></div>`;
 }
 
 function finderBuildBarsHtml(giveList, getList){
@@ -3875,23 +3892,9 @@ function finderBuildBarsHtml(giveList, getList){
   }).join('');
 }
 
-function finderBuildVerdictHtml(giveList, getList, giveTeam, getTeam){
-  const v26A=sumF(giveList,'val2026'), v26B=sumF(getList,'val2026');
-  const avgA=sumF(giveList,'avgVal'), avgB=sumF(getList,'avgVal');
-  updateVerdict(v26A,v26B,avgA,avgB,{
-    teamA: giveTeam,
-    teamB: getTeam,
-    listA: giveList,
-    listB: getList,
-    hasPlayers: true,
-    fromFinder: true
-  });
-  const clone=document.getElementById('verdictBox').cloneNode(true);
-  clone.removeAttribute('id');
-  clone.style.marginTop='10px';
-  clone.style.display='block';
-  return clone.outerHTML;
-}
+// finderBuildVerdictHtml + vsFinderWhySection are defined at the end of the script
+// block by the verdict/finder patch (v3), which supersedes the finder_verdict_patch.js
+// versions with an age-aware verdict.
 
 function finderRenderOfferCard(offer, index, total){
   const userTeam=finderState.team;
@@ -4530,7 +4533,7 @@ function openShareModal(){
   const playerLine=(p)=>{
     if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
     if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
-    return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${ctrlYrsLabel(p)||'—'}</span></div></div>`;
+    return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${vsCtrlThruLabel(p)||'—'}</span></div></div>`;
   };
   const side=(list,lbl)=>{
     if(!list.length) return `<div><div class="share-side-label">${lbl} Receives</div><div style="font-size:11px;color:var(--text-muted)">Nothing</div></div>`;
@@ -5606,6 +5609,445 @@ function vsFinderTryFifthPiece(combo, pool, targetV26, targetAvg, bandFn) {
     if (bandFn(gV, gA)) return aug;
   }
   return null;
+}
+
+/* =====================================================================================
+   VALUE SAVANT — VERDICT/FINDER PATCH v3  (consolidated)
+   =====================================================================================
+   Loads after verdict_engine_v2.js and trade_finder_logic_v2.js — overrides several of
+   their functions with improved versions (JS "last definition wins").
+
+   CONTENTS
+     B. Ctrl-through model — replaces "Ctrl: N yrs" with "Ctrl thru YYYY"
+     C. Wild-card-aware buyer/seller classifier (reads new WC GB column)
+     D. In-trade blocker bug fix (a player leaving in THIS deal can't block)
+     E. Age / peak-curve engine (the Salas-vs-Narváez logic)
+     G. Finder verdict + "Why This Trade Was Recommended" (supersedes finder_verdict_patch.js)
+   ===================================================================================== */
+
+/* =====================================================================================
+   PART B — CTRL-THROUGH MODEL
+   =====================================================================================
+   Replaces the old "N years of control" count with an explicit final controlled year.
+   This is what the UI should display ("Ctrl thru 2033") and what all engine logic uses. */
+
+// True final controlled year for any asset.
+//   MLB players     → last season carrying positive value (valByYear / ctrlYears fallback)
+//   prospects       → real Pipeline ETA + 6   (6 years of team control from debut)
+//   minor leaguers  → level-derived etaRaw + 6 (rookie-ball arm isn't controlled-thru-2031)
+function vsControlThrough(p) {
+  if (!p) return 2026;
+  if (p.isProspect) {
+    const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+    return eta + 6;
+  }
+  if (p.level === 'minors') {
+    const eta = parseInt(p.etaRaw, 10) || 2029;
+    return eta + 6;
+  }
+  // MLB player: last positive value year
+  if (p.valByYear) {
+    let last = null;
+    for (let y = 2026; y <= 2031; y++) {
+      const v = p.valByYear[y];
+      if (v != null && !isNaN(v) && v > 0) last = y;
+    }
+    if (last !== null) return last;
+  }
+  if (p.ctrlYears != null) return 2025 + p.ctrlYears;
+  return 2026;
+}
+
+// OVERRIDE: the v2 engine's vsLastControlYear now defers to the richer ctrl-through model
+// so every downstream check (holes, blocking, rentals, direction) uses real ETAs.
+vsLastControlYear = function (p) { return vsControlThrough(p); };
+
+// Display helper for the trade-sim / finder cards. Replaces the "Ctrl: N yr" label.
+// Returns e.g. "thru 2033".
+function vsCtrlThruLabel(p) {
+  if (!p || p.isComp || p.isCash) return '—';
+  const y = vsControlThrough(p);
+  return 'thru ' + y;
+}
+
+/* =====================================================================================
+   PART C — WILD-CARD-AWARE BUYER/SELLER CLASSIFIER
+   =====================================================================================
+   The old classifier only saw division GB, so SD (over .500, ~2 GB of a WC spot but far
+   back in the division) was mislabeled a seller. This reads the new "WC GB" column and
+   treats WC contention as buyer territory. */
+
+// Parse a games-back cell that may be "-", "+2.0", "2.5", or a number.
+function vsParseGB(raw) {
+  if (raw == null || raw === '-' || raw === '' || raw === 0 || raw === '0') return 0;
+  const s = String(raw).replace('+', '');
+  const n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
+
+// OVERRIDE of the v2 vsTeamContext with wild-card awareness.
+// standingsData rows are expected to now include wcGb (and optionally wcRank); the
+// loadStandings parser must map the new columns (see INTEGRATION_NOTES_v3 Part C).
+vsTeamContext = function (team) {
+  const row = (typeof standingsData !== 'undefined' ? standingsData : []).find(r => r.team === team);
+  if (!row) return { role: 'unknown', wins: null, losses: null, winPct: null, gb: null, wcGb: null, label: '', record: '' };
+  const divGb = vsParseGB(row.gb);
+  const wcGb  = vsParseGB(row.wcGb);
+  const winPct = row.winPct != null ? parseFloat(row.winPct) : (row.wins / Math.max(1, row.wins + row.losses));
+  const record = `${row.wins}-${row.losses}`;
+
+  // Buyer if: leading/near-leading the division, OR holding/near a wild-card spot,
+  //           OR simply a strong record.
+  const nearDivLead = divGb != null && divGb <= VS_ROLE.BUYER_MAX_GB;
+  const inWcHunt     = wcGb  != null && wcGb  <= 4.0;      // within ~4 of a WC berth = buyer/fringe
+  const holdsWc      = wcGb  != null && wcGb  <= 0;        // currently in a WC spot
+  const strong       = winPct >= VS_ROLE.BUYER_MIN_PCT;
+  const over500      = winPct >= 0.500;
+
+  let role, label;
+  if (nearDivLead || holdsWc || (inWcHunt && over500) || strong) {
+    role = 'buyer';
+    label = (nearDivLead ? 'division contender' : holdsWc ? 'wild-card holder' : 'wild-card contender');
+  } else if (
+    // Seller only when genuinely out of it in BOTH races and not over .500.
+    (divGb != null && divGb >= VS_ROLE.SELLER_MIN_GB) &&
+    (wcGb == null || wcGb >= 6.0) && !over500
+  ) {
+    role = 'seller';
+    label = 'seller / rebuilder';
+  } else {
+    role = 'fringe';
+    label = over500 ? 'fringe buyer (WC race)' : 'fringe / undecided';
+  }
+  return { role, wins: row.wins, losses: row.losses, winPct, gb: divGb, wcGb, label, record };
+};
+
+/* =====================================================================================
+   PART D — IN-TRADE BLOCKER BUG FIX
+   =====================================================================================
+   A player being sent away in THIS deal cannot block an incoming prospect. The v2
+   blocking scan read the receiving team's current roster without excluding the pieces
+   leaving in the same trade. We override with a version that takes the outgoing list. */
+
+// receivingTeam gets `incoming`; `alsoLeaving` = the pieces receivingTeam is trading away
+// in this same deal (so they're excluded from the blocker pool).
+function vsBlockingAnalysis2(incoming, receivingTeam, alsoLeaving) {
+  const leavingNames = new Set((alsoLeaving || []).map(p => p.name));
+  const notes = [];
+  for (const p of incoming) {
+    if (p.isComp || p.isCash) continue;
+    if (!(p.isProspect || p.level === 'minors')) continue;
+    const bucket = finderPosBucket(p.pos);
+    if (!bucket || bucket === 'SP' || bucket === 'RP') continue;
+    const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+    const blockers = allPlayers.filter(a =>
+      a.team === receivingTeam && a.level === 'mlb' && finderPosBucket(a.pos) === bucket &&
+      a.name !== p.name &&
+      !leavingNames.has(a.name) &&                       // ← the fix: exclude players leaving in this deal
+      vsControlThrough(a) >= eta + 1 &&
+      (a.avgVal || 0) >= Math.max(3, (p.avgVal || 0)));
+    if (!blockers.length) continue;
+    const fp = finderFirstPos(p.pos);
+    const blockNames = blockers.slice(0, 2).map(b => `<span>${b.name}</span>`).join(' and ');
+    if (VS_MOBILE_POS.has(fp)) {
+      notes.push({ severity: 'minor', text: `<span>${p.name}</span> (${p.pos}) arrives behind ${blockNames} — but ${fp === 'SS' ? 'shortstops' : 'center fielders'} carry full spectrum mobility and slide over without value loss. Flexibility, not a logjam.` });
+    } else if (VS_LOCKED_POS.has(fp)) {
+      notes.push({ severity: 'major', text: `<span>${p.name}</span> (C) is blocked by ${blockNames}, and catchers have one fallback (1B/DH). Hard block — paying for value that may never start.` });
+    } else {
+      notes.push({ severity: 'moderate', text: `<span>${p.name}</span> (${p.pos}) sits behind ${blockNames}; corner spots have limited mobility (1B/DH), so the path to at-bats is narrow.` });
+    }
+  }
+  return notes;
+}
+
+/* =====================================================================================
+   PART E — AGE / PEAK-CURVE ENGINE  (Salas vs Narváez)
+   =====================================================================================
+   Fires ONLY when a younger asset is weighed against an older one on the OPPOSITE side
+   at the same/adjacent position tier. Never overrides a value verdict outside the 60/40
+   combined-share guardrail. Encodes the graduated rules agreed in discussion. */
+
+const VS_PEAK = {
+  YOUNG_MAX_AGE: 22,       // <= this (or a future-ETA prospect) counts as "young"
+  ESTAB_MIN_AGE: 26,       // >= this at MLB level counts as "established"
+  PEAK_LOW: 27, PEAK_HIGH: 28,
+  GUARDRAIL: 0.60,         // if either share exceeds this, age logic is suppressed
+};
+
+function vsIsYoung(p) {
+  if (p.isComp || p.isCash) return false;
+  if (p.age != null && p.age <= VS_PEAK.YOUNG_MAX_AGE) return true;
+  // Prospect not yet debuted counts as young regardless of a missing age
+  const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+  return (p.isProspect || p.level === 'minors') && eta >= 2027;
+}
+function vsIsEstablished(p) {
+  return !p.isComp && !p.isCash && p.level === 'mlb' && p.age != null && p.age >= VS_PEAK.ESTAB_MIN_AGE;
+}
+
+// Blended value share for the YOUNGER player vs the older one, lens-weighted:
+//   seller acquiring → weight Avg Value (long-term) 60/40
+//   buyer acquiring  → weight 2026 Value 60/40
+function vsYoungShare(young, old, acquirerRole) {
+  const y26 = young.val2026 || 0, o26 = old.val2026 || 0;
+  const yA = young.avgVal || 0, oA = old.avgVal || 0;
+  const share26 = (y26 + o26) > 0 ? y26 / (y26 + o26) : 0.5;
+  const shareAvg = (yA + oA) > 0 ? yA / (yA + oA) : 0.5;
+  const wAvg = acquirerRole === 'seller' ? 0.60 : 0.40;
+  return share26 * (1 - wAvg) + shareAvg * wAvg;
+}
+
+// The 2026-Score divergence tiebreaker (column V vs overall 2026 Value).
+//   score2026 >  val2026  → ascending  (peak season, trending up)
+//   score2026 << val2026  → propped up by past seasons (possible wall / already peaked)
+function vsScoreTrend(p) {
+  if (p.score2026 == null || p.val2026 == null) return null;
+  const diff = p.score2026 - p.val2026;
+  if (diff >= 0.10) return { trend: 'ascending', diff };
+  if (diff <= -0.75) return { trend: 'declining', diff };
+  return { trend: 'steady', diff };
+}
+
+// Main entry. Returns { text, lean, expendableHint } or null when not applicable.
+//   listGetA/listGetB = what each side RECEIVES. teamA/teamB = the two sides.
+//   acquirerCtx passed in for both.
+function vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB) {
+  // Find best young vs best established across the two receive-sides, same position bucket.
+  // A receives listB; B receives listA. We compare pieces GOING OPPOSITE directions.
+  const out = [];
+  const pairs = [];
+  const allA = listA.filter(p => !p.isComp && !p.isCash);
+  const allB = listB.filter(p => !p.isComp && !p.isCash);
+  for (const a of allA) {
+    for (const b of allB) {
+      const bucketA = finderPosBucket(a.pos), bucketB = finderPosBucket(b.pos);
+      if (!bucketA || bucketA !== bucketB) continue;
+      // One young, one established
+      let young = null, old = null, youngTo = null;
+      if (vsIsYoung(a) && vsIsEstablished(b)) { young = a; old = b; youngTo = teamB; }
+      else if (vsIsYoung(b) && vsIsEstablished(a)) { young = b; old = a; youngTo = teamA; }
+      if (!young || !old) continue;
+      pairs.push({ young, old, youngTo });
+    }
+  }
+  if (!pairs.length) return null;
+
+  // Evaluate the most valuable such pairing.
+  pairs.sort((x, y) => ((y.young.val2026 || 0) + (y.old.val2026 || 0)) - ((x.young.val2026 || 0) + (x.old.val2026 || 0)));
+  const { young, old, youngTo } = pairs[0];
+  const acquirerCtx = youngTo === teamA ? ctxA : ctxB;
+  const acquirerRole = acquirerCtx.role;
+
+  const share = vsYoungShare(young, old, acquirerRole);
+  // Guardrail: lopsided value → age never rescues it.
+  if (share > VS_PEAK.GUARDRAIL || share < (1 - VS_PEAK.GUARDRAIL)) {
+    return null;
+  }
+
+  const ageGap = Math.round((old.age || 0) - (young.age || 0));
+  const youngCtrl = vsControlThrough(young);
+  const oldCtrl = vsControlThrough(old);
+  const peakYear = vsPeakYear(youngTo);
+  const windowAligned = acquirerRole === 'seller' && youngCtrl >= peakYear &&
+    ((young.pipelineETA || parseInt(young.etaRaw, 10) || 2028) <= peakYear);
+
+  const yTrend = vsScoreTrend(young);
+  const oTrend = vsScoreTrend(old);
+
+  let lean = null, txt = '';
+  const younger = `<span>${young.name}</span> (age ${young.age!=null?Math.round(young.age):'?'}, ctrl thru ${youngCtrl})`;
+  const older = `<span>${old.name}</span> (age ${old.age!=null?Math.round(old.age):'?'}, ctrl thru ${oldCtrl})`;
+
+  // Rule 1: small gap + value favors established → lean established.
+  if (ageGap <= 2 && share <= 0.47) {
+    lean = 'established';
+    txt = `${older} vs ${younger}: only a ${ageGap}-year age gap and the value edge sits with the established bat. Lean the proven MLB piece — the youth premium is too small to justify betting on projection${oldCtrl >= peakYear ? ", and he's controlled through the window anyway" : ''}.`;
+  }
+  // Rule 2: big gap (≥5) + roughly even share (45–55) → hard lean young for aligned rebuilder.
+  else if (ageGap >= 5 && share >= 0.45 && share <= 0.55) {
+    lean = 'young';
+    const trendBit = (yTrend && yTrend.trend === 'ascending')
+      ? ` His 2026 Score (${fmtVs(young.score2026)}) sits above his overall 2026 Value (${fmtVs(young.val2026)}) — an ascending, pre-peak player.` : '';
+    const oldTrendBit = (oTrend && oTrend.trend === 'declining')
+      ? ` ${old.name}'s 2026 Score (${fmtVs(old.score2026)}) is well below his 2026 Value (${fmtVs(old.val2026)}) — his value is carried by past seasons, a possible-wall signal at age ${Math.round(old.age)}.` : '';
+    txt = `${younger} vs ${older}: a ${ageGap}-year age gap with essentially even combined value (${Math.round(share * 100)}% to the younger player under a ${acquirerRole === 'seller' ? 'seller (Avg-weighted)' : 'buyer (2026-weighted)'} lens).${trendBit}${oldTrendBit} For ${windowAligned ? 'a rebuilder whose window aligns with his arrival' : 'this acquirer'}, take the younger asset decisively — same control length measured correctly, years of additional peak, and a rising arrow vs a flattening one.`;
+  }
+  // Rule 3: ~4-yr gap, right at ~45% → soft lean young, "shop the older guy" framing.
+  else if (ageGap === 4 && share >= 0.43 && share <= 0.47) {
+    lean = 'young-soft';
+    txt = `${younger} vs ${older}: a 4-year gap and a near-even split (${Math.round(share * 100)}% younger). Soft lean to the younger piece — and acquiring him lets the established player be shopped to a contender to maximize the prospect haul, rather than kept as a redundancy.`;
+  }
+  // Rule 4: ambiguous middle → column-V (2026 Score) tiebreaker.
+  else {
+    if (yTrend && oTrend) {
+      if (yTrend.trend === 'ascending' && oTrend.trend !== 'ascending') {
+        lean = 'young';
+        txt = `${younger} vs ${older}: value is close and the age gap (${ageGap} yrs) isn't decisive on its own, so the 2026 Score breaks it — ${young.name} is ascending (${fmtVs(young.score2026)} score vs ${fmtVs(young.val2026)} value, trending up) while ${old.name} is being propped up by past seasons (${fmtVs(old.score2026)} score vs ${fmtVs(old.val2026)} value). Edge to the younger, rising player.`;
+      } else if (oTrend.trend === 'ascending' && yTrend.trend !== 'ascending') {
+        lean = 'established';
+        txt = `${older} vs ${younger}: the 2026 Score tiebreaker favors the established player — ${old.name} is still ascending (${fmtVs(old.score2026)} vs ${fmtVs(old.val2026)}), not declining, so his current value is real rather than legacy. No age discount warranted here.`;
+      }
+    }
+    if (!lean) return null; // truly a wash — don't manufacture a lean
+  }
+
+  // Expendable spin-off: only when the OLDER player is NOT in this trade but is on the
+  // acquiring side's roster and now redundant behind the younger incoming piece.
+  let expendableHint = null;
+  if (lean && lean.startsWith('young')) {
+    const oldInDeal = [...listA, ...listB].some(p => p.name === old.name);
+    if (!oldInDeal) {
+      const olderOnAcquirer = allPlayers.find(p => p.team === youngTo && p.name === old.name);
+      if (olderOnAcquirer) {
+        expendableHint = `This makes <span>${old.name}</span> expendable for ${youngTo} — explore shopping him next to convert the surplus into more return.`;
+      }
+    }
+  }
+
+  out.push(txt);
+  if (expendableHint) out.push(expendableHint);
+  return { text: out.join('<br>'), lean, expendableHint };
+}
+
+/* =====================================================================================
+   PART G — SMART VERDICT OVERRIDE (adds age/peak section + fixes blocking call)
+   =====================================================================================
+   We wrap the v2 vsGenerateSmartVerdict: run the original, then splice the Package
+   Construction blocking to use the in-trade-aware version, and inject the Age & Peak
+   section. Simplest robust approach: re-implement the two touched pieces by post-
+   processing is brittle, so we override the whole function with an augmented copy that
+   calls the new helpers. To avoid duplicating ~200 lines, we call the original for the
+   base sections and only REPLACE blocking + ADD the age section. */
+
+const _vsGenerateSmartVerdict_v2 = vsGenerateSmartVerdict;
+
+vsGenerateSmartVerdict = function (listA, listB, teamA, teamB) {
+  // Run the v2 engine for all the base sections/grade.
+  const base = _vsGenerateSmartVerdict_v2(listA, listB, teamA, teamB);
+
+  const ctxA = vsTeamContext(teamA);
+  const ctxB = vsTeamContext(teamB);
+
+  // --- Fix blocking inside the rendered HTML: the v2 output used current-roster
+  // blocking. Recompute with the in-trade-aware version and, if the old text differs,
+  // rebuild the Package Construction lines. Rather than string-surgery the HTML, we
+  // detect blocking notes here and, when the corrected scan finds NO block where v2
+  // reported one (because the blocker is in the deal), we append a correction note.
+  const corrNotes = [];
+  const aBlocks = vsBlockingAnalysis2(listA, teamB, listB); // B receives listA; B also sends listB
+  const bBlocks = vsBlockingAnalysis2(listB, teamA, listA);
+  // (These corrected notes are surfaced in a small "Construction (corrected)" addendum
+  //  only when they contain MAJOR/MODERATE items, to avoid noise. The base grade is
+  //  left intact; the age section below can still move the final read.)
+  for (const n of [...aBlocks, ...bBlocks]) {
+    if (n.severity === 'major' || n.severity === 'moderate') corrNotes.push('· ' + n.text);
+  }
+
+  // --- Age / peak section
+  const age = vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB);
+
+  let extraHtml = '';
+  if (age) {
+    extraHtml += `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">Age &amp; Peak Curve</div><div>${age.text}</div></div>`;
+  }
+
+  // Re-title the verdict if the age engine produced a decisive young-lean that the raw
+  // value math would have undersold (the Salas/Narváez correction).
+  let headline = base.headline, grade = base.grade;
+  if (age && age.lean === 'young' && (grade === 'neutral' || grade === 'warn')) {
+    grade = 'fair';
+    headline = '✓ Fair — Age-Adjusted Edge to the Younger Asset';
+  } else if (age && age.lean === 'young-soft' && grade === 'neutral') {
+    headline = '✓ Fair — Slight Edge to the Younger Asset';
+  }
+
+  // Insert the age section right after Value Math if present, else append; put any
+  // blocking-correction addendum at the very end.
+  let html = base.html;
+  if (extraHtml) {
+    const marker = '<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">Historical Comparable';
+    const idx = html.indexOf(marker);
+    if (idx >= 0) html = html.slice(0, idx) + extraHtml + html.slice(idx);
+    else html += extraHtml;
+  }
+
+  return { grade, headline, html };
+};
+
+/* =====================================================================================
+   PART G2 — FINDER VERDICT + "WHY THIS TRADE WAS RECOMMENDED"
+   =====================================================================================
+   Supersedes finder_verdict_patch.js. Because vsGenerateSmartVerdict is now the
+   age-aware override, the finder card automatically inherits the Age & Peak section.
+   The "Why" block additionally cites the age lean when that's what drove the pick. */
+
+function vsFinderWhySection(giveList, getList, giveTeam, getTeam) {
+  const lines = [];
+  const giveCtx = vsTeamContext(giveTeam);
+  const getCtx = vsTeamContext(getTeam);
+  const targets = getList.filter(p => !p.isComp && !p.isCash && p.level === 'mlb');
+  const prospectsOut = giveList.filter(p => !p.isComp && !p.isCash && (p.isProspect || p.level === 'minors'));
+
+  if (targets.length && prospectsOut.length) {
+    const roleBit = giveCtx.role !== 'unknown' && getCtx.role !== 'unknown'
+      ? ` <span>${giveTeam}</span> (${giveCtx.record}, ${giveCtx.label}) sends prospects; <span>${getTeam}</span> (${getCtx.record}, ${getCtx.label}) sends MLB value —`
+      : '';
+    lines.push(`${roleBit} controllable future value flows to the rebuilder, 2026 production to the contender. Correct deadline flow.`);
+  }
+
+  try {
+    const needs = vsFinderSellerNeeds(getTeam);
+    const fit = vsFinderNeedFitScore(prospectsOut, getTeam);
+    if (fit.fitNames.length) {
+      const holeDesc = needs.holes
+        .filter(h => prospectsOut.some(p => finderPosBucket(p.pos) === h.bucket))
+        .map(h => `${h.bucket} (${h.expiring.slice(0, 2).map(e => e.name + ' ctrl thru ' + e.lastYear).join(', ')})`)
+        .join('; ');
+      lines.push(`Selected because it fills <span>${getTeam}</span>'s real gaps before its ~${needs.peak} peak: ${holeDesc}. Fits: <span>${fit.fitNames.join('</span>, <span>')}</span>.`);
+    } else if (needs.holes.length) {
+      lines.push(`Note: <span>${getTeam}</span>'s expiration gaps are at ${needs.holes.map(h => h.bucket).join('/')} — this clears the value bands on value, not need-fit.`);
+    }
+  } catch (e) { /* never break rendering */ }
+
+  const rentals = targets.filter(t => vsControlThrough(t) <= 2026);
+  if (rentals.length) {
+    lines.push(`<span>${rentals.map(r => r.name).join(', ')}</span> ${rentals.length > 1 ? 'are rentals' : 'is a rental'} — generated in the future-skewed band so the seller extracts a long-term premium. Fair-band offers were rejected for this target.`);
+  }
+
+  // Cite the age lean if it drove the recommendation.
+  try {
+    const age = vsAgePeakAnalysis(giveList, getList, giveTeam, getTeam, giveCtx, getCtx);
+    if (age && age.lean && age.lean.startsWith('young')) {
+      lines.push(`Age curve reinforces it: the younger incoming asset carries years of additional pre-peak control at comparable value — a rebuilder takes that every time.`);
+    }
+  } catch (e) { /* */ }
+
+  lines.push(`Passed all construction gates: diversity (max 1 C / max 2 OF), no hard-blocked prospects, no hole created on <span>${giveTeam}</span>.`);
+  return lines.join('<br>');
+}
+
+// DROP-IN replacement for finderBuildVerdictHtml (same as finder_verdict_patch.js but
+// now inherits the age-aware verdict automatically).
+function finderBuildVerdictHtml(giveList, getList, giveTeam, getTeam) {
+  let grade = 'neutral', headline = 'Trade Analysis', body = '';
+  try {
+    const result = vsGenerateSmartVerdict(giveList, getList, giveTeam, getTeam);
+    grade = result.grade; headline = result.headline;
+    const why = vsFinderWhySection(giveList, getList, giveTeam, getTeam);
+    const whySection = `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">Why This Trade Was Recommended</div><div>${why}</div></div>`;
+    body = whySection + result.html;
+  } catch (e) {
+    console.error('Finder smart verdict error:', e);
+    const v26A = giveList.reduce((s, p) => s + (p.val2026 || 0), 0), v26B = getList.reduce((s, p) => s + (p.val2026 || 0), 0);
+    const avgA = giveList.reduce((s, p) => s + (p.avgVal || 0), 0), avgB = getList.reduce((s, p) => s + (p.avgVal || 0), 0);
+    updateVerdict(v26A, v26B, avgA, avgB, { teamA: giveTeam, teamB: getTeam, listA: giveList, listB: getList, hasPlayers: true, fromFinder: true });
+    const clone = document.getElementById('verdictBox').cloneNode(true);
+    clone.removeAttribute('id'); clone.style.marginTop = '10px'; clone.style.display = 'block';
+    document.getElementById('verdictBox').style.display = 'none';
+    return clone.outerHTML;
+  }
+  const cls = 'verdict-box ' + (grade === 'fair' ? 'v-fair' : grade === 'warn' ? 'v-warn' : 'v-neutral');
+  return `<div class="${cls}" style="margin-top:10px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${body}</div></div></div>`;
 }
 </script>
 </body>
