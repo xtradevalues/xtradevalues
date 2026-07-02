@@ -1830,9 +1830,14 @@ function computeMiLBHitterStats(r){
 function computeMiLBPitcherStats(r){
   if(!r) return null;
   // 26 pPitchers: W is column F (index 5), L is column G (index 6)
+  // Prefer the sheet's own FIP column when it's populated; older MiLB seasons (23/24/25
+  // pPitchers) don't have one, so fall back to computing it with the same formula used
+  // for MLB pitchers.
+  const sheetFip=numOrNull(r['FIP']);
   return {
     ip:numOrNull(r['IP']), k:numOrNull(r['K']), era:numOrNull(r['ERA']),
-    fip:numOrNull(r['FIP']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+    fip:sheetFip!==null?sheetFip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
+    whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
     w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
 }
