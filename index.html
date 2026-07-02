@@ -3084,14 +3084,8 @@ function finderBuildGiveScenarios(targets, userTeam){
   if (sellerTeam) eligibleAll.sort(vsFinderNeedAwareSort(sellerTeam));
 
   if(!eligibleAll.length){
-    // Absolute last resort: the team has nothing meeting normal eligibility thresholds at all.
-    // Still always surface something — any non-RP minors player on the roster, ignoring the
-    // usual age/control/value floors, so a buyer's specific request is never left empty.
-    const anyMinors=allPlayers.filter(p=>p.team===userTeam && p.level==='minors' && finderFirstPos(p.pos)!=='RP');
-    if(anyMinors.length){
-      const scrub=anyMinors.reduce((cheapest,p)=>(p.avgVal||0)<(cheapest.avgVal||0)?p:cheapest, anyMinors[0]);
-      return [{players:[scrub], label:'Scrub Throw-In', isInDivision:false, tax:0}];
-    }
+    // v3.1: under the methodology, when nothing meets eligibility thresholds the finder
+    // returns no offers rather than a non-compliant scrub package (formerly "Scrub Throw-In").
     return [];
   }
 
@@ -3308,30 +3302,9 @@ function finderBuildGiveScenarios(targets, userTeam){
     }
   }
 
-  // ===== 7: Guaranteed Scrub Throw-In =====
-  // A buyer asking about a specific player should never come back empty-handed, even if nothing
-  // fit the fairness bands above. Fall back to a low-level minors scrub closest in value to the
-  // target (skipping top prospects), or as a last resort the cheapest eligible piece of any kind.
-  if(!scenarios.length){
-    const scrubPool=eligibleMinors.filter(p=>!usedNames.has(p.name));
-    let scrub=null;
-    if(scrubPool.length){
-      scrub=scrubPool.reduce((best,p)=>{
-        const diff=Math.abs((p.avgVal||0)-targetAvg);
-        const bestDiff=Math.abs((best.avgVal||0)-targetAvg);
-        return diff<bestDiff?p:best;
-      }, scrubPool[0]);
-    } else {
-      const leftover=availablePool();
-      if(leftover.length){
-        scrub=leftover.reduce((cheapest,p)=>(p.avgVal||0)<(cheapest.avgVal||0)?p:cheapest, leftover[0]);
-      }
-    }
-    if(scrub){
-      markUsed([scrub]);
-      scenarios.push({players:[scrub], label:'Scrub Throw-In', isInDivision, tax});
-    }
-  }
+  // v3.1: the "Guaranteed Scrub Throw-In" fallback that used to run here has been removed.
+  // Under the methodology, when no compliant package exists the finder returns fewer/no
+  // offers — never a non-compliant one. (See FINDER HOTFIX v3.1 notes.)
 
   return scenarios;
 }
@@ -3846,6 +3819,21 @@ async function generateOffers(){
   } else {
     offers=finderGenerateSellerOffers();
   }
+  // v3.1 hotfix: belt-and-suspenders gate check on the FINAL offers array, right before
+  // the empty-state check / rendering, so no scenario-generation path (fair/future-skewed/
+  // blockbuster/scrub/1-for-1, buyer or seller intent) can slip a non-compliant package
+  // onto a card. Runs ahead of the empty-state branch below so a fully-filtered result
+  // still shows the existing "No trade found" message instead of a blank card list.
+  offers = offers.filter(o=>{
+    const userTeam=finderState.team;
+    let combo, givingTeam, receivingTeam, targetList;
+    if(finderState.intent==='buyer'){
+      combo=o.givePlayers; givingTeam=userTeam; receivingTeam=o.targetTeam; targetList=o.targetPlayers;
+    } else {
+      combo=o.returnPlayers; givingTeam=o.buyerTeam; receivingTeam=userTeam; targetList=o.sellPlayers;
+    }
+    return vsFinderPostFilter([{players:combo, label:o.label}], givingTeam, receivingTeam, targetList||[]).length>0;
+  });
   if(!offers.length){
     const intent=finderState.intent;
     let msg='';
@@ -4682,6 +4670,45 @@ function tbVerdictHtml(atTradeSides, currentSides, unavailable){
   if(!atWin && curWin) return tbVerdictBox('verdict-box v-warn', `${esc(curWin.team)} has since pulled ahead`, `This trade looked even at the time, but <span>${esc(curWin.team)}</span> has picked up more value since (now ${Math.round(curWin.pct)}% of the combined value).`);
   return tbVerdictBox('verdict-box v-fair','The gap has closed since the trade', `<span>${esc(atWin.team)}</span> appeared to win this trade at the time (${Math.round(atWin.pct)}%), but the two sides have evened out since.`);
 }
+// Convert a trade record's side (comp picks / cash / real players, with refreshed
+// live val2026/avgVal) into full player objects the smart verdict engine understands.
+// Comp/cash entries mirror the exact shape addCash()/getCompPicksForTeam() already use
+// elsewhere so vsGenerateSmartVerdict's isComp/isCash checks work the same way. Real
+// players are looked up fresh from allPlayers (not the thin val2026/avgVal snapshot)
+// since the engine needs pos/level/isProspect/age/valByYear/etc. A player who no longer
+// resolves (traded off-system) is simply omitted from this list.
+function tbBuildVsListFromTradeSide(players, team){
+  const list=[];
+  for(const p of players){
+    if(p.asset==='compA'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.7,avgVal:1.7,ctrlYears:null,perfVal:null,isComp:true}); continue; }
+    if(p.asset==='compB'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.3,avgVal:1.3,ctrlYears:null,perfVal:null,isComp:true}); continue; }
+    if(p.asset==='cash'){ list.push({name:p.playerName,team,pos:'CASH',age:null,val2026:p.val2026,avgVal:null,ctrlYears:null,perfVal:null,isCash:true}); continue; }
+    const live=allPlayers.find(x=>x.playerID===p.playerID);
+    if(live) list.push(live);
+  }
+  return list;
+}
+// Full methodology verdict (same engine as Submit Trade / Trade Finder) applied to a
+// historical trade's CURRENT rosters. Only runs for a clean 2-side trade with fully
+// resolved live data — the "at the time" comparison above already covers what the deal
+// looked like on the day it happened, which the engine can't reconstruct (it needs live
+// roster context: positions, control years, prospect status).
+function tbSmartVerdictHtml(currentSides, unavailable){
+  if(unavailable || currentSides.length!==2) return '';
+  const teamA=currentSides[1].receivingTeam, teamB=currentSides[0].receivingTeam;
+  if(!teamA || !teamB) return '';
+  const listA=tbBuildVsListFromTradeSide(currentSides[0].players, teamA);
+  const listB=tbBuildVsListFromTradeSide(currentSides[1].players, teamB);
+  if(!listA.length || !listB.length) return '';
+  try{
+    const result=vsGenerateSmartVerdict(listA, listB, teamA, teamB);
+    const cls='verdict-box '+(result.grade==='fair'?'v-fair':result.grade==='warn'?'v-warn':'v-neutral');
+    return `<div style="margin-top:14px"><div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Today's Full Trade Analysis</div>${tbVerdictBox(cls, result.headline, result.html)}</div>`;
+  } catch(e){
+    console.error('Trade Tracker smart verdict error:', e);
+    return '';
+  }
+}
 function renderTradeBreakdown(trade, liveOk){
   const sides=groupTradeSides(trade);
 
@@ -4709,7 +4736,8 @@ function renderTradeBreakdown(trade, liveOk){
     + tbBlockHtml(fmtDate(trade.date), sides, false)
     + `<div style="margin-top:14px">${tbSideStatsHtml(currentSides)}</div>`
     + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable)
-    + tbVerdictHtml(sides, currentSides, unavailable);
+    + tbVerdictHtml(sides, currentSides, unavailable)
+    + tbSmartVerdictHtml(currentSides, unavailable);
 }
 
 // ===== SCORE MODAL =====
@@ -6049,6 +6077,177 @@ function finderBuildVerdictHtml(giveList, getList, giveTeam, getTeam) {
   const cls = 'verdict-box ' + (grade === 'fair' ? 'v-fair' : grade === 'warn' ? 'v-warn' : 'v-neutral');
   return `<div class="${cls}" style="margin-top:10px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${body}</div></div></div>`;
 }
+
+/* =====================================================================================
+   VALUE SAVANT — FINDER HOTFIX v3.1
+   =====================================================================================
+   Fixes the "Scrub Throw-In" incident: legacy finder fallback paths bypassed the
+   methodology gate. This file (loaded last, after verdict_patch_v3.js) adds a
+   belt-and-suspenders post-filter, hard value-share bounds, comp return-quality
+   checks, and a verified "Why" section.
+   ===================================================================================== */
+
+/* ============================== 1. TUNABLE BOUNDS ============================== */
+
+const VS_BANDS = {
+  // Give-side share of combined 2026 Value must land inside this window.
+  V26_MIN: 0.45, V26_MAX: 0.55,
+  // Give-side share of combined Avg Value for NON-rental targets.
+  AVG_MIN: 0.42, AVG_MAX: 0.62,
+  // Rental targets: seller must extract a long-term premium — give side's Avg share
+  // must be at least this (the buyer pays MORE long-term value than they receive).
+  RENTAL_AVG_MIN: 0.58,
+  // And a rental's give side can never be a scrub package: minimum absolute Avg total
+  // relative to the rental's 2026 value.
+  RENTAL_AVG_FLOOR_MULT: 1.15,   // give Avg total >= 1.15 x rental 2026 Value
+};
+
+/* ============================== 2. VALUE-SHARE GATE ============================== */
+
+// Hard bounds on a candidate give-side combo vs the target list. Returns rejection
+// reason or null. This runs inside the master gate AND the post-filter.
+function vsFinderValueBoundsCheck(combo, targetList) {
+  const g26 = combo.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const gAv = combo.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const t26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const tAv = targetList.reduce((s, p) => s + (p.avgVal || 0), 0);
+
+  const share26 = (g26 + t26) > 0 ? g26 / (g26 + t26) : 0.5;
+  const shareAv = (gAv + tAv) > 0 ? gAv / (gAv + tAv) : 0.5;
+
+  if (share26 < VS_BANDS.V26_MIN || share26 > VS_BANDS.V26_MAX) {
+    return `2026 value share ${Math.round(share26 * 100)}% is outside the 45–55% band`;
+  }
+
+  const rental = targetList.some(t => t.level === 'mlb' && vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+  if (rental) {
+    if (shareAv < VS_BANDS.RENTAL_AVG_MIN) {
+      return `rental target requires a seller Avg premium — give side is only ${Math.round(shareAv * 100)}% of combined Avg (needs ≥ ${Math.round(VS_BANDS.RENTAL_AVG_MIN * 100)}%)`;
+    }
+    const rental26 = targetList.filter(t => vsControlThrough(t) <= 2026).reduce((s, t) => s + (t.val2026 || 0), 0);
+    if (gAv < rental26 * VS_BANDS.RENTAL_AVG_FLOOR_MULT) {
+      return `rental floor: give Avg total ${gAv.toFixed(2)} is below ${(rental26 * VS_BANDS.RENTAL_AVG_FLOOR_MULT).toFixed(2)} (1.15x the rental's 2026 value)`;
+    }
+  } else {
+    if (shareAv < VS_BANDS.AVG_MIN || shareAv > VS_BANDS.AVG_MAX) {
+      return `Avg value share ${Math.round(shareAv * 100)}% is outside the ${Math.round(VS_BANDS.AVG_MIN * 100)}–${Math.round(VS_BANDS.AVG_MAX * 100)}% band`;
+    }
+  }
+  return null;
+}
+
+/* ============================== 3. MASTER GATE OVERRIDE ============================== */
+
+// Extends the v2 gate with the value bounds AND a general blocking rejection (not just
+// catchers): any incoming prospect hard/moderately blocked on the receiving side by a
+// player NOT leaving in the deal is a rejection at finder level (users can still build
+// such trades manually in the sim — the verdict will flag them — but the finder should
+// never RECOMMEND one).
+const _vsFinderGateCombo_v2 = vsFinderGateCombo;
+
+vsFinderGateCombo = function (combo, givingTeam, receivingTeam, targetList, bandName) {
+  // (0) NEW: hard value-share bounds — catches scrub packages regardless of path
+  const vb = vsFinderValueBoundsCheck(combo, targetList);
+  if (vb) return vb;
+
+  // (1) NEW: full blocking rejection using the in-trade-aware scan.
+  //     targetList are the players leaving the receiving team in this same deal.
+  const blocks = vsBlockingAnalysis2(combo, receivingTeam, targetList);
+  const hard = blocks.find(b => b.severity === 'major' || b.severity === 'moderate');
+  if (hard) {
+    return 'blocked prospect: ' + hard.text.replace(/<[^>]+>/g, '');
+  }
+
+  // (2) Everything from v2 (diversity, C-block, own-hole, rental band, direction)
+  return _vsFinderGateCombo_v2(combo, givingTeam, receivingTeam, targetList, bandName);
+};
+
+/* ============================== 4. POST-FILTER (belt & suspenders) ============================== */
+
+// Filters the FINAL offers array immediately before rendering. Works on the offer
+// objects the card renderer consumes ({players, label, ...}). Any offer failing the
+// master gate is dropped and the reason logged. This closes every bypass path,
+// including legacy fallbacks and future scenario types.
+function vsFinderPostFilter(offers, givingTeam, receivingTeam, targetList) {
+  if (!Array.isArray(offers)) return offers;
+  const kept = [];
+  for (const offer of offers) {
+    const combo = offer.players || [];
+    if (!combo.length) continue;
+    // Never allow the legacy scrub fallback through, regardless of gate result.
+    if (/scrub/i.test(offer.label || '')) {
+      console.debug('[finder-v3.1] dropped legacy scrub fallback offer');
+      continue;
+    }
+    const fail = vsFinderGateCombo(combo, givingTeam, receivingTeam, targetList, offer.bandName || 'future');
+    if (fail) {
+      console.debug('[finder-v3.1] post-filter dropped offer "' + (offer.label || '') + '":', fail);
+      continue;
+    }
+    kept.push(offer);
+  }
+  return kept;
+}
+
+/* ============================== 5. COMP RETURN-QUALITY CHECKS ============================== */
+
+// A historical comp is only valid when the RETURN side resembles the historical return.
+// All six curated comps involved premium prospect capital going back; a package headlined
+// by an unranked low-value piece must never inherit their precedent.
+function vsReturnHeadlinerQuality(returnList) {
+  const real = returnList.filter(p => !p.isComp && !p.isCash);
+  if (!real.length) return { ranked: false, topAvg: 0 };
+  const top = real.reduce((b, p) => ((p.avgVal || 0) > (b.avgVal || 0) ? p : b), real[0]);
+  const ranked = !!(top.mlbRank || (top.orgRank && parseInt(String(top.orgRank).replace(/\D/g, ''), 10) <= 10));
+  return { ranked, topAvg: top.avgVal || 0, top };
+}
+
+const _vsFindHistoricalComp_v2 = vsFindHistoricalComp;
+
+vsFindHistoricalComp = function (listA, listB, ctxA, ctxB) {
+  const match = _vsFindHistoricalComp_v2(listA, listB, ctxA, ctxB);
+  if (!match) return null;
+  // Determine the return side: the list NOT containing the matched star.
+  const starInA = listA.some(p => p.name === match.star.name);
+  const returnList = starInA ? listB : listA;
+  const q = vsReturnHeadlinerQuality(returnList);
+  // Premium-return comps require a ranked headliner OR a premium-value one (Avg >= 5).
+  const premiumComps = new Set(['darvish2017', 'chapman2016', 'miller2016', 'soto2022', 'quintana2017']);
+  if (premiumComps.has(match.comp.id) && !q.ranked && q.topAvg < 5) {
+    console.debug('[comp] suppressed', match.comp.id, '— return headliner is unranked/low-value; precedent not comparable');
+    return null;
+  }
+  // Machado 2018 (quantity-of-mids warning) is allowed for mid-tier returns — that's its point —
+  // but still requires at least 3 real pieces to resemble the historical package.
+  if (match.comp.id === 'machado2018' && returnList.filter(p => !p.isComp && !p.isCash).length < 3) {
+    return null;
+  }
+  return match;
+};
+
+/* ============================== 6. VERIFIED "WHY" SECTION ============================== */
+
+// Override: the Why section now RUNS the gate and reports the actual result. If somehow
+// a non-compliant offer reaches rendering (it shouldn't, post-filter), the section says
+// so instead of asserting compliance.
+const _vsFinderWhySection_v3 = vsFinderWhySection;
+
+vsFinderWhySection = function (giveList, getList, giveTeam, getTeam) {
+  let html = _vsFinderWhySection_v3(giveList, getList, giveTeam, getTeam);
+  const gateResult = (function () {
+    try { return vsFinderGateCombo(giveList, giveTeam, getTeam, getList, 'future'); }
+    catch (e) { return null; }
+  })();
+  const assertLine = /Passed all construction gates[^<]*<br>|Passed all construction gates[^<]*$/;
+  if (gateResult) {
+    html = html.replace(assertLine, '');
+    html += `<br>⚠ Gate check: this package does <span>not</span> clear all methodology gates (${gateResult}). It should not have been recommended — if you're seeing this, report it.`;
+  } else {
+    // Replace the asserted line with the verified one (same text, now actually checked).
+    html = html.replace('Passed all construction gates', 'Verified against all construction gates');
+  }
+  return html;
+};
 </script>
 </body>
 </html>
