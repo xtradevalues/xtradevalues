@@ -1846,14 +1846,13 @@ function computeMiLBHitterStats(r){
 }
 function computeMiLBPitcherStats(r){
   if(!r) return null;
-  // 26 pPitchers: W is column F (index 5), L is column G (index 6), FIP is column T (index 19)
-  // on all four pPitchers sheets. Prefer the sheet's own FIP column (by name, falling back to
-  // the index since header text isn't always consistent across tabs); if it's genuinely blank
-  // fall back to computing it with the same formula used for MLB pitchers.
-  const sheetFip=numOrNull(colVal(r,'FIP',19));
+  // This applies identically to 23/24/25/26 pPitchers (same function, called in a loop over
+  // all four years) — W is column F (index 5), L is column G (index 6), FIP is column T
+  // (index 19) on all of them. FIP is a real column here (unlike MLB Pitchers, which has no
+  // FIP column and must be computed) — read it directly, no formula fallback.
   return {
     ip:numOrNull(colVal(r,'IP',9)), k:numOrNull(colVal(r,'K',16)), era:numOrNull(r['ERA']),
-    fip:sheetFip!==null?sheetFip:calcFIP(colVal(r,'IP',9), colVal(r,'HR',13), colVal(r,'BB',14), colVal(r,'HBP',15), colVal(r,'K',16)),
+    fip:numOrNull(colVal(r,'FIP',19)),
     whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
     w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
