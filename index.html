@@ -4613,14 +4613,19 @@ function tbBarHtml(sides, getVal){
     const color=i===winnerIdx?'var(--accent)':'var(--bar2)';
     return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${color};border-radius:${radius}"></div>`;
   }).join('');
-  // Bubble sits on the color boundary next to the winner's segment (not floating in the middle
-  // of it) — for the common 2-side case this is always the single dividing line between the red
-  // and white fill, regardless of which side won.
+  // Bubble position pulls toward whichever side actually won, scaled by how decisive the win
+  // was, and lands dead center for an even split. The plain color boundary doesn't do this: for
+  // a winner on the right, the boundary sits at the edge closest to the LOSING side's sliver,
+  // which reads as "belonging" to the loser even though the number is the winner's. Mirroring
+  // the winner's share around the 50% midpoint — toward 0 if they're on the left, toward 100 if
+  // they're on the right — keeps the bubble inside the winner's own colored region instead.
   let bubble='';
   if(winnerIdx>=0){
     let before=0; for(let i=0;i<winnerIdx;i++) before+=pcts[i];
-    const edge=winnerIdx===0?before+pcts[0]:before;
-    bubble=`<div class="tb-bar-bubble" style="left:${edge}%">${Math.round(pcts[winnerIdx])}%</div>`;
+    const segCenter=before+pcts[winnerIdx]/2;
+    const direction=segCenter<50?-1:1;
+    const position=50+(pcts[winnerIdx]-50)*direction;
+    bubble=`<div class="tb-bar-bubble" style="left:${position}%">${Math.round(pcts[winnerIdx])}%</div>`;
   }
   return `<div class="tb-bar-track">${segs}${bubble}</div>`;
 }
