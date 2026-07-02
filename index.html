@@ -1309,7 +1309,12 @@ function buildTrades(rows){
     }
     byNum[tradeNumber].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal});
   }
-  return order.map(n=>byNum[n]).sort((a,b)=>(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0));
+  // Most recent trade first; ties (same date) break by Trade Number descending, since trade
+  // numbers are assigned in chronological order.
+  return order.map(n=>byNum[n]).sort((a,b)=>{
+    const byDate=(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0);
+    return byDate!==0 ? byDate : b.tradeNumber.localeCompare(a.tradeNumber);
+  });
 }
 // Google's gviz endpoint encodes date cells as the literal string "Date(Y,M,D)" (M is 0-based)
 function parseGvizDate(raw){
