@@ -4613,11 +4613,14 @@ function tbBarHtml(sides, getVal){
     const color=i===winnerIdx?'var(--accent)':'var(--bar2)';
     return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${color};border-radius:${radius}"></div>`;
   }).join('');
+  // Bubble sits on the color boundary next to the winner's segment (not floating in the middle
+  // of it) — for the common 2-side case this is always the single dividing line between the red
+  // and white fill, regardless of which side won.
   let bubble='';
   if(winnerIdx>=0){
     let before=0; for(let i=0;i<winnerIdx;i++) before+=pcts[i];
-    const center=before+pcts[winnerIdx]/2;
-    bubble=`<div class="tb-bar-bubble" style="left:${center}%">${Math.round(pcts[winnerIdx])}%</div>`;
+    const edge=winnerIdx===0?before+pcts[0]:before;
+    bubble=`<div class="tb-bar-bubble" style="left:${edge}%">${Math.round(pcts[winnerIdx])}%</div>`;
   }
   return `<div class="tb-bar-track">${segs}${bubble}</div>`;
 }
