@@ -1367,7 +1367,7 @@ async function loadData() {
         p.ip   = numOrNull(row['IP']);
         p.whip = numOrNull(row['WHIP']);
         p.k9   = numOrNull(row['K9']);
-        p.fip  = calcFIP(row['IP'], row['HR'], row['BB'], row['HBP'], row['K']);
+        p.fip  = calcFIP(colVal(row,'IP',9), colVal(row,'HR',13), colVal(row,'BB',14), colVal(row,'HBP',15), colVal(row,'K',16));
         p.w    = numOrNull(colVal(row,'W',4));
         p.l    = numOrNull(colVal(row,'L',5));
         const vw = parseFloat(row['vWAR']);
@@ -1847,8 +1847,8 @@ function computeMiLBPitcherStats(r){
   // fall back to computing it with the same formula used for MLB pitchers.
   const sheetFip=numOrNull(colVal(r,'FIP',19));
   return {
-    ip:numOrNull(r['IP']), k:numOrNull(r['K']), era:numOrNull(r['ERA']),
-    fip:sheetFip!==null?sheetFip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
+    ip:numOrNull(colVal(r,'IP',9)), k:numOrNull(colVal(r,'K',16)), era:numOrNull(r['ERA']),
+    fip:sheetFip!==null?sheetFip:calcFIP(colVal(r,'IP',9), colVal(r,'HR',13), colVal(r,'BB',14), colVal(r,'HBP',15), colVal(r,'K',16)),
     whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
     w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
@@ -1925,10 +1925,10 @@ async function ppRenderStats(){
     // FIP is computed with the sheet's own formula (calcFIP), not read from a column.
     const pRow=(season,r)=>{
       if(!r) return null;
-      return {season, ip:numOrNull(r['IP']), k:numOrNull(r['K']),
+      return {season, ip:numOrNull(colVal(r,'IP',9)), k:numOrNull(colVal(r,'K',16)),
         era:numOrNull(r['ERA']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
         vWAR:numOrNull(r['vWAR']),
-        fip:calcFIP(r['IP'], r['HR'], r['BB'], r['HBP'], r['K']),
+        fip:calcFIP(colVal(r,'IP',9), colVal(r,'HR',13), colVal(r,'BB',14), colVal(r,'HBP',15), colVal(r,'K',16)),
         w:numOrNull(colVal(r,'W',4)), l:numOrNull(colVal(r,'L',5))};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
