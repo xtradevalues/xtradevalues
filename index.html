@@ -3867,17 +3867,7 @@ function finderPlayerLine(p){
 function finderBuildBarsHtml(giveList, getList){
   const giveV26=sumF(giveList,'val2026'), getV26=sumF(getList,'val2026');
   const giveAvg=sumF(giveList,'avgVal'), getAvg=sumF(getList,'avgVal');
-  return [['2026 Value',giveV26,getV26],['Avg Value',giveAvg,getAvg]].map(([lbl,vA,vB])=>{
-    const tot=vA+vB; if(tot<=0) return '';
-    const pctA=(vA/tot)*100,pctB=100-pctA;
-    const aWins=pctA<=pctB;
-    const winPct=Math.round(aWins?pctB:pctA);
-    return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
-      <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
-      <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
-      <div class="share-bar-bubble" style="left:${pctA}%;background:${aWins?'var(--accent)':'var(--bar2)'};color:${aWins?'#fff':'var(--accent)'}">${winPct}%</div>
-    </div></div>`;
-  }).join('');
+  return [['2026 Value',giveV26,getV26],['Avg Value',giveAvg,getAvg]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
 }
 
 // finderBuildVerdictHtml + vsFinderWhySection are defined at the end of the script
@@ -4236,6 +4226,27 @@ function renderList(side){
   jerseyPlayers.forEach((p,i)=>{ if(jerseyEls[i]) mountJerseyCard(jerseyEls[i], p); });
 }
 function sumF(list,f){return list.reduce((s,p)=>s+(p[f]!==null&&!isNaN(p[f])?p[f]:0),0);}
+// Shared give/get percentile bar (Trade Sim share modal + Trade Finder offer cards): vA is what's
+// being given up, vB what's coming back. The color joint sits exactly where the bubble does — the
+// winning side's share (whoever's receiving more, giving up less) mirrored around the 50%
+// midpoint toward their own edge — so red (the winner's color) is always the shorter segment,
+// anchored at the winner's side and growing only with their margin, and the bubble lands dead
+// center for a near-even trade instead of floating toward whichever side happens to be smaller.
+function sharePctBarHtml(lbl,vA,vB){
+  const tot=vA+vB; if(tot<=0) return '';
+  const pctA=(vA/tot)*100,pctB=100-pctA;
+  const aWins=pctA<=pctB;
+  const winPct=Math.round(aWins?pctB:pctA);
+  const winnerOnRight=!aWins;
+  const position=50+(winPct-50)*(winnerOnRight?1:-1);
+  const leftColor=winnerOnRight?'var(--bar2)':'var(--accent)';
+  const rightColor=winnerOnRight?'var(--accent)':'var(--bar2)';
+  return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
+    <div class="share-bar-l" style="width:${position}%;background:${leftColor}"></div>
+    <div class="share-bar-r" style="width:${100-position}%;background:${rightColor}"></div>
+    <div class="share-bar-bubble" style="left:${position}%;background:${aWins?'var(--accent)':'var(--bar2)'};color:${aWins?'#fff':'var(--accent)'}">${winPct}%</div>
+  </div></div>`;
+}
 
 // ===== UPDATE BARS =====
 function updateBar(valA, valB, flId, frId, bubId, lScoreId, rScoreId) {
@@ -4537,19 +4548,7 @@ function openShareModal(){
 
   // Share bars - red highlights the side RECEIVING more value, with % bubble. Only 2026 and Avg now.
   if(selectedA.length&&selectedB.length){
-    document.getElementById('shareBars').innerHTML=[['2026 Value',v26A,v26B],['Avg Value',avgA,avgB]].map(([lbl,vA,vB])=>{
-      const tot=vA+vB; if(tot<=0) return '';
-      const pctA=(vA/tot)*100,pctB=100-pctA;
-      // aWins = A gives up less = A receives relatively more value than what it gave = A's side highlighted
-      const aWins=pctA<=pctB;
-      const winPct=Math.round(aWins?pctB:pctA);
-      const bubblePos=pctA;
-      return `<div><div class="share-bar-lbl">${lbl}</div><div class="share-bar-track" style="position:relative">
-        <div class="share-bar-l" style="width:${pctA}%;background:var(--accent)"></div>
-        <div class="share-bar-r" style="width:${pctB}%;background:var(--bar2)"></div>
-        <div class="share-bar-bubble" style="left:${bubblePos}%;background:${aWins?'var(--accent)':'var(--bar2)'};color:${aWins?'#fff':'var(--accent)'}">${winPct}%</div>
-      </div></div>`;
-    }).join('');
+    document.getElementById('shareBars').innerHTML=[['2026 Value',v26A,v26B],['Avg Value',avgA,avgB]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
   } else {
     document.getElementById('shareBars').innerHTML='';
   }
@@ -4642,12 +4641,22 @@ function tbBlockHtml(dateLabel, sides, unavailable){
     </div>
   </div>`;
 }
+// Comp picks/cash aren't real roster players and never open the popup. A real player only gets
+// the tappable treatment if we can resolve their CURRENT team — showPM() looks players up by
+// name+team against the live allPlayers merge, so a stale/traded-off-system team wouldn't match.
+function tbPlayerNameHtml(p){
+  if(!p.asset && p.playerID){
+    const live=allPlayers.find(x=>x.playerID===p.playerID);
+    if(live) return `<span class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(live.name)}','${esc(live.team)}','${esc(live.pos||'')}')">${esc(p.playerName)}</span>`;
+  }
+  return `<div class="share-player-name">${esc(p.playerName)}</div>`;
+}
 function tbSideStatsHtml(sides){
   // Cash considerations don't carry a meaningful Avg Value — same display rule trade sim's own
   // share-player line uses for isCash entries.
   const playerLine=(p)=>{
-    if(p.asset==='cash') return `<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
-    return `<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
+    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
   };
   return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
 }
