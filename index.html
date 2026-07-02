@@ -1391,7 +1391,7 @@ async function loadData() {
 const teamPosture = {}; // team abbrev -> 'buyer' | 'seller' | 'either'
 async function loadStandings(){
   try {
-    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Standings&_cb=${Date.now()}`;
+    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Standings&headers=1&_cb=${Date.now()}`;
     const r=await fetch(url, {cache: 'no-store'});
     if(!r.ok) return;
     const text=await r.text();
@@ -1463,7 +1463,12 @@ function calcFIP(ip,hr,bb,hbp,k){
 async function fetchSheetTab(tabName){
   if(seasonStatsCache[tabName]) return seasonStatsCache[tabName];
   try {
-    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&_cb=${Date.now()}`;
+    // headers=1 tells the gviz endpoint row 1 is a header row. Without it, Google guesses per
+    // column based on data type, and gets it wrong for stretches of adjacent numeric stat
+    // columns — c.label comes back blank/wrong for some of them, silently shifting which
+    // value lands under which name (this is what's been causing RBI/W/L/FIP to intermittently
+    // resolve to the wrong column instead of just being missing).
+    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}&headers=1&_cb=${Date.now()}`;
     const r=await fetch(url,{cache:'no-store'});
     if(!r.ok) return null;
     const text=await r.text();
