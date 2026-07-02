@@ -323,6 +323,27 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .share-bar-r{position:absolute;right:0;top:0;bottom:0;border-radius:0 4px 4px 0}
 .share-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;border:2px solid var(--bg-mid);z-index:2}
 .share-footer{text-align:center;font-size:10px;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:9px}
+
+/* TRADE TRACKER */
+.tt-list{padding:10px 12px;flex:1;overflow-y:auto}
+.tt-card{padding:12px 13px;border-radius:9px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-card);border:1px solid var(--border-light);cursor:pointer;transition:background 0.15s,border-color 0.15s}
+.tt-card:nth-child(even){background:var(--row-alt)}
+.tt-card:hover{border-color:var(--border-strong)}
+.tt-card-left{flex:1;min-width:0}
+.tt-card-desc{font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.35}
+.tt-card-date{font-size:11px;color:var(--text-muted);margin-top:3px}
+.tt-card-icon-btn{width:34px;height:34px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent);background:var(--accent-soft);font-size:13px}
+
+/* TRADE BREAKDOWN MODAL */
+.tb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:11px}
+.tb-block{margin-top:14px}
+.tb-block-date{text-align:center;font-size:15px;font-weight:500;color:var(--text-primary);margin-bottom:8px;font-family:'Space Grotesk','Inter',sans-serif}
+.tb-bar-track{position:relative;height:7px;background:var(--bg-light);border-radius:4px;overflow:visible}
+.tb-bar-seg{position:absolute;top:0;bottom:0}
+.tb-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);min-width:18px;height:18px;padding:0 3px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;background:var(--accent);color:#fff;border:2px solid var(--bg-mid);z-index:2}
+.tb-bar-track-empty{background:var(--border-light)}
+.tb-bar-empty-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font-size:9px;font-weight:500;color:var(--text-muted);background:var(--bg-card);padding:2px 8px;border-radius:9px;border:1px solid var(--border-light);z-index:2}
+
 /* SCORE MODAL */
 .score-desc{font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:13px}
 .score-defs{border-top:1px solid var(--border-light);padding-top:11px;display:flex;flex-direction:column;gap:9px}
@@ -481,6 +502,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <nav class="desktop-nav">
     <div class="desktop-nav-item active" id="dmenu-trade" onclick="showPage('trade')">Trade Sim</div>
     <div class="desktop-nav-item" id="dmenu-finder" onclick="showPage('finder')">Trade Finder</div>
+    <div class="desktop-nav-item" id="dmenu-tradetracker" onclick="showPage('tradetracker')">Trade Tracker</div>
     <div class="desktop-nav-item" id="dmenu-roster" onclick="showPage('roster')">Rosters</div>
     <div class="desktop-nav-item" id="dmenu-players" onclick="showPage('players')">Players</div>
     <div class="desktop-nav-item" id="dmenu-prospects" onclick="showPage('prospects')">Prospects</div>
@@ -499,6 +521,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <button class="menu-close" onclick="closeMenu()">✕</button>
     <div class="menu-item active" id="menu-trade" onclick="showPage('trade')">Trade Sim</div>
     <div class="menu-item" id="menu-finder" onclick="showPage('finder')">Trade Finder</div>
+    <div class="menu-item" id="menu-tradetracker" onclick="showPage('tradetracker')">Trade Tracker</div>
     <div class="menu-item" id="menu-roster" onclick="showPage('roster')">Rosters</div>
     <div class="menu-item" id="menu-players" onclick="showPage('players')">Players</div>
     <div class="menu-item" id="menu-prospects" onclick="showPage('prospects')">Prospects</div>
@@ -784,6 +807,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <!-- PLAYERS PAGE -->
 <div id="page-players" class="page">
   <div class="rankings-controls">
+    <input type="text" id="playersSearch" placeholder="Search players..." oninput="playersFilterChanged()" style="margin-bottom:6px">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       <select id="playersLevel" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
         <option value="">All Levels</option>
@@ -838,6 +862,13 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <div id="page-standings" class="page">
   <div id="standingsContent" class="standings-table-wrap" style="overflow-y:auto">
     <div class="roster-placeholder">Loading standings...</div>
+  </div>
+</div>
+
+<!-- TRADE TRACKER PAGE -->
+<div id="page-tradetracker" class="page">
+  <div id="tradeTrackerContent" class="tt-list">
+    <div class="roster-placeholder">Loading trades...</div>
   </div>
 </div>
 
@@ -925,6 +956,16 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <div class="modal-title">Trade Breakdown</div>
     <div class="share-grid" id="shareGrid"></div>
     <div class="share-bars" id="shareBars"></div>
+    <div class="share-footer">valuesavant.com</div>
+  </div>
+</div>
+
+<!-- TRADE BREAKDOWN MODAL (historical trade detail, Trade Tracker page) -->
+<div class="overlay-base overlay-center" id="tradeBreakdownModal" onclick="closeTradeBreakdownOut(event)">
+  <div class="modal-box" style="max-width:440px">
+    <button class="modal-close" onclick="closeTradeBreakdown()">✕</button>
+    <div class="modal-title">Trade Breakdown</div>
+    <div id="tbdBody"></div>
     <div class="share-footer">valuesavant.com</div>
   </div>
 </div>
@@ -1150,6 +1191,15 @@ function showPage(p) {
     }
   }
   if(p==='standings') renderStandingsPage();
+  if(p==='tradetracker'){
+    if(tradesData){ renderTradeTrackerList(tradesData); }
+    else {
+      document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Loading trades…</div>';
+      ensureTradesLoaded().then(t=>renderTradeTrackerList(t)).catch(e=>{
+        document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Unable to load trades: '+esc(e.message)+'</div>';
+      });
+    }
+  }
   // Reset finder to step 1 when navigating to it from any page except player (research flow)
   if(p==='finder' && _leavingPage!=='player') finderRestart();
 }
@@ -1222,6 +1272,92 @@ function ensureDataLoaded(){
     dataLoadPromise=loadData().then(()=>{dataLoaded=true;}).catch(e=>{dataLoadPromise=null;throw e;});
   }
   return dataLoadPromise;
+}
+
+// ===== TRADE TRACKER (Trades sheet) =====
+// Columns: A=Trade Number, B=Player ID, C=Player Name, D=Trading Team, E=Receiving Team,
+// F=Trade Description, G=Date, H=2026 Value (at time of trade), I=Avg Value (at time of trade).
+let tradesData=null, tradesLoadPromise=null;
+function ensureTradesLoaded(){
+  if(tradesData) return Promise.resolve(tradesData);
+  if(!tradesLoadPromise){
+    tradesLoadPromise=fetchSheetTab('Trades').then(rows=>{
+      tradesData=buildTrades(rows||[]);
+      return tradesData;
+    }).catch(e=>{tradesLoadPromise=null;throw e;});
+  }
+  return tradesLoadPromise;
+}
+function buildTrades(rows){
+  const byNum={}, order=[];
+  for(const row of rows){
+    const tradeNumber=String(colVal(row,'Trade Number',0)||'').trim();
+    if(!tradeNumber || tradeNumber==='Trade Number') continue;
+    const playerIDRaw=colVal(row,'Player ID',1);
+    const playerID=playerIDRaw!=null?String(Math.round(Number(playerIDRaw))):null;
+    const playerName=String(colVal(row,'Player Name',2)||'').trim();
+    if(!playerID || !playerName) continue;
+    const tradingTeam=String(colVal(row,'Trading Team',3)||'').trim();
+    const receivingTeam=String(colVal(row,'Receiving Team',4)||'').trim();
+    const description=String(colVal(row,'Trade Description',5)||'').trim();
+    const date=parseGvizDate(colVal(row,'Date',6));
+    const val2026=numOrNull(colVal(row,'2026 Value',7));
+    const avgVal=numOrNull(colVal(row,'Avg Value',8));
+    if(!byNum[tradeNumber]){
+      byNum[tradeNumber]={tradeNumber,description,date,players:[]};
+      order.push(tradeNumber);
+    }
+    byNum[tradeNumber].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal});
+  }
+  // Most recent trade first; ties (same date) break by Trade Number descending, since trade
+  // numbers are assigned in chronological order.
+  return order.map(n=>byNum[n]).sort((a,b)=>{
+    const byDate=(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0);
+    return byDate!==0 ? byDate : b.tradeNumber.localeCompare(a.tradeNumber);
+  });
+}
+// Google's gviz endpoint encodes date cells as the literal string "Date(Y,M,D)" (M is 0-based)
+function parseGvizDate(raw){
+  if(raw==null || raw==='') return null;
+  const s=String(raw);
+  const m=s.match(/^Date\((\d+),(\d+),(\d+)/);
+  if(m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
+  const d=new Date(s);
+  return isNaN(d.getTime())?null:d;
+}
+function fmtDate(d){
+  return d ? (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear() : '—';
+}
+// Group a trade's player rows by Trading Team (the org giving up the player) — players leaving
+// the same team land in the same column, headed by the team that received them.
+function groupTradeSides(trade){
+  const groups={}, order=[];
+  for(const p of trade.players){
+    const key=p.tradingTeam||'—';
+    if(!groups[key]){groups[key]={receivingTeam:p.receivingTeam,players:[]};order.push(key);}
+    groups[key].players.push(p);
+  }
+  return order.map(k=>groups[k]);
+}
+// allPlayers is already a live merge of all 30 current roster tabs (built by loadData()), so a
+// plain lookup here doubles as the "search all 30 team sheets" fallback for players who've since
+// been traded again off the team in the Trades sheet's Receiving Team column.
+function liveTradePlayerValues(playerID){
+  const p=allPlayers.find(x=>x.playerID===playerID);
+  return p ? {val2026:p.val2026, avgVal:p.avgVal} : null;
+}
+function renderTradeTrackerList(trades){
+  const c=document.getElementById('tradeTrackerContent');
+  if(!trades.length){c.innerHTML='<div class="roster-placeholder">No trades yet</div>';return;}
+  c.innerHTML=trades.map(t=>`
+    <div class="tt-card" onclick="openTradeBreakdown('${esc(t.tradeNumber)}')">
+      <div class="tt-card-left">
+        <div class="tt-card-desc">${esc(t.description||'Trade')}</div>
+        <div class="tt-card-date">${esc(fmtDate(t.date))}</div>
+      </div>
+      <div class="tt-card-icon-btn" title="View trade breakdown"><i class="fa-solid fa-chart-simple"></i></div>
+    </div>
+  `).join('');
 }
 // Map full team names (from roster Team column) → abbreviation
 const TEAM_NAME_TO_ABBR = {
@@ -1623,10 +1759,13 @@ function playersFilterChanged(){renderPlayers();}
 function renderPlayers(){
   const levelF=document.getElementById('playersLevel').value;
   const posF=document.getElementById('playersPos').value;
+  const searchF=document.getElementById('playersSearch').value.trim().toLowerCase();
   // Determine if viewing hitters or pitchers based on pos filter
   if(posF==='pitcher'||posF==='SP'||posF==='RP') playersViewHitters=false;
   else if(posF==='hitter'||['C','1B','2B','3B','SS','OF','DH'].includes(posF)) playersViewHitters=true;
   let pl=[...allPlayers];
+  // Name search
+  if(searchF) pl=pl.filter(x=>x.name.toLowerCase().includes(searchF));
   // Level filter
   if(levelF) pl=pl.filter(x=>matchesGroup(x,levelF));
   // Position filter — Ohtani (pos:"TWP") belongs on both the Hitters and Pitchers views
@@ -4386,6 +4525,78 @@ function openShareModal(){
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
 function closeShareOut(e){if(e.target.id==='shareModal')closeShare();}
+
+// ===== TRADE BREAKDOWN MODAL (Trade Tracker page) =====
+async function openTradeBreakdown(tradeNumber){
+  document.getElementById('tradeBreakdownModal').classList.add('open');
+  document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Loading…</div>';
+  let trades;
+  try { trades=await ensureTradesLoaded(); }
+  catch(e){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Unable to load trade: '+esc(e.message)+'</div>'; return; }
+  const trade=trades.find(t=>t.tradeNumber===tradeNumber);
+  if(!trade){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Trade not found</div>'; return; }
+  let liveOk=true;
+  try { await ensureDataLoaded(); } catch(e){ liveOk=false; }
+  renderTradeBreakdown(trade, liveOk);
+}
+function closeTradeBreakdown(){document.getElementById('tradeBreakdownModal').classList.remove('open');}
+function closeTradeBreakdownOut(e){if(e.target.id==='tradeBreakdownModal')closeTradeBreakdown();}
+function tbBarHtml(sides, getVal){
+  const totals=sides.map(s=>s.players.reduce((sum,p)=>{const v=getVal(p);return sum+(v!=null&&!isNaN(v)?v:0);},0));
+  const grand=totals.reduce((a,b)=>a+b,0);
+  if(grand<=0) return '<div style="font-size:10px;color:var(--text-muted)">No data</div>';
+  const pcts=totals.map(t=>(t/grand)*100);
+  const colors=['var(--accent)','var(--bar2)','var(--pos)','var(--blue-light)'];
+  let acc=0;
+  const segs=pcts.map((pct,i)=>{
+    const left=acc; acc+=pct;
+    const radius=i===0?'4px 0 0 4px':(i===pcts.length-1?'0 4px 4px 0':'0');
+    return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${colors[i%colors.length]};border-radius:${radius}"></div>`;
+  }).join('');
+  const bubble=`<div class="tb-bar-bubble" style="left:${pcts[0]}%">${Math.round(pcts[0])}%</div>`;
+  return `<div class="tb-bar-track">${segs}${bubble}</div>`;
+}
+function tbEmptyBarHtml(label){
+  return `<div class="tb-bar-track tb-bar-track-empty"><div class="tb-bar-empty-label">${esc(label)}</div></div>`;
+}
+function tbBlockHtml(dateLabel, sides, unavailable){
+  const val26Html=unavailable ? tbEmptyBarHtml('No Data Available') : tbBarHtml(sides,p=>p.val2026);
+  const avgHtml=unavailable ? tbEmptyBarHtml('Check Back Soon') : tbBarHtml(sides,p=>p.avgVal);
+  return `<div class="tb-block">
+    <div class="tb-block-date">${esc(dateLabel)}</div>
+    <div class="share-bars">
+      <div><div class="share-bar-lbl">2026 VALUE</div>${val26Html}</div>
+      <div><div class="share-bar-lbl">AVG VALUE</div>${avgHtml}</div>
+    </div>
+  </div>`;
+}
+function renderTradeBreakdown(trade, liveOk){
+  const sides=groupTradeSides(trade);
+  const playerLine=(p)=>`<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+  const headerHtml=`<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
+
+  // liveTradePlayerValues() already searches the full 30-team merged roster (allPlayers), so a
+  // miss here means the player genuinely isn't findable anywhere yet (traded off-system, or the
+  // roster sheet just hasn't caught up to a very recent move) — grey out the Current block rather
+  // than blend in a misleading partial total.
+  let currentSides=sides, unavailable=!liveOk;
+  if(liveOk){
+    let anyMissing=false;
+    currentSides=sides.map(s=>({
+      receivingTeam:s.receivingTeam,
+      players:s.players.map(p=>{
+        const live=liveTradePlayerValues(p.playerID);
+        if(!live) anyMissing=true;
+        return {...p, val2026:live?live.val2026:null, avgVal:live?live.avgVal:null};
+      })
+    }));
+    unavailable=anyMissing;
+  }
+
+  document.getElementById('tbdBody').innerHTML=headerHtml
+    + tbBlockHtml(fmtDate(trade.date), sides, false)
+    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable);
+}
 
 // ===== SCORE MODAL =====
 function openScoreModal(){document.getElementById('scoreModal').classList.add('open');}
