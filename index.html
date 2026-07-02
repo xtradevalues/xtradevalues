@@ -340,7 +340,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .tb-block-date{text-align:center;font-size:15px;font-weight:500;color:var(--text-primary);margin-bottom:8px;font-family:'Space Grotesk','Inter',sans-serif}
 .tb-bar-track{position:relative;height:7px;background:var(--bg-light);border-radius:4px;overflow:visible}
 .tb-bar-seg{position:absolute;top:0;bottom:0}
-.tb-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);min-width:18px;height:18px;padding:0 3px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;background:var(--accent);color:#fff;border:2px solid var(--bg-mid);z-index:2}
+.tb-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);min-width:18px;height:18px;padding:0 3px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;background:#fff;color:var(--accent);border:2px solid var(--bg-mid);z-index:2}
 .tb-bar-track-empty{background:var(--border-light)}
 .tb-bar-empty-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font-size:9px;font-weight:500;color:var(--text-muted);background:var(--bg-card);padding:2px 8px;border-radius:9px;border:1px solid var(--border-light);z-index:2}
 
@@ -1297,8 +1297,8 @@ function buildTrades(rows){
     const playerID=playerIDRaw!=null?String(Math.round(Number(playerIDRaw))):null;
     const playerName=String(colVal(row,'Player Name',2)||'').trim();
     if(!playerID || !playerName) continue;
-    const tradingTeam=String(colVal(row,'Trading Team',3)||'').trim();
-    const receivingTeam=String(colVal(row,'Receiving Team',4)||'').trim();
+    const tradingTeam=normTeamAbbr(colVal(row,'Trading Team',3));
+    const receivingTeam=normTeamAbbr(colVal(row,'Receiving Team',4));
     const description=String(colVal(row,'Trade Description',5)||'').trim();
     const date=parseGvizDate(colVal(row,'Date',6));
     const val2026=numOrNull(colVal(row,'2026 Value',7));
@@ -1372,6 +1372,12 @@ const TEAM_NAME_TO_ABBR = {
   'Seattle Mariners':'SEA','St. Louis Cardinals':'STL','Tampa Bay Rays':'TB',
   'Texas Rangers':'TEX','Toronto Blue Jays':'TOR','Washington Nationals':'WSH',
 };
+// Trading Team / Receiving Team cells in the Trades sheet may contain either the abbreviation
+// already or the full team name — normalize to the abbreviation either way.
+function normTeamAbbr(v){
+  const s=String(v||'').trim();
+  return TEAM_NAME_TO_ABBR[s] || s;
+}
 
 async function loadData() {
   try {
@@ -4541,19 +4547,43 @@ async function openTradeBreakdown(tradeNumber){
 }
 function closeTradeBreakdown(){document.getElementById('tradeBreakdownModal').classList.remove('open');}
 function closeTradeBreakdownOut(e){if(e.target.id==='tradeBreakdownModal')closeTradeBreakdown();}
-function tbBarHtml(sides, getVal){
+function tbSideTotals(sides, getVal){
   const totals=sides.map(s=>s.players.reduce((sum,p)=>{const v=getVal(p);return sum+(v!=null&&!isNaN(v)?v:0);},0));
   const grand=totals.reduce((a,b)=>a+b,0);
+  const pcts=grand>0?totals.map(t=>(t/grand)*100):null;
+  return {totals,grand,pcts};
+}
+// The side actually receiving the larger share "wins" that comparison — the bar's red highlight
+// and callout bubble follow whichever side that is, not a fixed left/right position. A 40-60%
+// max share is treated as a wash (no highlighted winner), matching the fair-trade band used
+// elsewhere in the app (inFairBand()).
+function tbSideWinner(sides, getVal){
+  const {grand,pcts}=tbSideTotals(sides,getVal);
+  if(grand<=0||!pcts) return null;
+  const maxPct=Math.max(...pcts);
+  if(maxPct>=40 && maxPct<=60) return null;
+  const idx=pcts.indexOf(maxPct);
+  return {idx, team:sides[idx].receivingTeam, pct:maxPct};
+}
+function tbBarHtml(sides, getVal){
+  const {grand,pcts}=tbSideTotals(sides,getVal);
   if(grand<=0) return '<div style="font-size:10px;color:var(--text-muted)">No data</div>';
-  const pcts=totals.map(t=>(t/grand)*100);
-  const colors=['var(--accent)','var(--bar2)','var(--pos)','var(--blue-light)'];
+  const maxPct=Math.max(...pcts);
+  const leaders=pcts.filter(p=>Math.abs(p-maxPct)<0.001).length;
+  const winnerIdx=leaders===1?pcts.indexOf(maxPct):-1;
   let acc=0;
   const segs=pcts.map((pct,i)=>{
     const left=acc; acc+=pct;
     const radius=i===0?'4px 0 0 4px':(i===pcts.length-1?'0 4px 4px 0':'0');
-    return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${colors[i%colors.length]};border-radius:${radius}"></div>`;
+    const color=i===winnerIdx?'var(--accent)':'var(--bar2)';
+    return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${color};border-radius:${radius}"></div>`;
   }).join('');
-  const bubble=`<div class="tb-bar-bubble" style="left:${pcts[0]}%">${Math.round(pcts[0])}%</div>`;
+  let bubble='';
+  if(winnerIdx>=0){
+    let before=0; for(let i=0;i<winnerIdx;i++) before+=pcts[i];
+    const center=before+pcts[winnerIdx]/2;
+    bubble=`<div class="tb-bar-bubble" style="left:${center}%">${Math.round(pcts[winnerIdx])}%</div>`;
+  }
   return `<div class="tb-bar-track">${segs}${bubble}</div>`;
 }
 function tbEmptyBarHtml(label){
@@ -4570,10 +4600,31 @@ function tbBlockHtml(dateLabel, sides, unavailable){
     </div>
   </div>`;
 }
+function tbSideStatsHtml(sides){
+  const playerLine=(p)=>`<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+  return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
+}
+function tbVerdictBox(cls,headline,detail){
+  return `<div class="${cls}" style="margin-top:14px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${detail}</div></div></div>`;
+}
+function tbVerdictHtml(atTradeSides, currentSides, unavailable){
+  const atWin=tbSideWinner(atTradeSides, p=>p.val2026);
+
+  if(unavailable){
+    if(!atWin) return tbVerdictBox('verdict-box v-neutral','Trade looked even at the time','Both sides gave up comparable 2026 value in this deal. Current value data isn’t available yet for every player involved, so we can’t say how it looks today.');
+    return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} appeared to win this trade at the time`, `<span>${esc(atWin.team)}</span> received the larger share of 2026 value in this deal (${Math.round(atWin.pct)}%). Current value data isn’t available yet for every player involved, so we can’t say how it looks today.`);
+  }
+
+  const curWin=tbSideWinner(currentSides, p=>p.val2026);
+
+  if(!atWin && !curWin) return tbVerdictBox('verdict-box v-fair','Fair trade, then and now','Both sides gave up comparable 2026 value at the time of the deal, and the trade remains balanced today.');
+  if(atWin && curWin && atWin.idx===curWin.idx) return tbVerdictBox('verdict-box v-warn', `${esc(atWin.team)} has won this trade from day one`, `<span>${esc(atWin.team)}</span> received the better value at the time of the deal (${Math.round(atWin.pct)}%) and still holds the edge today (${Math.round(curWin.pct)}%).`);
+  if(atWin && curWin && atWin.idx!==curWin.idx) return tbVerdictBox('verdict-box v-warn','The verdict has flipped since the trade', `It appeared <span>${esc(atWin.team)}</span> won this trade at the time (${Math.round(atWin.pct)}% of the value), but <span>${esc(curWin.team)}</span> has received more value since, now holding ${Math.round(curWin.pct)}% of the combined value.`);
+  if(!atWin && curWin) return tbVerdictBox('verdict-box v-warn', `${esc(curWin.team)} has since pulled ahead`, `This trade looked even at the time, but <span>${esc(curWin.team)}</span> has picked up more value since (now ${Math.round(curWin.pct)}% of the combined value).`);
+  return tbVerdictBox('verdict-box v-fair','The gap has closed since the trade', `<span>${esc(atWin.team)}</span> appeared to win this trade at the time (${Math.round(atWin.pct)}%), but the two sides have evened out since.`);
+}
 function renderTradeBreakdown(trade, liveOk){
   const sides=groupTradeSides(trade);
-  const playerLine=(p)=>`<div class="share-player"><div class="share-player-name">${esc(p.playerName)}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
-  const headerHtml=`<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
 
   // liveTradePlayerValues() already searches the full 30-team merged roster (allPlayers), so a
   // miss here means the player genuinely isn't findable anywhere yet (traded off-system, or the
@@ -4593,9 +4644,11 @@ function renderTradeBreakdown(trade, liveOk){
     unavailable=anyMissing;
   }
 
-  document.getElementById('tbdBody').innerHTML=headerHtml
+  document.getElementById('tbdBody').innerHTML=tbSideStatsHtml(sides)
     + tbBlockHtml(fmtDate(trade.date), sides, false)
-    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable);
+    + `<div style="margin-top:14px">${tbSideStatsHtml(currentSides)}</div>`
+    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable)
+    + tbVerdictHtml(sides, currentSides, unavailable);
 }
 
 // ===== SCORE MODAL =====
