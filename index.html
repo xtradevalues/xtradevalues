@@ -4600,34 +4600,42 @@ function tbSideWinner(sides, getVal){
   const idx=pcts.indexOf(maxPct);
   return {idx, team:sides[idx].receivingTeam, pct:maxPct};
 }
+function tbBarSeg(left,width,color,radius){
+  return `<div class="tb-bar-seg" style="left:${left}%;width:${width}%;background:${color};border-radius:${radius}"></div>`;
+}
 function tbBarHtml(sides, getVal){
   const {grand,pcts}=tbSideTotals(sides,getVal);
   if(grand<=0) return '<div style="font-size:10px;color:var(--text-muted)">No data</div>';
   const maxPct=Math.max(...pcts);
   const leaders=pcts.filter(p=>Math.abs(p-maxPct)<0.001).length;
   const winnerIdx=leaders===1?pcts.indexOf(maxPct):-1;
+
+  // For the standard 2-side trade, the color joint sits exactly where the bubble does: the
+  // winner's share mirrored around the 50% midpoint (toward their own edge). That makes red —
+  // always the winner's color — the shorter of the two segments, anchored at the winner's own
+  // side and growing only with their margin, instead of drawing their raw (larger) value share
+  // as width, which put the boundary closer to the loser's edge than to the winner's.
+  if(sides.length===2 && winnerIdx>=0){
+    const winnerOnRight=winnerIdx===1;
+    const position=50+(pcts[winnerIdx]-50)*(winnerOnRight?1:-1);
+    const winColor='var(--accent)', loseColor='var(--bar2)';
+    const segs=winnerOnRight
+      ? tbBarSeg(0,position,loseColor,'4px 0 0 4px')+tbBarSeg(position,100-position,winColor,'0 4px 4px 0')
+      : tbBarSeg(0,position,winColor,'4px 0 0 4px')+tbBarSeg(position,100-position,loseColor,'0 4px 4px 0');
+    const bubble=`<div class="tb-bar-bubble" style="left:${position}%">${Math.round(pcts[winnerIdx])}%</div>`;
+    return `<div class="tb-bar-track">${segs}${bubble}</div>`;
+  }
+
+  // Fallback for an exact tie or a 3+ side trade (rare) — plain proportional segments, no single
+  // joint to anchor a bubble to.
   let acc=0;
   const segs=pcts.map((pct,i)=>{
     const left=acc; acc+=pct;
     const radius=i===0?'4px 0 0 4px':(i===pcts.length-1?'0 4px 4px 0':'0');
     const color=i===winnerIdx?'var(--accent)':'var(--bar2)';
-    return `<div class="tb-bar-seg" style="left:${left}%;width:${pct}%;background:${color};border-radius:${radius}"></div>`;
+    return tbBarSeg(left,pct,color,radius);
   }).join('');
-  // Bubble position pulls toward whichever side actually won, scaled by how decisive the win
-  // was, and lands dead center for an even split. The plain color boundary doesn't do this: for
-  // a winner on the right, the boundary sits at the edge closest to the LOSING side's sliver,
-  // which reads as "belonging" to the loser even though the number is the winner's. Mirroring
-  // the winner's share around the 50% midpoint — toward 0 if they're on the left, toward 100 if
-  // they're on the right — keeps the bubble inside the winner's own colored region instead.
-  let bubble='';
-  if(winnerIdx>=0){
-    let before=0; for(let i=0;i<winnerIdx;i++) before+=pcts[i];
-    const segCenter=before+pcts[winnerIdx]/2;
-    const direction=segCenter<50?-1:1;
-    const position=50+(pcts[winnerIdx]-50)*direction;
-    bubble=`<div class="tb-bar-bubble" style="left:${position}%">${Math.round(pcts[winnerIdx])}%</div>`;
-  }
-  return `<div class="tb-bar-track">${segs}${bubble}</div>`;
+  return `<div class="tb-bar-track">${segs}</div>`;
 }
 function tbEmptyBarHtml(label){
   return `<div class="tb-bar-track tb-bar-track-empty"><div class="tb-bar-empty-label">${esc(label)}</div></div>`;
