@@ -4265,11 +4265,21 @@ function updateBar(valA, valB, flId, frId, bubId, lScoreId, rScoreId) {
   const pctA=(valA/total)*100, pctB=100-pctA;
   const aWins=pctA<=pctB; // A wins if gives up less (pctA <= pctB)
   const winPct=Math.round(aWins?pctB:pctA);
-  // Side A is always rendered in --accent, Side B always in --bar2
-  fl.style.width=pctA+'%';
-  fr.style.width=pctB+'%';
-  // Bubble sits at the split, colored by whichever side is winning
-  bub.style.left=pctA+'%'; bub.style.marginLeft=-bSize+'px';
+  // Same fix as sharePctBarHtml: the fill/joint sits at the winner's share mirrored around the
+  // 50% midpoint (toward their own side), so red is always the shorter segment anchored at
+  // whoever's actually winning, instead of always being side A regardless of who that is.
+  const winnerOnRight=!aWins;
+  const position=50+(winPct-50)*(winnerOnRight?1:-1);
+  const grad=(color,anchorRight)=>{
+    const dark=`color-mix(in srgb,${color} 70%,#000)`;
+    return anchorRight?`linear-gradient(90deg,${color},${dark})`:`linear-gradient(90deg,${dark},${color})`;
+  };
+  fl.style.width=position+'%';
+  fr.style.width=(100-position)+'%';
+  fl.style.background=grad(winnerOnRight?'var(--bar2)':'var(--accent)', false);
+  fr.style.background=grad(winnerOnRight?'var(--accent)':'var(--bar2)', true);
+  // Bubble sits at the joint, colored by whichever side is winning
+  bub.style.left=position+'%'; bub.style.marginLeft=-bSize+'px';
   bub.textContent=winPct+'%'; bub.style.background=aWins?'var(--accent)':'var(--bar2)'; bub.style.color=aWins?'#fff':'var(--accent)';
   // Side scores
   lScore.textContent=valA.toFixed(2); lScore.style.color='var(--accent)';
