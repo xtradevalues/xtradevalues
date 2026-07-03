@@ -1936,13 +1936,8 @@ async function renderProspects(){
     list=list.map(x=>({...x,rank:extractRank(colVal(x.row,'MLB Top 100 Rank',11))})).filter(x=>!isNaN(x.rank));
     list.sort((a,b)=>a.rank-b.rank);
   } else {
-    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',10))}));
-    list.sort((a,b)=>{
-      if(isNaN(a.rank)&&isNaN(b.rank)) return 0;
-      if(isNaN(a.rank)) return 1;
-      if(isNaN(b.rank)) return -1;
-      return a.rank-b.rank;
-    });
+    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',10))})).filter(x=>!isNaN(x.rank));
+    list.sort((a,b)=>a.rank-b.rank);
   }
 
   const fmtI=v=>v!=null&&v!==''&&!isNaN(parseFloat(v))?Math.round(parseFloat(v)):'-';
