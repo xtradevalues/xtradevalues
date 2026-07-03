@@ -2039,7 +2039,7 @@ function computeMiLBHitterStats(r){
     pa:numOrNull(r['plateAppearances']), h:numOrNull(r['hits']), hr:numOrNull(r['homeRuns']),
     rbi:numOrNull(colVal(r,'rbi',25)), avg,
     ops:(obp!=null&&slg!=null)?obp+slg:null,
-    sb:numOrNull(r['stolenBases']),
+    sb:numOrNull(colVal(r,'stolenBases',19)),
     vWAR:numOrNull(r['vWAR'])
   };
 }
