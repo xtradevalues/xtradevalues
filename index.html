@@ -727,15 +727,10 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
       <div id="finderUntouchableSelected" style="margin-top:8px"></div>
     </div>
 
-    <!-- Step 4B: Caliber -->
-    <div class="finder-step" id="finderStep4B" style="display:none">
-      <div class="finder-q" id="finderCaliberQ">What caliber are you looking to acquire?</div>
-      <div class="finder-choice-row" style="gap:6px">
-        <button class="finder-choice-btn" style="flex:1;min-width:80px" onclick="finderCaliberChosen('star',this)">Star</button>
-        <button class="finder-choice-btn" style="flex:1;min-width:80px" onclick="finderCaliberChosen('above',this)">Above Average</button>
-        <button class="finder-choice-btn" style="flex:1;min-width:80px" onclick="finderCaliberChosen('any',this)">Any</button>
-      </div>
-    </div>
+    <!-- Step 4B: Caliber — removed in finder v4 (budget-first generation determines what's
+         affordable directly; no caliber question). Container kept as a stable, always-hidden
+         anchor since other code still toggles its display. -->
+    <div class="finder-step" id="finderStep4B" style="display:none"></div>
 
     <!-- SELLER PATH -->
     <!-- Step 3S: Player select (add multiple as optional pieces - offers can include any subset) -->
@@ -2683,11 +2678,12 @@ function finderPosChosen(pos){
   document.getElementById('finderTargetPlayerSelected').innerHTML='';
   document.getElementById('finderTargetPlayerWarning').style.display='none';
   if(!pos){
-    document.getElementById('finderStep4B').style.display='none';
     return;
   }
-  document.getElementById('finderCaliberQ').textContent=`What caliber ${pos} are you looking to acquire?`;
-  document.getElementById('finderStep4B').style.display='flex';
+  // v4: no caliber question — the budget-first finder computes what's actually
+  // affordable directly, so choosing a position goes straight to Generate.
+  document.getElementById('finderGenerateWrap').style.display='block';
+  document.getElementById('finderRestartWrap').style.display='block';
 }
 
 // ----- BUYER PATH: search for a specific target player instead of position/caliber -----
@@ -2819,15 +2815,6 @@ document.addEventListener('click', e => {
     if(d) d.classList.remove('open');
   }
 });
-
-function finderCaliberChosen(caliber,el){
-  finderCloseResultsIfOpen();
-  finderState.caliber=caliber;
-  document.querySelectorAll('#finderStep4B .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
-  if(el) el.classList.add('selected');
-  document.getElementById('finderGenerateWrap').style.display='block';
-  document.getElementById('finderRestartWrap').style.display='block';
-}
 
 // ----- SELLER PATH -----
 function finderPlayerSearchInput(){
@@ -3815,7 +3802,20 @@ async function generateOffers(){
   }
   let offers=[];
   if(finderState.intent==='buyer'){
-    offers=finderGenerateBuyerOffers();
+    // finder v4: budget-first generation. Normalize its {players,getTeam,getPlayers} offer
+    // shape into the givePlayers/targetTeam/targetPlayers fields the card renderer,
+    // finderEditTrade, and the post-filter below already expect. vsLabelPackage() already
+    // appends "— via TEAM" to its label, but finderRenderOfferCard appends its own
+    // "— via "+targetTeam suffix too — strip v4's copy so it isn't duplicated on the card.
+    offers=vsGenerateBuyerOffersV4().map(o=>{
+      const viaSuffix=' — via '+o.getTeam;
+      const label=o.label.endsWith(viaSuffix) ? o.label.slice(0,-viaSuffix.length) : o.label;
+      return { ...o, label,
+        givePlayers: o.players,
+        targetPlayers: o.getPlayers,
+        targetTeam: o.getTeam,
+      };
+    });
   } else {
     offers=finderGenerateSellerOffers();
   }
@@ -3842,8 +3842,10 @@ async function generateOffers(){
       msg=(sp && sp.length)
         ? `No trade found for <strong>${sp.map(p=>p.name).join(' / ')}</strong>. This can happen when no buyer's prospect or minors pool fits the value range, or no teams qualify as suitors at that position. Try a different partner team or haul type.`
         : 'No trade found. Try adjusting your criteria.';
+    } else if(finderState.targetPlayers && finderState.targetPlayers.length){
+      msg='No compliant trade found for your target. Your expendable pool (blocked prospects + positional surplus) can’t cover this player’s realistic price. Teams without surplus don’t get offers for players out of their range — that’s the market working.';
     } else {
-      msg='No trade found for your target. Your prospect/minors pool may not have enough value to match, or no sellers qualify. Try a different caliber or target player.';
+      msg='No compliant trade found at this position. Your expendable pool (blocked prospects + positional surplus) can’t cover any available player’s realistic price. Teams without surplus don’t get offers for better players — that’s the market working.';
     }
     const resultsModal=document.getElementById('finderResultsModal');
     const scroller=document.getElementById('finderCardsScroller');
@@ -6708,6 +6710,283 @@ vsGenerateSmartVerdict = function (listA, listB, teamA, teamB) {
     }
   }
   return { grade, headline, html };
+};
+
+/* =====================================================================================
+   VALUE SAVANT — TRADE FINDER v4: BUDGET-FIRST GENERATION
+   =====================================================================================
+   Inverts the buyer flow to match how real front offices work: compute the user's
+   trade budget (expendable pieces in realistic priority order), scan for affordable
+   targets, and build compliant packages against the full v3.x gate stack.
+   ===================================================================================== */
+
+/* ============================== 1. THE BUDGET POOL ============================== */
+
+// A piece is untouchable-core for budget purposes: org #1–2 prospect or MLB top-30.
+function vsIsBudgetUntouchable(p) {
+  const orgN = vsOrgRankNum(p), mlbN = vsMlbRankNum(p);
+  return (orgN != null && orgN <= 2) || (mlbN != null && mlbN <= 30);
+}
+
+// Buckets where a team holds 2+ long-term pieces (anchor + depth) — the depth is
+// expendable. Returns { surplusBuckets:Set, anchorByBucket:{bucket:player} }.
+function vsTeamSurplusMap(team) {
+  const surplusBuckets = new Set();
+  const anchorByBucket = {};
+  const buckets = ['C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP'];
+  for (const b of buckets) {
+    const longTerm = allPlayers.filter(p =>
+      p.team === team && finderPosBucket(p.pos) === b &&
+      ((p.isProspect && (p.avgVal || 0) >= 2) ||
+       (p.level === 'mlb' && vsControlThrough(p) >= 2029 && (p.avgVal || 0) >= 3)));
+    if (longTerm.length >= 2) {
+      longTerm.sort((a, b2) => (b2.avgVal || 0) - (a.avgVal || 0));
+      surplusBuckets.add(b);
+      anchorByBucket[b] = longTerm[0];
+    }
+  }
+  return { surplusBuckets, anchorByBucket };
+}
+
+// Build the user's expendable budget, tiered by realism.
+function vsBudgetPool(userTeam) {
+  const { surplusBuckets, anchorByBucket } = vsTeamSurplusMap(userTeam);
+  const blocked = [], surplusDepth = [], general = [], mlbSurplus = [];
+
+  for (const p of allPlayers) {
+    if (p.team !== userTeam || p.isComp || p.isCash) continue;
+    if (finderIsInjured(p)) continue;
+
+    // MLB surplus for B2B: MLB level, at a surplus bucket, not the anchor.
+    if (p.level === 'mlb' && !p.isProspect) {
+      const b = finderPosBucket(p.pos);
+      if (b && surplusBuckets.has(b) && anchorByBucket[b] !== p && (p.val2026 || 0) >= 2) {
+        mlbSurplus.push(p);
+      }
+      continue;
+    }
+
+    // Minors/prospects
+    if (!(p.isProspect || p.level === 'minors')) continue;
+    if (vsIsBudgetUntouchable(p)) continue;                 // core stays home
+    if ((p.avgVal || 0) < 0.5 && (p.val2026 || 0) < 0.5) continue; // true filler
+
+    // Blocked on own team = prime chip
+    const blocks = vsBlockingAnalysis2([p], userTeam, []);
+    if (blocks.length) { blocked.push(p); continue; }
+
+    const b = finderPosBucket(p.pos);
+    if (b && surplusBuckets.has(b) && anchorByBucket[b] !== p) { surplusDepth.push(p); continue; }
+
+    general.push(p);
+  }
+
+  const byAvg = (a, b) => (b.avgVal || 0) - (a.avgVal || 0);
+  blocked.sort(byAvg); surplusDepth.sort(byAvg); general.sort(byAvg); mlbSurplus.sort(byAvg);
+
+  return { blocked, surplusDepth, general, mlbSurplus,
+    prospectPool: [...blocked, ...surplusDepth, ...general] };
+}
+
+/* ============================== 2. AFFORDABLE TARGETS ============================== */
+
+// Cheap feasibility prefilter before attempting real package construction.
+function vsCanAfford(pool, target) {
+  const t26 = target.val2026 || 0;
+  const top = pool.slice(0, 8);
+  const max26 = top.reduce((s, p) => s + (p.val2026 || 0), 0);
+  if (max26 < t26 * 0.82) return false;                     // can't reach 45% share
+  if (vsControlThrough(target) <= 2026) {                   // rental premium reachable?
+    const maxAvg = top.reduce((s, p) => s + (p.avgVal || 0), 0);
+    if (maxAvg < t26 * VS_BANDS.RENTAL_AVG_FLOOR_MULT) return false;
+  }
+  return true;
+}
+
+// All players at the bucket the user could realistically call about.
+function vsAffordableTargets(posBucket, userTeam, pool) {
+  const userCtx = vsTeamContext(userTeam);
+  const out = [];
+  for (const p of allPlayers) {
+    if (p.team === userTeam || p.isComp || p.isCash) continue;
+    if (p.level !== 'mlb') continue;
+    if (finderPosBucket(p.pos) !== posBucket) continue;
+    if ((p.val2026 || 0) < 1.5) continue;                   // below trade-relevance
+    if (finderIsInjured(p)) continue;
+
+    const ownerCtx = vsTeamContext(p.team);
+    if (ownerCtx.role === 'buyer') {
+      // Contender only shops from surplus, and only in a valid B2B frame.
+      if (userCtx.role !== 'buyer') continue;               // B2B needs two buyers
+      const { surplusBuckets } = vsTeamSurplusMap(p.team);
+      if (!surplusBuckets.has(posBucket)) continue;
+      if (!pool.mlbSurplus.length) continue;                // user must have MLB value to send
+    } else {
+      // Seller/fringe: their untouchable core stays home.
+      if (vsIsBudgetUntouchable(p) && !(ownerCtx.role === 'seller' && vsControlThrough(p) <= 2027)) {
+        // top prospects aren't targets here anyway (MLB-level filter), guard kept for safety
+      }
+      if (typeof finderIsSellerAvailable === 'function' && !finderIsSellerAvailable(p)) continue;
+    }
+    if (!vsCanAfford(pool.prospectPool, p)) continue;
+    out.push(p);
+  }
+  // Best affordable first — the budget already guarantees reachability.
+  return out.sort((a, b) => (b.val2026 || 0) - (a.val2026 || 0));
+}
+
+/* ============================== 3. PACKAGE CONSTRUCTION ============================== */
+
+// Attempt to build one compliant package for a target from the tiered pool.
+// Tries 1–4 piece combos, blocked chips first. Returns {players, label} or null.
+function vsBuildPackageFor(target, userTeam, pool) {
+  const targetList = [target];
+  const isB2B = vsTeamContext(target.team).role === 'buyer';
+  const source = isB2B
+    ? [...pool.mlbSurplus, ...pool.blocked, ...pool.surplusDepth].slice(0, 14)
+    : [...pool.blocked, ...pool.surplusDepth, ...pool.general].slice(0, 14);
+  if (!source.length) return null;
+
+  const bandOk = (combo) => vsFinderValueBoundsCheck(combo, targetList) === null;
+  const gateOk = (combo) => vsFinderGateCombo(combo, userTeam, target.team, targetList, 'future') === null;
+
+  // Search order: singles, pairs, triples, then triple+small — first pass that clears
+  // the bounds gets the full gate; first full-gate pass wins.
+  const tryCombo = (combo) => (bandOk(combo) && gateOk(combo)) ? combo : null;
+
+  for (let i = 0; i < source.length; i++) {
+    const c = tryCombo([source[i]]);
+    if (c) return vsLabelPackage(c, pool, target);
+  }
+  for (let i = 0; i < source.length; i++) for (let j = i + 1; j < source.length; j++) {
+    const c = tryCombo([source[i], source[j]]);
+    if (c) return vsLabelPackage(c, pool, target);
+  }
+  for (let i = 0; i < source.length; i++) for (let j = i + 1; j < source.length; j++) for (let k = j + 1; k < source.length; k++) {
+    const c = tryCombo([source[i], source[j], source[k]]);
+    if (c) return vsLabelPackage(c, pool, target);
+    // 4th small piece to tip the 2026 axis (the "5th piece" mechanic, scaled down)
+    for (let m = k + 1; m < source.length; m++) {
+      if ((source[m].avgVal || 0) > 2.5) continue;
+      const c4 = tryCombo([source[i], source[j], source[k], source[m]]);
+      if (c4) return vsLabelPackage(c4, pool, target);
+    }
+  }
+  return null;
+}
+
+// Label explains WHERE the pieces came from — the realism story.
+function vsLabelPackage(combo, pool, target) {
+  const tags = [];
+  if (combo.some(p => pool.blocked.includes(p))) tags.push('moves blocked prospect' + (combo.filter(p => pool.blocked.includes(p)).length > 1 ? 's' : ''));
+  if (combo.some(p => pool.surplusDepth.includes(p))) tags.push('trades from surplus');
+  if (combo.some(p => pool.mlbSurplus.includes(p))) tags.push('contender surplus swap');
+  const label = (tags.length ? tags.join(' · ') : 'value match') + ' — via ' + target.team;
+  return { players: combo, label: label.charAt(0).toUpperCase() + label.slice(1) };
+}
+
+/* ============================== 4. ENTRY POINT ============================== */
+
+// Replaces finderGenerateBuyerOffers() for the position path. Direct player-search
+// path (finderState.targetPlayers) reuses the same construction against that player.
+function vsGenerateBuyerOffersV4() {
+  const userTeam = finderState.team;
+  const pool = vsBudgetPool(userTeam);
+
+  // Direct player search: build for the chosen target(s) only.
+  if (finderState.targetPlayers && finderState.targetPlayers.length) {
+    const offers = [];
+    for (const target of finderState.targetPlayers) {
+      const pkg = vsBuildPackageFor(target, userTeam, pool);
+      if (pkg) offers.push({ ...pkg, target, giveTeam: userTeam, getTeam: target.team,
+        getPlayers: [target], isInDivision: finderIsSameDivision ? finderIsSameDivision(userTeam, target.team) : false, tax: 0 });
+    }
+    return vsFinderPostFilter(offers.map(o => ({ ...o, players: o.players })), userTeam,
+      offers[0] ? offers[0].getTeam : null, finderState.targetPlayers) || offers;
+  }
+
+  const posBucket = finderState.position;
+  if (!posBucket) return [];
+
+  const targets = vsAffordableTargets(posBucket, userTeam, pool);
+  const offers = [];
+  const perTeamCount = {};
+  for (const target of targets) {
+    if (offers.length >= 13) break;
+    // Spread across teams: max 2 offers per selling team for variety.
+    if ((perTeamCount[target.team] || 0) >= 2) continue;
+    const pkg = vsBuildPackageFor(target, userTeam, pool);
+    if (!pkg) continue;
+    perTeamCount[target.team] = (perTeamCount[target.team] || 0) + 1;
+    offers.push({ ...pkg, target, giveTeam: userTeam, getTeam: target.team,
+      getPlayers: [target],
+      isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, target.team) : false,
+      tax: 0 });
+  }
+  return offers;
+}
+
+/* =====================================================================================
+   VALUE SAVANT — BLOCKING THRESHOLD PATCH
+   =====================================================================================
+   Rule update: a prospect is only "blocked" when the incumbent is a genuine anchor —
+   a 5+ Avg Value player who is also at least as valuable as the prospect himself.
+   Replacement-level incumbents (2-3 Avg) never block anyone; the prospect simply
+   takes the job.
+   ===================================================================================== */
+
+const VS_BLOCKER_MIN_AVG = 5;   // an incumbent below this Avg Value never blocks anyone
+
+// Shared blocker test: anchor-quality AND at least as valuable as the prospect.
+function vsIsRealBlocker(incumbent, prospect) {
+  return (incumbent.avgVal || 0) >= Math.max(VS_BLOCKER_MIN_AVG, (prospect.avgVal || 0));
+}
+
+vsBlockingAnalysis2 = function (incoming, receivingTeam, alsoLeaving) {
+  const leavingNames = new Set((alsoLeaving || []).map(p => p.name));
+  const notes = [];
+  for (const p of incoming) {
+    if (p.isComp || p.isCash) continue;
+    if (!(p.isProspect || p.level === 'minors')) continue;
+    const bucket = finderPosBucket(p.pos);
+    if (!bucket || bucket === 'SP' || bucket === 'RP') continue;
+    const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+    const blockers = allPlayers.filter(a =>
+      a.team === receivingTeam && a.level === 'mlb' && finderPosBucket(a.pos) === bucket &&
+      a.name !== p.name &&
+      !leavingNames.has(a.name) &&
+      vsControlThrough(a) >= eta + 1 &&
+      vsIsRealBlocker(a, p));
+    if (!blockers.length) continue;
+    const fp = finderFirstPos(p.pos);
+    const blockNames = blockers.slice(0, 2).map(b => `<span>${b.name}</span>`).join(' and ');
+    if (VS_MOBILE_POS.has(fp)) {
+      notes.push({ severity: 'minor', text: `<span>${p.name}</span> (${p.pos}) arrives behind ${blockNames} — but ${fp === 'SS' ? 'shortstops' : 'center fielders'} carry full spectrum mobility and slide over without value loss. Flexibility, not a logjam.` });
+    } else if (VS_LOCKED_POS.has(fp)) {
+      notes.push({ severity: 'major', text: `<span>${p.name}</span> (C) is blocked by ${blockNames} — an established 5+ Avg anchor — and catchers have one fallback (1B/DH). Hard block.` });
+    } else {
+      notes.push({ severity: 'moderate', text: `<span>${p.name}</span> (${p.pos}) sits behind ${blockNames} (established anchor); corner spots have limited mobility (1B/DH), so the path to at-bats is narrow.` });
+    }
+  }
+  return notes;
+};
+
+vsFinderBlockingReject = function (combo, sellerTeam) {
+  for (const p of combo) {
+    const fp = finderFirstPos(p.pos);
+    if (fp !== 'C') continue;
+    const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
+    const anchors = allPlayers.filter(a =>
+      a.team === sellerTeam && a.level === 'mlb' && finderPosBucket(a.pos) === 'C' &&
+      vsControlThrough(a) >= eta + 1 && vsIsRealBlocker(a, p));
+    if (anchors.length) return `catcher ${p.name} is hard-blocked by ${anchors[0].name} (5+ Avg anchor) on ${sellerTeam} — catchers have no spectrum mobility.`;
+  }
+  return null;
+};
+
+// Base v2 scan (still renders the verdict's Package Construction section).
+vsBlockingAnalysis = function (incoming, receivingTeam) {
+  return vsBlockingAnalysis2(incoming, receivingTeam, []);
 };
 </script>
 </body>
