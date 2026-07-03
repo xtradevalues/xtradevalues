@@ -848,7 +848,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <div class="players-table-wrap" id="prospectsTableWrap" style="overflow-y:auto">
     <table class="players-table" id="prospectsTable">
       <thead id="prospectsTableHead"></thead>
-      <tbody id="prospectsBody"><tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      <tbody id="prospectsBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -1456,9 +1456,12 @@ async function loadData() {
         const avgVal = numOrNull(row['Avg Value'] ?? row['Avg Val'] ?? row['_29']);
         const valueScore = numOrNull(row['Value Score']);
         const score2026 = numOrNull(row['2026 Score'] ?? row['_21']);   // col V (index 21)
-        // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
-        const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
-        const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
+        // col AE/AF store bare numbers ("8", "35") — build the "TEAM 8" / "MLB 35" display
+        // strings ourselves rather than assuming the sheet already formatted them.
+        const orgRankNum = numOrNull(row['Org Rank'] ?? row['_30']);
+        const mlbRankNum = numOrNull(row['MLB Rank'] ?? row['_31']);
+        const orgRank = orgRankNum!=null ? `${orgAbbr} ${Math.round(orgRankNum)}` : null;
+        const mlbRank = mlbRankNum!=null ? `MLB ${Math.round(mlbRankNum)}` : null;
         // col AG: Control Through — the authoritative final controlled year, straight from
         // the sheet (replaces the ctrlYears/ETA-based estimate wherever it's present).
         const ctrlThru = numOrNull(row['Control Through'] ?? row['Ctrl Thru'] ?? row['_32']);
@@ -1494,7 +1497,7 @@ async function loadData() {
           era: null, fip: null, k9: null,
           hr: null, k: null, vWAR: null,
           ip: null, whip: null, pa: null, h: null, avg26: null,
-          rbi: null, w: null, l: null,
+          rbi: null, w: null, l: null, sb: null,
           vWARHit: null, vWARPitch: null,
           fgUrl: null,
         };
@@ -1529,6 +1532,7 @@ async function loadData() {
         p.rbi = numOrNull(colVal(row,'RBI',10));
         p.obp = numOrNull(row['OBP']);
         p.slg = numOrNull(row['SLG']);
+        p.sb  = numOrNull(colVal(row,'SB',15));
         p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARHit = vw; }
@@ -1917,20 +1921,22 @@ async function renderProspects(){
   const tbody=document.getElementById('prospectsBody');
   const scope=document.getElementById('prospectsScope').value||'__top100';
   if(!pipelineRankingsLoaded){
-    tbody.innerHTML='<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">Loading prospects…</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading prospects…</td></tr>';
     await loadPipelineRankings();
     if(document.getElementById('prospectsScope').value!==scope) return; // scope changed mid-load
   }
-  const cols=['Age','ETA','Hit','Power','Speed','Fielding','Proj vWAR (Hit)','Fastball','Changeup','Slider','Curveball','Command','Proj vWAR (Pitch)'];
+  const cols=['Age','ETA','OVR','Proj vWAR','2026 Value','Avg Value'];
   document.getElementById('prospectsTableHead').innerHTML='<tr><th class="rank-col">#</th><th class="player-col">Player</th>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
 
-  // Column C (index 2) is the join key on 2026 Pipeline Rankings, not column A
+  // Column C (index 2) is the join key on 2026 Pipeline Rankings, not column A.
+  // Rank source: col L (MLB Top 100, index 11) for the overall view, col K (Org Rank,
+  // index 10) for a team-scoped view — both stored as bare numbers on this sheet.
   let list=allPlayers.map(p=>({p,row:pipelineRankings[p.playerID]})).filter(x=>x.row);
   if(scope==='__top100'){
-    list=list.map(x=>({...x,rank:extractRank(colVal(x.row,'MLB Top 100 Rank',21))})).filter(x=>!isNaN(x.rank));
+    list=list.map(x=>({...x,rank:extractRank(colVal(x.row,'MLB Top 100 Rank',11))})).filter(x=>!isNaN(x.rank));
     list.sort((a,b)=>a.rank-b.rank);
   } else {
-    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',20))}));
+    list=list.filter(({p})=>p.team===scope).map(x=>({...x,rank:extractRank(colVal(x.row,'Org Rank',10))}));
     list.sort((a,b)=>{
       if(isNaN(a.rank)&&isNaN(b.rank)) return 0;
       if(isNaN(a.rank)) return 1;
@@ -1943,26 +1949,20 @@ async function renderProspects(){
   const fmtF=v=>v!=null&&v!==''&&!isNaN(parseFloat(v))?parseFloat(v).toFixed(1):'-';
   const fmtS=v=>v!=null&&v!==''?esc(String(v)):'-';
   const body=list.map(({p,row,rank})=>{
+    const rankDisp=isNaN(rank)?'-':(scope==='__top100'?`MLB ${rank}`:`${p.team} ${rank}`);
     const cells=[
-      `<td class="rank-col">${!isNaN(rank)?rank:'-'}</td>`,
+      `<td class="rank-col">${rankDisp}</td>`,
       `<td class="player-col">${miniJerseySvg(p.team)}${esc(p.name)}<span class="team-pill">${esc(p.team)}</span></td>`,
-      `<td>${fmtI(row['_7'])}</td>`,
+      `<td>${fmtI(p.age)}</td>`,
       `<td>${fmtS(row['_6'])}</td>`,
       `<td>${fmtI(row['_8'])}</td>`,
-      `<td>${fmtI(row['_9'])}</td>`,
-      `<td>${fmtI(row['_10'])}</td>`,
-      `<td>${fmtI(row['_11'])}</td>`,
-      `<td>${fmtF(row['_17'])}</td>`,
-      `<td>${fmtI(row['_12'])}</td>`,
-      `<td>${fmtI(row['_13'])}</td>`,
-      `<td>${fmtI(row['_14'])}</td>`,
-      `<td>${fmtI(row['_15'])}</td>`,
-      `<td>${fmtI(row['_16'])}</td>`,
-      `<td>${fmtF(row['_18'])}</td>`,
+      `<td>${fmtF(row['_9'])}</td>`,
+      `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
+      `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
     ];
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
-  tbody.innerHTML=body||'<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
+  tbody.innerHTML=body||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
 }
 
 // ===== PLAYER PAGE =====
@@ -2037,7 +2037,10 @@ function computeMiLBHitterStats(r){
   const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
   return {
     pa:numOrNull(r['plateAppearances']), h:numOrNull(r['hits']), hr:numOrNull(r['homeRuns']),
-    rbi:numOrNull(colVal(r,'rbi',25)), avg, obp, slg, vWAR:numOrNull(r['vWAR'])
+    rbi:numOrNull(colVal(r,'rbi',25)), avg,
+    ops:(obp!=null&&slg!=null)?obp+slg:null,
+    sb:numOrNull(colVal(r,'stolenBases',19)),
+    vWAR:numOrNull(r['vWAR'])
   };
 }
 function computeMiLBPitcherStats(r){
@@ -2146,17 +2149,14 @@ async function ppRenderStats(){
     const hRow=(season,r)=>{
       if(!r) return null;
       const h=parseFloat(r['H'])||0, ab=parseFloat(r['AB'])||0, hr=parseFloat(r['HR'])||0;
-      const dbl=parseFloat(r['2B'])||0, trpl=parseFloat(r['3B'])||0;
-      const bb=parseFloat(r['BB'])||0, hbp=parseFloat(r['HBP'])||0, sf=parseFloat(r['SF'])||0;
       const pa=numOrNull(r['PA']);
       const rbi=numOrNull(colVal(r,'RBI',10));
       const avg=ab>0?h/ab:null;
-      const obp=(ab+bb+hbp+sf)>0?(h+bb+hbp)/(ab+bb+hbp+sf):null;
-      const singles=h-dbl-trpl-hr;
-      const tb=singles+2*dbl+3*trpl+4*hr;
-      const slg=ab>0?tb/ab:null;
+      const obp=numOrNull(colVal(r,'OBP',17)), slg=numOrNull(colVal(r,'SLG',18));
+      const ops=(obp!=null&&slg!=null)?obp+slg:null;
+      const sb=numOrNull(colVal(r,'SB',15));
       const vwar=numOrNull(r['vWAR']);
-      return {season,pa,h,hr,rbi,avg,obp,slg,vWAR:vwar,ab,bb,hbp,sf,tb,dbl,trpl};
+      return {season,pa,h,hr,rbi,avg,ops,sb,vWAR:vwar};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
       const row=hRow(season,r); if(row) rows.push(row);
@@ -2164,10 +2164,13 @@ async function ppRenderStats(){
     // Career row is pre-blended server-side — read it directly, no frontend blending.
     if(rCareer){
       const c=rCareer;
+      const obp=numOrNull(c['OBP']), slg=numOrNull(c['SLG']);
       rows.push({season:'Career',
         pa:numOrNull(c['PA']), h:numOrNull(c['H']), hr:numOrNull(c['HR']),
         rbi:numOrNull(colVal(c,'RBI',10)),
-        avg:numOrNull(c['AVG']), obp:numOrNull(c['OBP']), slg:numOrNull(c['SLG']),
+        avg:numOrNull(c['AVG']),
+        ops:(obp!=null&&slg!=null)?obp+slg:null,
+        sb:numOrNull(colVal(c,'SB',15)),
         vWAR:numOrNull(c['vWAR']), isCareer:true});
     }
     section.innerHTML=rows.length?ppHitterTable(rows):'<div class="pp-no-data">No stats available</div>';
@@ -2177,9 +2180,9 @@ function ppHitterTable(rows){
   const fmt3=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(3).replace(/^0\./,'.'):'-';
   const fmtI=v=>v!==null&&!isNaN(v)?Math.round(v):'-';
   const fmtF=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'-';
-  let html=`<table class="pp-stat-table"><thead><tr><th>Season</th><th>PA</th><th>H</th><th>HR</th><th>RBI</th><th>AVG</th><th>OBP</th><th>SLG</th><th>vWAR</th></tr></thead><tbody>`;
+  let html=`<table class="pp-stat-table"><thead><tr><th>Season</th><th>PA</th><th>H</th><th>HR</th><th>RBI</th><th>AVG</th><th>OPS</th><th>SB</th><th>vWAR</th></tr></thead><tbody>`;
   rows.forEach(r=>{
-    html+=`<tr class="${r.isCareer?'career-row':''}"><td>${esc(String(r.season))}</td><td>${fmtI(r.pa)}</td><td>${fmtI(r.h)}</td><td>${fmtI(r.hr)}</td><td>${fmtI(r.rbi)}</td><td>${fmt3(r.avg)}</td><td>${fmt3(r.obp)}</td><td>${fmt3(r.slg)}</td><td>${fmtF(r.vWAR)}</td></tr>`;
+    html+=`<tr class="${r.isCareer?'career-row':''}"><td>${esc(String(r.season))}</td><td>${fmtI(r.pa)}</td><td>${fmtI(r.h)}</td><td>${fmtI(r.hr)}</td><td>${fmtI(r.rbi)}</td><td>${fmt3(r.avg)}</td><td>${fmt3(r.ops)}</td><td>${fmtI(r.sb)}</td><td>${fmtF(r.vWAR)}</td></tr>`;
   });
   html+=`</tbody></table>`;
   return html;
@@ -4445,7 +4448,7 @@ function isValidCssColor(c){
 }
 function pmDash(v){return(v===null||v===undefined||isNaN(v))?'-':v;}
 function pmWL(w,l){return(w!==null&&w!==undefined&&!isNaN(w)&&l!==null&&l!==undefined&&!isNaN(l))?`${Math.round(w)}-${Math.round(l)}`:'-';}
-// Stat set per section 4: Hitters PA,H,HR,RBI,AVG,OBP,SLG,vWAR | Pitchers IP,W-L,ERA,K,FIP,WHIP,K/9,vWAR
+// Stat set per section 4: Hitters PA,H,HR,RBI,AVG,OPS,SB,vWAR | Pitchers IP,W-L,ERA,K,FIP,WHIP,K/9,vWAR
 function pmHitterStats(s){
   if(!s) s={};
   return [
@@ -4454,8 +4457,8 @@ function pmHitterStats(s){
     {lbl:'HR',val:pmDash(s.hr!=null&&!isNaN(s.hr)?Math.round(s.hr):null)},
     {lbl:'RBI',val:pmDash(s.rbi!=null&&!isNaN(s.rbi)?Math.round(s.rbi):null)},
     {lbl:'AVG',val:pmDash(s.avg!=null&&!isNaN(s.avg)?s.avg.toFixed(3).replace(/^0\./,'.'):null)},
-    {lbl:'OBP',val:pmDash(s.obp!=null&&!isNaN(s.obp)?s.obp.toFixed(3).replace(/^0\./,'.'):null)},
-    {lbl:'SLG',val:pmDash(s.slg!=null&&!isNaN(s.slg)?s.slg.toFixed(3).replace(/^0\./,'.'):null)},
+    {lbl:'OPS',val:pmDash(s.ops!=null&&!isNaN(s.ops)?s.ops.toFixed(3).replace(/^0\./,'.'):null)},
+    {lbl:'SB',val:pmDash(s.sb!=null&&!isNaN(s.sb)?Math.round(s.sb):null)},
     {lbl:'vWAR',val:pmDash(s.vWAR!=null&&!isNaN(s.vWAR)?s.vWAR.toFixed(1):null)},
   ];
 }
@@ -4474,7 +4477,8 @@ function pmPitcherStats(s){
 }
 // `p` stores the hitter's batting average under avg26, not avg — adapt to the shared shape
 function pmHitterStatsFromPlayer(p){
-  return pmHitterStats({pa:p.pa,h:p.h,hr:p.hr,rbi:p.rbi,avg:p.avg26,obp:p.obp,slg:p.slg,vWAR:p.vWAR});
+  const ops=(p.obp!=null&&p.slg!=null)?p.obp+p.slg:null;
+  return pmHitterStats({pa:p.pa,h:p.h,hr:p.hr,rbi:p.rbi,avg:p.avg26,ops,sb:p.sb,vWAR:p.vWAR});
 }
 function pmRenderStatRows(...statLists){
   const rows=[];
