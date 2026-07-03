@@ -984,7 +984,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <div class="score-defs">
       <div><div class="score-def-label">2026</div><div class="score-def-text">A player's projected value for the current season</div></div>
       <div><div class="score-def-label">Avg</div><div class="score-def-text">The average annual value across a player's remaining control window</div></div>
-      <div><div class="score-def-label">Ctrl Yrs</div><div class="score-def-text">The number of remaining years a player is under team control, through 2031</div></div>
+      <div><div class="score-def-label">Ctrl Thru</div><div class="score-def-text">The final year a player remains under team control</div></div>
     </div>
   </div>
 </div>
@@ -1459,6 +1459,9 @@ async function loadData() {
         // col AE: Org rank stored as string like "KC 8"; col AF: MLB rank like "MLB 35"
         const orgRank = String(row['Org Rank'] ?? row['_30'] ?? '').trim() || null;
         const mlbRank = String(row['MLB Rank'] ?? row['_31'] ?? '').trim() || null;
+        // col AG: Control Through — the authoritative final controlled year, straight from
+        // the sheet (replaces the ctrlYears/ETA-based estimate wherever it's present).
+        const ctrlThru = numOrNull(row['Control Through'] ?? row['Ctrl Thru'] ?? row['_32']);
 
         // Level (col I) determines baseball assignment — completely separate from injury
         const levelUp = levelRaw.toUpperCase();
@@ -1481,7 +1484,7 @@ async function loadData() {
           srvTime: null,
           level, levelRaw,
           isProspect, status,
-          val2026, avgVal, ctrlYears,
+          val2026, avgVal, ctrlYears, ctrlThru,
           valByYear: {2026:val2026, 2027:val2027, 2028:val2028, 2029:val2029, 2030:val2030, 2031:val2031},
           perfVal: valueScore,
           score2026,
@@ -2708,7 +2711,7 @@ function finderRenderTargetPlayersSelected(){
   if(!list.length){ el.innerHTML=''; return; }
   el.innerHTML=list.map(p=>{
     const warn=finderAvailabilityWarningHtml(p);
-    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
   }).join('');
 }
 
@@ -2852,7 +2855,7 @@ function finderRenderSellPlayersSelected(){
   const note=list.length>1?'<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Offers may include any one of these, or combinations of them.</div>':'';
   el.innerHTML=note+list.map(p=>{
     const warn=finderAvailabilityWarningHtml(p);
-    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${ctrlYrsLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveSellPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveSellPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
   }).join('');
 }
 
@@ -4165,10 +4168,6 @@ function removePlayer(side,name,team,pos){
   renderList(side); updateTotals();
 }
 function fmt(v,d=2){return(v===null||v===undefined||isNaN(v))?'—':v.toFixed(d);}
-function ctrlYrsLabel(p){
-  if(p.ctrlYears===null||p.ctrlYears===undefined) return '';
-  return p.ctrlYears+(p.ctrlYears===1?' yr':' yrs');
-}
 function renderList(side){
   const list=side==='A'?selectedA:selectedB;
   const el=document.getElementById('list'+side);
@@ -4218,7 +4217,7 @@ function renderList(side){
         <div class="player-row-stats">
           <div class="stat-float"><div class="stat-val">${fmt(p.val2026)}</div><div class="stat-lbl">2026</div></div>
           <div class="stat-float"><div class="stat-val">${fmt(p.avgVal)}</div><div class="stat-lbl">Avg</div></div>
-          <div class="stat-float"><div class="stat-val">${ctrlYrsLabel(p)||'—'}</div><div class="stat-lbl">Ctrl Yrs (-2031)</div></div>
+          <div class="stat-float"><div class="stat-val">${vsCtrlThruLabel(p)||'—'}</div><div class="stat-lbl">Ctrl Thru</div></div>
         </div>
       </div>
       <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
@@ -4981,9 +4980,9 @@ function loadRoster(){
       const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
       const dc=dotClass(p.status);
       const inj=playerHasInjury(p)?'<span style="color:#D72229" title="'+injuredLabel(p.injuredRaw)+'">✚</span>':'';
-      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${ctrlYrsLabel(p)||'—'}</td></tr>`;
+      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p)||'—'}</td></tr>`;
     }).join('');
-    return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Yrs</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
   if(pf){c.innerHTML=sg(pl,SUBLBLS[pf]);return;}
   const byP={};SUBGRPS.forEach(s=>byP[s]=[]);
@@ -5856,6 +5855,9 @@ function vsFinderTryFifthPiece(combo, pool, targetV26, targetAvg, bandFn) {
 //   minor leaguers  → level-derived etaRaw + 6 (rookie-ball arm isn't controlled-thru-2031)
 function vsControlThrough(p) {
   if (!p) return 2026;
+  // Authoritative value straight from the sheet (col AG) — takes priority over every
+  // estimate below when present.
+  if (p.ctrlThru != null && !isNaN(p.ctrlThru)) return p.ctrlThru;
   if (p.isProspect) {
     const eta = (p.pipelineETA && !isNaN(p.pipelineETA)) ? p.pipelineETA : (parseInt(p.etaRaw, 10) || 2028);
     return eta + 6;
