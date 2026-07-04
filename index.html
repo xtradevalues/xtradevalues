@@ -701,6 +701,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
       <div class="finder-q">What position are you looking to improve?</div>
       <select id="finderPosSelect" onchange="finderPosChosen(this.value)">
         <option value="">— Select position —</option>
+        <option value="ANY">Any / Best available</option>
         <option value="C">C</option>
         <option value="1B">1B</option>
         <option value="2B">2B</option>
@@ -735,12 +736,19 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <!-- SELLER PATH -->
     <!-- Step 3S: Player select (add multiple as optional pieces - offers can include any subset) -->
     <div class="finder-step" id="finderStep3S" style="display:none">
-      <div class="finder-q">What player(s) are you trading? <span style="font-weight:400;color:var(--text-muted);font-size:12px">(add more than one for optional combos, e.g. packaging a bad contract)</span></div>
-      <div class="dropdown-wrap" id="finderPlayerDropdownWrap">
-        <input type="text" id="finderPlayerSearch" placeholder="Search your MLB players..." oninput="finderPlayerSearchInput()" onfocus="finderPlayerSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
-        <div class="dropdown-list" id="finderPlayerDrop"></div>
+      <div class="finder-q">How do you want to shop?</div>
+      <div class="finder-choice-row">
+        <button class="finder-choice-btn" onclick="vsSellerModeChosen('pick',this)">I'll pick players</button>
+        <button class="finder-choice-btn" onclick="vsSellerModeChosen('auto',this)">Find my best trade chips</button>
       </div>
-      <div id="finderPlayerSelected" style="margin-top:8px"></div>
+      <div id="finderStep3SPick" style="display:none">
+        <div class="finder-q">What player(s) are you trading? <span style="font-weight:400;color:var(--text-muted);font-size:12px">(add more than one for optional combos, e.g. packaging a bad contract)</span></div>
+        <div class="dropdown-wrap" id="finderPlayerDropdownWrap">
+          <input type="text" id="finderPlayerSearch" placeholder="Search your MLB players..." oninput="finderPlayerSearchInput()" onfocus="finderPlayerSearchInput()" autocomplete="off" autocorrect="off" spellcheck="false">
+          <div class="dropdown-list" id="finderPlayerDrop"></div>
+        </div>
+        <div id="finderPlayerSelected" style="margin-top:8px"></div>
+      </div>
     </div>
 
     <!-- Step 4S: Haul type -->
@@ -2558,11 +2566,12 @@ let finderState = {
   untouchableProspect: null, // buyer path: one of the user's own prospects, protected from any offer
   sellPlayers: [],  // seller path: array of player objects. Multiple players = OPTIONAL combos, not forced together.
   haulType: null,  // seller path: 'mlbready' | 'dev'
-  partnerTeam: null // seller path: specific trade partner, or null for 'any'
+  partnerTeam: null, // seller path: specific trade partner, or null for 'any'
+  sellerAuto: false // seller path: true = auto-scan for best trade chips, false/null = hand-pick
 };
 
 function finderRestart(){
-  finderState = {team:null, intent:null, position:null, caliber:null, targetPlayers:[], untouchableProspect:null, sellPlayers:[], haulType:null, partnerTeam:null};
+  finderState = {team:null, intent:null, position:null, caliber:null, targetPlayers:[], untouchableProspect:null, sellPlayers:[], haulType:null, partnerTeam:null, sellerAuto:false};
   document.getElementById('finderTeam').value='';
   document.getElementById('finderPartnerTeam').value='';
   document.getElementById('finderPosSelect').value='';
@@ -2626,8 +2635,11 @@ function finderResetPositionBranchTier(){
 }
 function finderResetSellBranchTier(){
   finderState.sellPlayers=[];
+  finderState.sellerAuto=false;
   document.getElementById('finderPlayerSearch').value='';
   document.getElementById('finderPlayerSelected').innerHTML='';
+  document.querySelectorAll('#finderStep3S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('finderStep3SPick').style.display='none';
   document.getElementById('finderStep3S').style.display='none';
   finderResetHaulTier();
 }
@@ -2673,7 +2685,10 @@ function finderPosChosen(pos){
   finderState.untouchableProspect=null;
   document.getElementById('finderUntouchableSearch').value='';
   document.getElementById('finderUntouchableSelected').innerHTML='';
-  finderState.position=pos||null;
+  // 'ANY' is the "best available" sentinel — internally treated the same as no
+  // position selected (null), which the v6 buyer generator reads as "scan every
+  // upgradeable depth slot." Only the truly-unset placeholder ('') skips Generate.
+  finderState.position=(pos && pos!=='ANY') ? pos : null;
   finderState.targetPlayers=[]; // choosing a position cancels any direct player search
   document.getElementById('finderTargetPlayerSearch').value='';
   document.getElementById('finderTargetPlayerSelected').innerHTML='';
@@ -2818,6 +2833,27 @@ document.addEventListener('click', e => {
 });
 
 // ----- SELLER PATH -----
+function vsSellerModeChosen(mode, el){
+  document.querySelectorAll('#finderStep3S .finder-choice-btn').forEach(b=>b.classList.remove('selected'));
+  if(el) el.classList.add('selected');
+  finderResetResultsTier();
+  finderState.sellerAuto = (mode==='auto');
+  if(mode==='auto'){
+    // Skip the pick/haul/partner steps entirely — go straight to generate.
+    document.getElementById('finderStep3SPick').style.display='none';
+    document.getElementById('finderStep4S').style.display='none';
+    document.getElementById('finderStep5S').style.display='none';
+    document.getElementById('finderGenerateWrap').style.display='block';
+    document.getElementById('finderRestartWrap').style.display='block';
+  } else {
+    // Existing flow: reveal the player search; generate reappears once a player
+    // and haul type are chosen, same as before this option existed.
+    document.getElementById('finderStep3SPick').style.display='block';
+    document.getElementById('finderGenerateWrap').style.display='none';
+    document.getElementById('finderRestartWrap').style.display='none';
+  }
+}
+
 function finderPlayerSearchInput(){
   const q=document.getElementById('finderPlayerSearch').value.toLowerCase().trim();
   const team=finderState.team;
@@ -3817,6 +3853,15 @@ async function generateOffers(){
         targetTeam: o.getTeam,
       };
     });
+  } else if(finderState.sellerAuto){
+    // Seller auto-scan: normalize {players,getTeam,getPlayers} into the sellPlayers/
+    // returnPlayers/buyerTeam shape finderRenderOfferCard, openFinderResults, and
+    // finderEditTrade already expect for seller-intent offers.
+    offers=vsGenerateSellerAutoOffers().map(o=>({ ...o,
+      sellPlayers: o.players,
+      returnPlayers: o.getPlayers,
+      buyerTeam: o.getTeam,
+    }));
   } else {
     offers=finderGenerateSellerOffers();
   }
@@ -3825,20 +3870,24 @@ async function generateOffers(){
   // blockbuster/scrub/1-for-1, buyer or seller intent) can slip a non-compliant package
   // onto a card. Runs ahead of the empty-state branch below so a fully-filtered result
   // still shows the existing "No trade found" message instead of a blank card list.
-  offers = offers.filter(o=>{
-    const userTeam=finderState.team;
-    let combo, givingTeam, receivingTeam, targetList;
-    if(finderState.intent==='buyer'){
-      combo=o.givePlayers; givingTeam=userTeam; receivingTeam=o.targetTeam; targetList=o.targetPlayers;
-    } else {
-      combo=o.returnPlayers; givingTeam=o.buyerTeam; receivingTeam=userTeam; targetList=o.sellPlayers;
-    }
-    return vsFinderPostFilter([{players:combo, label:o.label}], givingTeam, receivingTeam, targetList||[]).length>0;
-  });
+  // v6: buyer offers (always) and seller auto-scan offers already enforce their own
+  // bands/caps/role gates inline (vsBands6/vsCapViolation/vsRole6) — deliberately without
+  // the old blocking-analysis/B2B/hole checks the v6 philosophy drops. Re-running the old
+  // gate on them here would silently reintroduce roster-need audits v6 is meant to skip,
+  // so this legacy re-check only still applies to the untouched hand-pick seller flow.
+  if(finderState.intent==='seller' && !finderState.sellerAuto){
+    offers = offers.filter(o=>{
+      const userTeam=finderState.team;
+      const combo=o.returnPlayers, givingTeam=o.buyerTeam, receivingTeam=userTeam, targetList=o.sellPlayers;
+      return vsFinderPostFilter([{players:combo, label:o.label}], givingTeam, receivingTeam, targetList||[]).length>0;
+    });
+  }
   if(!offers.length){
     const intent=finderState.intent;
     let msg='';
-    if(intent==='seller'){
+    if(intent==='seller' && finderState.sellerAuto){
+      msg='No haul found — no buyer\'s prospect pool currently clears a 50% return on your tradeable players.';
+    } else if(intent==='seller'){
       const sp=finderState.sellPlayers;
       msg=(sp && sp.length)
         ? `No trade found for <strong>${sp.map(p=>p.name).join(' / ')}</strong>. This can happen when no buyer's prospect or minors pool fits the value range, or no teams qualify as suitors at that position. Try a different partner team or haul type.`
@@ -6988,6 +7037,378 @@ vsFinderBlockingReject = function (combo, sellerTeam) {
 // Base v2 scan (still renders the verdict's Package Construction section).
 vsBlockingAnalysis = function (incoming, receivingTeam) {
   return vsBlockingAnalysis2(incoming, receivingTeam, []);
+};
+
+/* =====================================================================================
+   VALUE SAVANT — v6: DISCOVERY FINDER + ASYMMETRIC VERDICTS + MAGNITUDE AWARENESS
+   =====================================================================================
+   One file, three rebuilds. Loaded LAST (after every prior patch file). Overrides the
+   entry points completely — prior gate chains for these paths are superseded.
+
+   PHILOSOPHY (the fix for the over-engineering):
+     · BUYERS THINK IN NOW. A contender is judged on whether the deal makes them
+       better in 2026 at a fair price. No roster-need audits, no blocking analysis,
+       no expiring-control "holes" — a contender's expiring star is an extension
+       candidate, not a gap.
+     · SELLERS THINK IN LATER. A rebuilder is judged on the haul: controllable
+       value, rental premium, and — softly — whether pieces feed the thinnest parts
+       of their org. Rebuilders cast wide nets; fit is a bonus, never a gate.
+     · MAGNITUDE SCALES THE VOICE. Sub-2-value swaps are depth moves and read as
+       such everywhere. No catastrophe language for roster-margin trades.
+     · Construction rules (position caps, bands) operate SILENTLY. Packages read
+       organic; the verdict never narrates its own mechanics.
+
+   ROLE MATRIX: seller offers come from seller/hold teams; buying is done by
+   buyer/hold teams. ("hold" = the classifier's fringe role.) No contender-to-
+   contender generation — those are built manually in the sim.
+   ===================================================================================== */
+
+/* ============================== SHARED: ROLES, CAPS, MAGNITUDE ============================== */
+
+function vsRole6(team) {
+  const ctx = vsTeamContext(team);
+  // fringe = "hold": can buy AND can sell
+  return { ctx, canBuy: ctx.role === 'buyer' || ctx.role === 'fringe' || ctx.role === 'unknown',
+           canSell: ctx.role === 'seller' || ctx.role === 'fringe' || ctx.role === 'unknown' };
+}
+
+// Silent per-position package caps. SS/OF/SP allow 2; everything else 1.
+const VS_POS_CAP = { SS: 2, OF: 2, SP: 2 };
+function vsCapViolation(combo) {
+  const counts = {};
+  for (const p of combo) {
+    if (p.isComp || p.isCash) continue;
+    const b = finderPosBucket(p.pos);
+    if (!b) continue;
+    counts[b] = (counts[b] || 0) + 1;
+    if (counts[b] > (VS_POS_CAP[b] || 1)) return true;
+  }
+  return false;
+}
+
+// Deal magnitude: 'depth' (both sides under 2 on both clocks), 'minor' (<4), 'real'.
+function vsDealMagnitude(listA, listB) {
+  const sideMax = (list) => Math.max(
+    list.reduce((s, p) => s + (p.val2026 || 0), 0),
+    list.reduce((s, p) => s + (p.avgVal || 0), 0));
+  const a = sideMax(listA), b = sideMax(listB);
+  const big = Math.max(a, b);
+  if (big < 2.0) return 'depth';
+  if (big < 4.0) return 'minor';
+  return 'real';
+}
+
+/* ============================== FINDER v6 ============================== */
+
+/* ---- Buyer's MLB depth-slot scan (MLB level ONLY — buyers think in now) ----
+   Returns per-bucket: the value of the depth slot a new acquisition would replace.
+   RP → 4th best · SP → 5th · OF → 3rd · everywhere else → the starter. */
+function vsBuyerDepthSlots(team) {
+  const slotIndex = { RP: 3, SP: 4, OF: 2 };
+  const out = {};
+  for (const b of ['C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP']) {
+    const ranked = allPlayers
+      .filter(p => p.team === team && p.level === 'mlb' && !p.isComp && !p.isCash && finderPosBucket(p.pos) === b)
+      .sort((x, y) => (y.val2026 || 0) - (x.val2026 || 0));
+    const idx = slotIndex[b] ?? 0;
+    out[b] = ranked[idx] ? (ranked[idx].val2026 || 0) : 0;
+  }
+  return out;
+}
+
+/* ---- Seller org thinness (whole org — sellers think in later) ----
+   Buckets ranked by how little long-term talent the org holds there. */
+function vsSellerThinBuckets(team) {
+  const depth = {};
+  for (const b of ['C', '1B', '2B', '3B', 'SS', 'OF', 'SP', 'RP']) {
+    depth[b] = allPlayers.filter(p =>
+      p.team === team && finderPosBucket(p.pos) === b &&
+      ((p.isProspect && (p.avgVal || 0) >= 2) ||
+       ((p.level === 'minors') && (p.avgVal || 0) >= 2) ||
+       (p.level === 'mlb' && p.age != null && p.age <= 26 && vsControlThrough(p) >= 2029 && (p.avgVal || 0) >= 2)))
+      .reduce((s, p) => s + (p.avgVal || 0), 0);
+  }
+  return Object.keys(depth).sort((a, b) => depth[a] - depth[b]); // thinnest first
+}
+
+/* ---- Give pool: every non-top-100 prospect/minors piece ---- */
+function vsPool6(team) {
+  return allPlayers.filter(p =>
+    p.team === team && !p.isComp && !p.isCash &&
+    (p.isProspect || p.level === 'minors') &&
+    !(vsMlbRankNum(p) != null && vsMlbRankNum(p) <= 100) &&
+    !finderIsInjured(p) &&
+    ((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5));
+}
+
+/* ---- Value bands ----
+   mode 'buy': give-side 2026 share 45–55. mode 'sell': the SELLER must clear 50%
+   of 2026 (user rule) → buyer's give share 50–55. Rental premium in both modes. */
+function vsBands6(combo, targetList, mode) {
+  const g26 = combo.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const gAv = combo.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const t26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const tAv = targetList.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const share26 = (g26 + t26) > 0 ? g26 / (g26 + t26) : 0.5;
+  const shareAv = (gAv + tAv) > 0 ? gAv / (gAv + tAv) : 0.5;
+  const lo = mode === 'sell' ? 0.50 : 0.45;
+  if (share26 < lo || share26 > 0.55) return false;
+  const rental = targetList.some(t => t.level === 'mlb' && vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+  if (rental && shareAv < 0.58) return false;
+  return true;
+}
+
+/* ---- Package builder: fewest pieces, closest value, silent caps, soft seller-fit ---- */
+function vsBuild6(target, buyerTeam, pool, mode) {
+  const targetList = [target];
+  const t26 = target.val2026 || 0;
+  const thin = vsSellerThinBuckets(target.team).slice(0, 2);
+  const fitBonus = (p) => thin.includes(finderPosBucket(p.pos)) ? 1 : 0;
+
+  // Closeness ordering with a soft fit nudge (fit breaks ties, never gates).
+  const src = [...pool].sort((a, b) => {
+    const da = Math.abs((a.val2026 || 0) - t26), db = Math.abs((b.val2026 || 0) - t26);
+    if (Math.abs(da - db) > 0.3) return da - db;
+    return fitBonus(b) - fitBonus(a);
+  }).slice(0, 16);
+
+  const ok = (c) => !vsCapViolation(c) && vsBands6(c, targetList, mode);
+
+  for (const a of src) if (ok([a])) return [a];
+  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++)
+    if (ok([src[i], src[j]])) return [src[i], src[j]];
+  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++)
+    if (ok([src[i], src[j], src[k]])) return [src[i], src[j], src[k]];
+  return null;
+}
+
+function vsOffer6(combo, target, buyerTeam, mode) {
+  const thin = vsSellerThinBuckets(target.team).slice(0, 2);
+  const fits = combo.some(p => thin.includes(finderPosBucket(p.pos)));
+  const rental = vsControlThrough(target) <= 2026;
+  // Organic label: what the trade IS, never how it was constructed.
+  let label = rental ? 'Rental pickup — via ' + target.team : 'Via ' + target.team;
+  if (fits && mode === 'buy') label += ' · fits their rebuild';
+  return {
+    players: combo, target, giveTeam: buyerTeam, getTeam: target.team, getPlayers: [target],
+    label,
+    isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(buyerTeam, target.team) : false,
+    tax: 0
+  };
+}
+
+/* ---- BUYER MODE (position optional) ---- */
+vsGenerateBuyerOffersV4 = function () {
+  const userTeam = finderState.team;
+  if (!vsRole6(userTeam).canBuy) return [];
+  const pool = vsPool6(userTeam);
+  if (!pool.length) return [];
+
+  // Direct player search unchanged in spirit
+  if (finderState.targetPlayers && finderState.targetPlayers.length) {
+    const offers = [];
+    for (const target of finderState.targetPlayers) {
+      const combo = vsBuild6(target, userTeam, pool, 'buy');
+      if (combo) offers.push(vsOffer6(combo, target, userTeam, 'buy'));
+    }
+    return offers;
+  }
+
+  const slots = vsBuyerDepthSlots(userTeam);
+  // Position chosen → that bucket only. "Any" → every bucket whose depth slot is
+  // below 3.0 (never upgrade over a ~star-level incumbent).
+  const buckets = finderState.position
+    ? [finderState.position]
+    : Object.keys(slots).filter(b => slots[b] < 3.0);
+
+  const offers = [], perTeam = {};
+  for (const p of allPlayers) {
+    if (offers.length >= 13) break;
+    if (p.team === userTeam || p.isComp || p.isCash || p.level !== 'mlb') continue;
+    const b = finderPosBucket(p.pos);
+    if (!b || !buckets.includes(b)) continue;
+    if ((p.val2026 || 0) < 1.0) continue;
+    if ((p.val2026 || 0) <= slots[b] + 0.5) continue;        // must be a real upgrade over the depth slot
+    if (!finderState.position && slots[b] >= 3.0) continue;   // don't upgrade stars in any-mode
+    if (finderIsInjured(p)) continue;
+    if (!vsRole6(p.team).canSell) continue;                   // sellers/hold only — no contender raids
+    if (typeof finderIsSellerAvailable === 'function' && !finderIsSellerAvailable(p)) continue;
+    if ((perTeam[p.team] || 0) >= 2) continue;
+    const combo = vsBuild6(p, userTeam, pool, 'buy');
+    if (!combo) continue;
+    perTeam[p.team] = (perTeam[p.team] || 0) + 1;
+    offers.push(vsOffer6(combo, p, userTeam, 'buy'));
+  }
+  // Show the range: strongest upgrades first, but the sort inside per-team caps
+  // already guarantees variety across sellers.
+  return offers.sort((a, b) => (b.target.val2026 || 0) - (a.target.val2026 || 0));
+};
+
+/* ---- SELLER MODE: auto-scan (sits ALONGSIDE the existing hand-pick flow) ----
+   Scans the user's team for anyone with real value; finds buyer/hold teams where
+   that player upgrades an MLB depth slot; builds a prospect haul from THAT buyer's
+   pool. Seller must clear 50% of 2026 value (mode 'sell'). */
+function vsGenerateSellerAutoOffers() {
+  const userTeam = finderState.team;
+  if (!vsRole6(userTeam).canSell) return [];
+
+  const shopList = allPlayers.filter(p =>
+    p.team === userTeam && p.level === 'mlb' && !p.isComp && !p.isCash &&
+    (p.val2026 || 0) >= 1.5 && !finderIsInjured(p))
+    .sort((a, b) => (b.val2026 || 0) - (a.val2026 || 0))
+    .slice(0, 10);
+
+  const offers = [], perBuyer = {};
+  for (const player of shopList) {
+    if (offers.length >= 13) break;
+    const b = finderPosBucket(player.pos);
+    for (const buyer of standingsData.map(r => r.team)) {
+      if (offers.length >= 13) break;
+      if (buyer === userTeam) continue;
+      if (!vsRole6(buyer).canBuy) continue;
+      if ((perBuyer[buyer] || 0) >= 2) continue;
+      const slots = vsBuyerDepthSlots(buyer);
+      if ((player.val2026 || 0) <= (slots[b] || 0) + 0.5) continue;   // must upgrade them
+      const combo = vsBuild6(player, buyer, vsPool6(buyer), 'sell');
+      if (!combo) continue;
+      perBuyer[buyer] = (perBuyer[buyer] || 0) + 1;
+      // In seller mode the card flips: user GIVES the player, RECEIVES the haul.
+      const rental = vsControlThrough(player) <= 2026;
+      offers.push({
+        players: [player], target: null,
+        giveTeam: userTeam, getTeam: buyer,
+        getPlayers: combo,
+        label: (rental ? 'Rental sale — premium haul from ' : 'Haul from ') + buyer,
+        isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, buyer) : false,
+        tax: 0
+      });
+    }
+  }
+  return offers;
+}
+
+/* ============================== SIM VERDICT v6 (asymmetric) ============================== */
+
+vsGenerateSmartVerdict = function (listA, listB, teamA, teamB) {
+  const ctxA = vsTeamContext(teamA), ctxB = vsTeamContext(teamB);
+  const v26A = listA.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const v26B = listB.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const avgA = listA.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const avgB = listB.reduce((s, p) => s + (p.avgVal || 0), 0);
+  const mag = vsDealMagnitude(listA, listB);
+
+  const S = (title, body) =>
+    `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+  const sections = [];
+
+  /* ---- Depth swap: short verdict, no drama ---- */
+  if (mag === 'depth') {
+    const share = (v26A + v26B) > 0 ? Math.round(v26A / (v26A + v26B) * 100) : 50;
+    const lean = share >= 58 ? teamB : share <= 42 ? teamA : null;
+    return {
+      grade: 'neutral',
+      headline: 'Depth swap',
+      html: S('The Read', `Roster-margin move — both sides are trading pieces under 2 value. ${lean ? `<span>${lean}</span> takes the slightly better end, but nothing here shifts either team's outlook.` : 'Effectively even, and inconsequential either way.'} These trades happen constantly; judge it on roster fit, not value drama.`)
+    };
+  }
+
+  /* ---- Team context ---- */
+  sections.push(S('Team Context',
+    `<span>${teamA}</span> (${ctxA.record || '—'}${ctxA.gb > 0 ? ', ' + ctxA.gb + ' GB' : ''}) — ${ctxA.label || 'role unknown'}.<br>` +
+    `<span>${teamB}</span> (${ctxB.record || '—'}${ctxB.gb > 0 ? ', ' + ctxB.gb + ' GB' : ''}) — ${ctxB.label || 'role unknown'}.`));
+
+  /* ---- Asymmetric lenses ---- */
+  const lens = (team, ctx, receives, gives) => {
+    const recv26 = receives.reduce((s, p) => s + (p.val2026 || 0), 0);
+    const recvAvg = receives.reduce((s, p) => s + (p.avgVal || 0), 0);
+    const give26 = gives.reduce((s, p) => s + (p.val2026 || 0), 0);
+    const giveAvg = gives.reduce((s, p) => s + (p.avgVal || 0), 0);
+    if (ctx.role === 'buyer' || (ctx.role !== 'seller' && recv26 >= recvAvg)) {
+      // NOW lens
+      const better = recv26 > give26 + 0.3;
+      const even = Math.abs(recv26 - give26) <= 0.3;
+      return `Judged on <span>now</span>: this ${better ? `makes them better this season (+${(recv26 - give26).toFixed(2)} in 2026 value)` : even ? 'is roughly a wash for this season' : `costs them ${(give26 - recv26).toFixed(2)} of 2026 value`} at a price of ${giveAvg.toFixed(2)} long-term value out the door.`;
+    }
+    // LATER lens
+    const thin = vsSellerThinBuckets(team).slice(0, 2);
+    const fits = receives.filter(p => (p.isProspect || p.level === 'minors') && thin.includes(finderPosBucket(p.pos)));
+    const rental = gives.some(p => p.level === 'mlb' && vsControlThrough(p) <= 2026 && (p.val2026 || 0) >= 3);
+    let txt = `Judged on <span>later</span>: the haul brings ${recvAvg.toFixed(2)} in controllable long-term value against ${giveAvg.toFixed(2)} out.`;
+    if (rental) txt += ` The piece moving is a rental — the ask should run high, and ${recvAvg > giveAvg ? 'it does' : 'this return is light for a rental'}.`;
+    if (fits.length) txt += ` Bonus: ${fits.map(p => `<span>${p.name}</span>`).join(', ')} feed${fits.length === 1 ? 's' : ''} the thinnest part of the org.`;
+    return txt;
+  };
+  sections.push(S(`${teamA} — The Deal For Them`, lens(teamA, ctxA, listB, listA)));
+  sections.push(S(`${teamB} — The Deal For Them`, lens(teamB, ctxB, listA, listB)));
+
+  /* ---- Value math (dual clock, no forced agreement) ---- */
+  const p26 = (v26A + v26B) > 0 ? Math.round(v26A / (v26A + v26B) * 100) : 50;
+  const pAv = (avgA + avgB) > 0 ? Math.round(avgA / (avgA + avgB) * 100) : 50;
+  sections.push(S('Value Math',
+    `2026: <span>${teamA}</span> ${v26A.toFixed(2)} (${p26}%) vs <span>${teamB}</span> ${v26B.toFixed(2)}.<br>` +
+    `Avg: <span>${teamA}</span> ${avgA.toFixed(2)} (${pAv}%) vs <span>${teamB}</span> ${avgB.toFixed(2)}.<br>` +
+    `A split decision here is the normal shape of a buyer/seller deal — the clocks measure different things.`));
+
+  /* ---- Age & peak (kept as spec'd) ---- */
+  try {
+    const age = vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB);
+    if (age) sections.push(S('Age & Peak Curve', age.text));
+  } catch (e) { /* optional */ }
+
+  /* ---- Contract structure (salary-dump recognition, kept) ---- */
+  try {
+    const dump = vsSalaryDumpSection(listA, listB, teamA, teamB);
+    if (dump) sections.push(S('Contract Structure', dump));
+  } catch (e) { /* optional */ }
+
+  /* ---- Historical comp (kept, with return-quality check) ---- */
+  try {
+    const comp = vsFindHistoricalComp(listA, listB, ctxA, ctxB);
+    if (comp && mag === 'real') sections.push(S('Historical Comparable — ' + comp.comp.title, comp.comp.text));
+  } catch (e) { /* optional */ }
+
+  /* ---- Headline ---- */
+  const fair26 = p26 >= 45 && p26 <= 55;
+  let grade, headline;
+  if (fair26) { grade = 'fair'; headline = mag === 'minor' ? '✓ Fair minor move' : '✓ Fair Trade'; }
+  else {
+    const win = p26 > 55 ? teamB : teamA;   // gives less = wins
+    grade = mag === 'minor' ? 'neutral' : 'warn';
+    headline = mag === 'minor' ? `Leans ${win}` : `${win} wins this trade`;
+  }
+  return { grade, headline, html: sections.join('') };
+};
+
+/* ============================== TRACKER v6 (magnitude-aware) ============================== */
+
+const _tbVerdictHtml_v5 = (typeof tbVerdictHtml === 'function') ? tbVerdictHtml : null;
+
+tbVerdictHtml = function (atTradeSides, currentSides, unavailable) {
+  // Depth-swap voice for small trades.
+  const sideAvg = (s) => s.players.reduce((sum, p) => sum + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+  const side26 = (s) => s.players.reduce((sum, p) => sum + (p.val2026 != null && !isNaN(p.val2026) ? p.val2026 : 0), 0);
+  const isDepth = atTradeSides.every(s => sideAvg(s) < 2 && side26(s) < 2);
+
+  if (isDepth) {
+    const S = (title, body) =>
+      `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
+    let body = 'A depth swap — pieces on both sides were under 2 value when it happened. Trades like this are roster-margin maintenance, not needle-movers.';
+    if (!unavailable) {
+      const cur = (typeof vsTbShares === 'function') ? vsTbShares(currentSides, p => p.avgVal) : null;
+      if (cur && currentSides.length === 2) {
+        const i = cur[0] >= cur[1] ? 0 : 1;
+        if (cur[i] >= 62) body += ` It has leaned toward <span>${esc(currentSides[i].receivingTeam)}</span> since (${Math.round(cur[i])}% of current value), which in a deal this size means one org found a useful piece — nothing more.`;
+        else body += ' Neither side has gained anything meaningful since.';
+      }
+      const ledger = (typeof vsTbLedger === 'function') ? vsTbLedger(atTradeSides, currentSides) : null;
+      if (ledger) body += '<br>' + ledger.map(l => `<span>${esc(l.team)}</span>: ${l.then.toFixed(2)} then → ${l.now.toFixed(2)} now`).join('<br>');
+    }
+    return tbVerdictBox('verdict-box v-neutral', 'Depth swap — low stakes, then and now', S('The Read', body));
+  }
+
+  // Real trades: the existing three-section retrospective.
+  if (_tbVerdictHtml_v5) return _tbVerdictHtml_v5(atTradeSides, currentSides, unavailable);
+  return tbVerdictBox('verdict-box v-neutral', 'Trade Analysis', '');
 };
 </script>
 </body>
