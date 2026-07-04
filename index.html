@@ -3893,9 +3893,9 @@ async function generateOffers(){
         ? `No trade found for <strong>${sp.map(p=>p.name).join(' / ')}</strong>. This can happen when no buyer's prospect or minors pool fits the value range, or no teams qualify as suitors at that position. Try a different partner team or haul type.`
         : 'No trade found. Try adjusting your criteria.';
     } else if(finderState.targetPlayers && finderState.targetPlayers.length){
-      msg='No compliant trade found for your target. Your expendable pool (blocked prospects + positional surplus) can’t cover this player’s realistic price. Teams without surplus don’t get offers for players out of their range — that’s the market working.';
+      msg='No compliant trade found — no package from your farm lands in the realistic price band for this target.';
     } else {
-      msg='No compliant trade found at this position. Your expendable pool (blocked prospects + positional surplus) can’t cover any available player’s realistic price. Teams without surplus don’t get offers for better players — that’s the market working.';
+      msg='No compliant trade found — no package from your farm lands in the realistic price band for any available player at this position.';
     }
     const resultsModal=document.getElementById('finderResultsModal');
     const scroller=document.getElementById('finderCardsScroller');
@@ -7042,7 +7042,7 @@ vsBlockingAnalysis = function (incoming, receivingTeam) {
 /* =====================================================================================
    VALUE SAVANT — v6: DISCOVERY FINDER + ASYMMETRIC VERDICTS + MAGNITUDE AWARENESS
    =====================================================================================
-   One file, three rebuilds. Loaded LAST (after every prior patch file). Overrides the
+   One file, three rebuilds. Load LAST (after every prior patch file). Overrides the
    entry points completely — prior gate chains for these paths are superseded.
 
    PHILOSOPHY (the fix for the over-engineering):
@@ -7061,7 +7061,11 @@ vsBlockingAnalysis = function (incoming, receivingTeam) {
    ROLE MATRIX: seller offers come from seller/hold teams; buying is done by
    buyer/hold teams. ("hold" = the classifier's fringe role.) No contender-to-
    contender generation — those are built manually in the sim.
+
+   INTEGRATION (for Claude Code) — at the bottom of this file.
    ===================================================================================== */
+
+'use strict';
 
 /* ============================== SHARED: ROLES, CAPS, MAGNITUDE ============================== */
 
@@ -7131,14 +7135,25 @@ function vsSellerThinBuckets(team) {
   return Object.keys(depth).sort((a, b) => depth[a] - depth[b]); // thinnest first
 }
 
-/* ---- Give pool: every non-top-100 prospect/minors piece ---- */
-function vsPool6(team) {
-  return allPlayers.filter(p =>
-    p.team === team && !p.isComp && !p.isCash &&
-    (p.isProspect || p.level === 'minors') &&
-    !(vsMlbRankNum(p) != null && vsMlbRankNum(p) <= 100) &&
-    !finderIsInjured(p) &&
-    ((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5));
+/* ---- Give pool (target-aware) ----
+   Non-top-100 prospects/minors are always available. MLB top-100 prospects unlock
+   ONLY when the target warrants it (star-level: 2026 value >= 5) — you part with a
+   top-100 arm for Logan Webb, not for a fourth reliever. The user's protected
+   prospect (finderState.untouchableProspect) is always excluded. */
+function vsPool6(team, target) {
+  const starTarget = target && (target.val2026 || 0) >= 5;
+  const protectedName = (typeof finderState !== 'undefined' && finderState.untouchableProspect)
+    ? finderState.untouchableProspect.name : null;
+  return allPlayers.filter(p => {
+    if (p.team !== team || p.isComp || p.isCash) return false;
+    if (!(p.isProspect || p.level === 'minors')) return false;
+    if (protectedName && p.name === protectedName) return false;
+    if (finderIsInjured(p)) return false;
+    if (!((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5)) return false;
+    const mlbN = vsMlbRankNum(p);
+    if (mlbN != null && mlbN <= 100 && !starTarget) return false;
+    return true;
+  });
 }
 
 /* ---- Value bands ----
@@ -7179,6 +7194,9 @@ function vsBuild6(target, buyerTeam, pool, mode) {
     if (ok([src[i], src[j]])) return [src[i], src[j]];
   for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++)
     if (ok([src[i], src[j], src[k]])) return [src[i], src[j], src[k]];
+  // 4-piece: star-level targets legitimately command quantity+quality packages.
+  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++)
+    if (ok([src[i], src[j], src[k], src[m]])) return [src[i], src[j], src[k], src[m]];
   return null;
 }
 
@@ -7201,19 +7219,17 @@ function vsOffer6(combo, target, buyerTeam, mode) {
 vsGenerateBuyerOffersV4 = function () {
   const userTeam = finderState.team;
   if (!vsRole6(userTeam).canBuy) return [];
-  const pool = vsPool6(userTeam);
-  if (!pool.length) return [];
-
-  // Direct player search unchanged in spirit
+  // Direct player search: pool is target-aware (star targets unlock top-100 arms)
   if (finderState.targetPlayers && finderState.targetPlayers.length) {
     const offers = [];
     for (const target of finderState.targetPlayers) {
-      const combo = vsBuild6(target, userTeam, pool, 'buy');
+      const combo = vsBuild6(target, userTeam, vsPool6(userTeam, target), 'buy');
       if (combo) offers.push(vsOffer6(combo, target, userTeam, 'buy'));
     }
     return offers;
   }
 
+  if (!vsPool6(userTeam, null).length && !vsPool6(userTeam, {val2026: 9}).length) return [];
   const slots = vsBuyerDepthSlots(userTeam);
   // Position chosen → that bucket only. "Any" → every bucket whose depth slot is
   // below 3.0 (never upgrade over a ~star-level incumbent).
@@ -7234,7 +7250,7 @@ vsGenerateBuyerOffersV4 = function () {
     if (!vsRole6(p.team).canSell) continue;                   // sellers/hold only — no contender raids
     if (typeof finderIsSellerAvailable === 'function' && !finderIsSellerAvailable(p)) continue;
     if ((perTeam[p.team] || 0) >= 2) continue;
-    const combo = vsBuild6(p, userTeam, pool, 'buy');
+    const combo = vsBuild6(p, userTeam, vsPool6(userTeam, p), 'buy');
     if (!combo) continue;
     perTeam[p.team] = (perTeam[p.team] || 0) + 1;
     offers.push(vsOffer6(combo, p, userTeam, 'buy'));
@@ -7269,7 +7285,7 @@ function vsGenerateSellerAutoOffers() {
       if ((perBuyer[buyer] || 0) >= 2) continue;
       const slots = vsBuyerDepthSlots(buyer);
       if ((player.val2026 || 0) <= (slots[b] || 0) + 0.5) continue;   // must upgrade them
-      const combo = vsBuild6(player, buyer, vsPool6(buyer), 'sell');
+      const combo = vsBuild6(player, buyer, vsPool6(buyer, player), 'sell');
       if (!combo) continue;
       perBuyer[buyer] = (perBuyer[buyer] || 0) + 1;
       // In seller mode the card flips: user GIVES the player, RECEIVES the haul.
