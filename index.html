@@ -5041,9 +5041,6 @@ function vsScoreTrend(p) {
 //   listGetA/listGetB = what each side RECEIVES. teamA/teamB = the two sides.
 //   acquirerCtx passed in for both.
 function vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB) {
-  // Find best young vs best established across the two receive-sides, same position bucket.
-  // A receives listB; B receives listA. We compare pieces GOING OPPOSITE directions.
-  const out = [];
   const pairs = [];
   const allA = listA.filter(p => !p.isComp && !p.isCash);
   const allB = listB.filter(p => !p.isComp && !p.isCash);
@@ -5051,7 +5048,6 @@ function vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB) {
     for (const b of allB) {
       const bucketA = finderPosBucket(a.pos), bucketB = finderPosBucket(b.pos);
       if (!bucketA || bucketA !== bucketB) continue;
-      // One young, one established
       let young = null, old = null, youngTo = null;
       if (vsIsYoung(a) && vsIsEstablished(b)) { young = a; old = b; youngTo = teamB; }
       else if (vsIsYoung(b) && vsIsEstablished(a)) { young = b; old = a; youngTo = teamA; }
@@ -5061,17 +5057,13 @@ function vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB) {
   }
   if (!pairs.length) return null;
 
-  // Evaluate the most valuable such pairing.
   pairs.sort((x, y) => ((y.young.val2026 || 0) + (y.old.val2026 || 0)) - ((x.young.val2026 || 0) + (x.old.val2026 || 0)));
   const { young, old, youngTo } = pairs[0];
   const acquirerCtx = youngTo === teamA ? ctxA : ctxB;
   const acquirerRole = acquirerCtx.role;
 
   const share = vsYoungShare(young, old, acquirerRole);
-  // Guardrail: lopsided value → age never rescues it.
-  if (share > VS_PEAK.GUARDRAIL || share < (1 - VS_PEAK.GUARDRAIL)) {
-    return null;
-  }
+  if (share > VS_PEAK.GUARDRAIL || share < (1 - VS_PEAK.GUARDRAIL)) return null;
 
   const ageGap = Math.round((old.age || 0) - (young.age || 0));
   const youngCtrl = vsControlThrough(young);
@@ -5084,57 +5076,50 @@ function vsAgePeakAnalysis(listA, listB, teamA, teamB, ctxA, ctxB) {
   const oTrend = vsScoreTrend(old);
 
   let lean = null, txt = '';
-  const younger = `<span>${young.name}</span> (age ${young.age!=null?Math.round(young.age):'?'}, ctrl thru ${youngCtrl})`;
-  const older = `<span>${old.name}</span> (age ${old.age!=null?Math.round(old.age):'?'}, ctrl thru ${oldCtrl})`;
+  const younger = `<span>${young.name}</span> (${young.age != null ? Math.round(young.age) : '?'}, controlled through ${youngCtrl})`;
+  const older = `<span>${old.name}</span> (${old.age != null ? Math.round(old.age) : '?'}, through ${oldCtrl})`;
 
-  // Rule 1: small gap + value favors established → lean established.
   if (ageGap <= 2 && share <= 0.47) {
     lean = 'established';
-    txt = `${older} vs ${younger}: only a ${ageGap}-year age gap and the value edge sits with the established bat. Lean the proven MLB piece — the youth premium is too small to justify betting on projection${oldCtrl >= peakYear ? ", and he's controlled through the window anyway" : ''}.`;
+    txt = `${older} against ${younger} is barely an age question — ${ageGap} year${ageGap === 1 ? '' : 's'} apart, and the proven bat holds the value edge. Take the guy who's already done it${oldCtrl >= peakYear ? '; he\'s under control through the window anyway' : ''}. Projection is for when the numbers are close, and here they aren't.`;
   }
-  // Rule 2: big gap (≥5) + roughly even share (45–55) → hard lean young for aligned rebuilder.
   else if (ageGap >= 5 && share >= 0.45 && share <= 0.55) {
     lean = 'young';
     const trendBit = (yTrend && yTrend.trend === 'ascending')
-      ? ` His 2026 Score (${fmtVs(young.score2026)}) sits above his overall 2026 Value (${fmtVs(young.val2026)}) — an ascending, pre-peak player.` : '';
+      ? ` And the kid is climbing — his ${fmtVs(young.score2026)} this season already outruns his overall number (${fmtVs(young.val2026)}). That arrow points one way.` : '';
     const oldTrendBit = (oTrend && oTrend.trend === 'declining')
-      ? ` ${old.name}'s 2026 Score (${fmtVs(old.score2026)}) is well below his 2026 Value (${fmtVs(old.val2026)}) — his value is carried by past seasons, a possible-wall signal at age ${Math.round(old.age)}.` : '';
-    txt = `${younger} vs ${older}: a ${ageGap}-year age gap with essentially even combined value (${Math.round(share * 100)}% to the younger player under a ${acquirerRole === 'seller' ? 'seller (Avg-weighted)' : 'buyer (2026-weighted)'} lens).${trendBit}${oldTrendBit} For ${windowAligned ? 'a rebuilder whose window aligns with his arrival' : 'this acquirer'}, take the younger asset decisively — same control length measured correctly, years of additional peak, and a rising arrow vs a flattening one.`;
+      ? ` Meanwhile ${old.name} is producing ${fmtVs(old.score2026)} this year against a ${fmtVs(old.val2026)} reputation — past seasons are carrying that number, and at ${Math.round(old.age)}, that's what a wall looks like from a distance.` : '';
+    txt = `${younger} versus ${older}: ${ageGap} years of daylight and the value is basically even (${Math.round(share * 100)}% to the kid through a ${acquirerRole === 'seller' ? 'rebuilder\'s' : 'contender\'s'} lens).${trendBit}${oldTrendBit} ${windowAligned ? 'For a club whose window opens right when he arrives, this' : 'This'} is the easiest call on the board — take the years, take the ceiling, take the kid. Ten times out of ten.`;
   }
-  // Rule 3: ~4-yr gap, right at ~45% → soft lean young, "shop the older guy" framing.
   else if (ageGap === 4 && share >= 0.43 && share <= 0.47) {
     lean = 'young-soft';
-    txt = `${younger} vs ${older}: a 4-year gap and a near-even split (${Math.round(share * 100)}% younger). Soft lean to the younger piece — and acquiring him lets the established player be shopped to a contender to maximize the prospect haul, rather than kept as a redundancy.`;
+    txt = `${younger} against ${older} is close — a 4-year gap, near-even money (${Math.round(share * 100)}% to the younger). The tiebreaker isn't the players, it's the leverage: land the kid, and suddenly ${old.name} is a chip you shop to a contender for another haul instead of a redundancy on your own roster.`;
   }
-  // Rule 4: ambiguous middle → column-V (2026 Score) tiebreaker.
   else {
     if (yTrend && oTrend) {
       if (yTrend.trend === 'ascending' && oTrend.trend !== 'ascending') {
         lean = 'young';
-        txt = `${younger} vs ${older}: value is close and the age gap (${ageGap} yrs) isn't decisive on its own, so the 2026 Score breaks it — ${young.name} is ascending (${fmtVs(young.score2026)} score vs ${fmtVs(young.val2026)} value, trending up) while ${old.name} is being propped up by past seasons (${fmtVs(old.score2026)} score vs ${fmtVs(old.val2026)} value). Edge to the younger, rising player.`;
+        txt = `${younger} or ${older}? The value's close and ${ageGap} years alone doesn't settle it — so look at who's earning their number this season. ${young.name} is (${fmtVs(young.score2026)} against a ${fmtVs(young.val2026)} overall — trending up); ${old.name} isn't (${fmtVs(old.score2026)} against ${fmtVs(old.val2026)} — past seasons doing the lifting). Bet the rising arrow.`;
       } else if (oTrend.trend === 'ascending' && yTrend.trend !== 'ascending') {
         lean = 'established';
-        txt = `${older} vs ${younger}: the 2026 Score tiebreaker favors the established player — ${old.name} is still ascending (${fmtVs(old.score2026)} vs ${fmtVs(old.val2026)}), not declining, so his current value is real rather than legacy. No age discount warranted here.`;
+        txt = `${older} over ${younger}, and here's why the age discount doesn't apply: ${old.name} is still climbing (${fmtVs(old.score2026)} this season on a ${fmtVs(old.val2026)} overall). His number is current-season real, not legacy. When the veteran is the one ascending, you don't pay a youth premium — you take the sure thing.`;
       }
     }
-    if (!lean) return null; // truly a wash — don't manufacture a lean
+    if (!lean) return null;
   }
 
-  // Expendable spin-off: only when the OLDER player is NOT in this trade but is on the
-  // acquiring side's roster and now redundant behind the younger incoming piece.
   let expendableHint = null;
+  const out = [txt];
   if (lean && lean.startsWith('young')) {
     const oldInDeal = [...listA, ...listB].some(p => p.name === old.name);
     if (!oldInDeal) {
       const olderOnAcquirer = allPlayers.find(p => p.team === youngTo && p.name === old.name);
       if (olderOnAcquirer) {
-        expendableHint = `This makes <span>${old.name}</span> expendable for ${youngTo} — explore shopping him next to convert the surplus into more return.`;
+        expendableHint = `And note the domino: this makes <span>${old.name}</span> expendable for ${youngTo}. Smart move is to shop him next while he still has a starter's job on paper.`;
+        out.push(expendableHint);
       }
     }
   }
-
-  out.push(txt);
-  if (expendableHint) out.push(expendableHint);
   return { text: out.join('<br>'), lean, expendableHint };
 }
 
@@ -5289,14 +5274,14 @@ function vsSalaryDumpSection(listA, listB, teamA, teamB) {
     const dumpNames = dumps.map(d => {
       const fwd = vsForwardValue(d);
       const shape = (fwd != null && fwd < -0.25 && (d.val2026 || 0) > 0)
-        ? `productive now (${fmtVs(d.val2026)} in 2026) but ${fmtVs(fwd)} across 2027+ — albatross going forward`
-        : `${fmtVs(d.avgVal)} Avg — underwater contract`;
+        ? `useful today at ${fmtVs(d.val2026)}, but the back of that contract is ${fmtVs(fwd)} of pure anchor`
+        : `${fmtVs(d.avgVal)} on the books — the contract outruns the player`;
       return `<span>${d.name}</span> (${shape})`;
     }).join(', ');
     if (sweeteners.length && otherNet < give.filter(p => !dumps.includes(p)).reduce((s, p) => s + (p.avgVal || 0), 0)) {
-      lines.push(`<span>${team}</span> is executing a salary dump: ${dumpNames} moves only because ${sweeteners.map(s => `<span>${s.name}</span>`).join(' and ')} sweeten${sweeteners.length === 1 ? 's' : ''} the deal. <span>${otherTeam}</span> is being paid in prospect capital to absorb the contract — the correct read is a paydown, not a value loss. Judge it by whether the sweetener outweighs the negative value absorbed (net here: ${fmtVs(giveNet)} given vs ${fmtVs(otherNet)} received).`);
+      lines.push(`Call this what it is: <span>${team}</span> is buying its way out of a contract. ${dumpNames} doesn't move without ${sweeteners.map(s => `<span>${s.name}</span>`).join(' and ')} riding along as the sweetener, and <span>${otherTeam}</span> is getting paid in prospect capital to eat the money. Don't grade it like a talent trade — grade it on whether the sweetener beats the dead weight (${fmtVs(giveNet)} out against ${fmtVs(otherNet)} back). Teams make this deal on purpose every winter.`);
     } else {
-      lines.push(`${dumpNames} carries negative surplus value — any acquirer is doing the sender a favor, and the return should reflect that (lesser pieces back, or sweeteners attached).`);
+      lines.push(`${dumpNames}. Any club taking that on is doing the favor, not receiving one — the return should look light, or come with something attached, because that's the going rate for absorbing somebody else's mistake.`);
     }
   }
   return lines.length ? lines.join('<br>') : null;
@@ -5339,21 +5324,21 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
     `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
   const sections = [];
 
-  /* ---- Depth swap: short verdict, no drama ---- */
+  /* ---- Depth swap: two sentences and out ---- */
   if (mag === 'depth') {
     const share = (v26A + v26B) > 0 ? Math.round(v26A / (v26A + v26B) * 100) : 50;
     const lean = share >= 58 ? teamB : share <= 42 ? teamA : null;
     return {
       grade: 'neutral',
       headline: 'Depth swap',
-      html: S('The Read', `Roster-margin move — both sides are trading pieces under 2 value. ${lean ? `<span>${lean}</span> takes the slightly better end, but nothing here shifts either team's outlook.` : 'Effectively even, and inconsequential either way.'} These trades happen constantly; judge it on roster fit, not value drama.`)
+      html: S('The Read', `This is org-depth housekeeping — the kind of deal that gets two lines in the transactions column and nobody's number retired. ${lean ? `<span>${lean}</span> comes out a hair ahead, and in a deal this size "ahead" means a slightly more useful 26th man.` : 'Call it a wash; both clubhouses barely notice.'} File it and move on.`)
     };
   }
 
   /* ---- Team context ---- */
   sections.push(S('Team Context',
-    `<span>${teamA}</span> (${ctxA.record || '—'}${ctxA.gb > 0 ? ', ' + ctxA.gb + ' GB' : ''}) — ${ctxA.label || 'role unknown'}.<br>` +
-    `<span>${teamB}</span> (${ctxB.record || '—'}${ctxB.gb > 0 ? ', ' + ctxB.gb + ' GB' : ''}) — ${ctxB.label || 'role unknown'}.`));
+    `<span>${teamA}</span> (${ctxA.record || '—'}${ctxA.gb > 0 ? ', ' + ctxA.gb + ' back' : ''}) — ${ctxA.label || 'role unknown'}.<br>` +
+    `<span>${teamB}</span> (${ctxB.record || '—'}${ctxB.gb > 0 ? ', ' + ctxB.gb + ' back' : ''}) — ${ctxB.label || 'role unknown'}.`));
 
   /* ---- Asymmetric lenses ---- */
   const lens = (team, ctx, receives, gives) => {
@@ -5365,27 +5350,30 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
       // NOW lens
       const better = recv26 > give26 + 0.3;
       const even = Math.abs(recv26 - give26) <= 0.3;
-      return `Judged on <span>now</span>: this ${better ? `makes them better this season (+${(recv26 - give26).toFixed(2)} in 2026 value)` : even ? 'is roughly a wash for this season' : `costs them ${(give26 - recv26).toFixed(2)} of 2026 value`} at a price of ${giveAvg.toFixed(2)} long-term value out the door.`;
+      if (better) return `This is a win-now move and it works: they get better today, +${(recv26 - give26).toFixed(2)} on the season, and the bill — ${giveAvg.toFixed(2)} in future value walking out the door — is the tax every contender pays in July. You don't hang banners for prospects you kept.`;
+      if (even) return `On this season's ledger it's a push — but a contender trading futures for a push better love the fit, because the ${giveAvg.toFixed(2)} in long-term value leaving the building is real.`;
+      return `Here's the rub: they're actually ${(give26 - recv26).toFixed(2)} worse on the season by the numbers, while shipping out ${giveAvg.toFixed(2)} in future value. A contender needs a story for this one — fit, health, clubhouse — because the math alone doesn't tell it.`;
     }
     // LATER lens
     const thin = vsSellerThinBuckets(team).slice(0, 2);
     const fits = receives.filter(p => (p.isProspect || p.level === 'minors') && thin.includes(finderPosBucket(p.pos)));
     const rental = gives.some(p => p.level === 'mlb' && vsControlThrough(p) <= 2026 && (p.val2026 || 0) >= 3);
-    let txt = `Judged on <span>later</span>: the haul brings ${recvAvg.toFixed(2)} in controllable long-term value against ${giveAvg.toFixed(2)} out.`;
-    if (rental) txt += ` The piece moving is a rental — the ask should run high, and ${recvAvg > giveAvg ? 'it does' : 'this return is light for a rental'}.`;
-    if (fits.length) txt += ` Bonus: ${fits.map(p => `<span>${p.name}</span>`).join(', ')} feed${fits.length === 1 ? 's' : ''} the thinnest part of the org.`;
+    let txt = `For a rebuilder, this is the whole job: turn today's roster into tomorrow's. The haul lands ${recvAvg.toFixed(2)} in controllable value against ${giveAvg.toFixed(2)} going out${recvAvg > giveAvg + 0.3 ? ' — a net gain of future, which is the only column they should be reading' : ''}.`;
+    if (rental) txt += recvAvg > giveAvg
+      ? ` And they held the line on the rental — no long-term offset means the ask runs high, and they got their premium.`
+      : ` One gripe: the piece leaving is a rental, and rentals are supposed to bring back a premium. This return is light for a player with an expiration date.`;
+    if (fits.length) txt += ` Better still, ${fits.map(p => `<span>${p.name}</span>`).join(' and ')} land${fits.length === 1 ? 's' : ''} exactly where the system is thinnest — that's not luck, that's a front office that knows its own farm.`;
     return txt;
   };
   sections.push(S(`${teamA} — The Deal For Them`, lens(teamA, ctxA, listB, listA)));
   sections.push(S(`${teamB} — The Deal For Them`, lens(teamB, ctxB, listA, listB)));
 
-  /* ---- Value math (dual clock, no forced agreement) ---- */
+  /* ---- Value math (dual clock) ---- */
   const p26 = (v26A + v26B) > 0 ? Math.round(v26A / (v26A + v26B) * 100) : 50;
   const pAv = (avgA + avgB) > 0 ? Math.round(avgA / (avgA + avgB) * 100) : 50;
   sections.push(S('Value Math',
-    `2026: <span>${teamA}</span> ${v26A.toFixed(2)} (${p26}%) vs <span>${teamB}</span> ${v26B.toFixed(2)}.<br>` +
-    `Avg: <span>${teamA}</span> ${avgA.toFixed(2)} (${pAv}%) vs <span>${teamB}</span> ${avgB.toFixed(2)}.<br>` +
-    `A split decision here is the normal shape of a buyer/seller deal — the clocks measure different things.`));
+    `On this season alone: <span>${teamA}</span> puts in ${v26A.toFixed(2)} (${p26}% of the deal) to <span>${teamB}</span>'s ${v26B.toFixed(2)}. Long haul: ${avgA.toFixed(2)} (${pAv}%) against ${avgB.toFixed(2)}.<br>` +
+    `When the two clocks disagree, that's not a red flag — that's a deadline trade doing what deadline trades do. One side bought October, the other bought 2028.`));
 
   /* ---- Age & peak ---- */
   try {
@@ -5393,13 +5381,13 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
     if (age) sections.push(S('Age & Peak Curve', age.text));
   } catch (e) { /* optional */ }
 
-  /* ---- Contract structure (salary-dump recognition) ---- */
+  /* ---- Contract structure ---- */
   try {
     const dump = vsSalaryDumpSection(listA, listB, teamA, teamB);
     if (dump) sections.push(S('Contract Structure', dump));
   } catch (e) { /* optional */ }
 
-  /* ---- Historical comp (with return-quality check) ---- */
+  /* ---- Historical comp ---- */
   try {
     const comp = vsFindHistoricalComp(listA, listB, ctxA, ctxB);
     if (comp && mag === 'real') sections.push(S('Historical Comparable — ' + comp.comp.title, comp.comp.text));
@@ -5410,7 +5398,7 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
   let grade, headline;
   if (fair26) { grade = 'fair'; headline = mag === 'minor' ? '✓ Fair minor move' : '✓ Fair Trade'; }
   else {
-    const win = p26 > 55 ? teamB : teamA;   // gives less = wins
+    const win = p26 > 55 ? teamB : teamA;
     grade = mag === 'minor' ? 'neutral' : 'warn';
     headline = mag === 'minor' ? `Leans ${win}` : `${win} wins this trade`;
   }
@@ -5929,61 +5917,39 @@ function vsFinderWhySection(giveList, getList, giveTeam, getTeam) {
   const lines = [];
   const giveCtx = vsTeamContext(giveTeam);
   const getCtx = vsTeamContext(getTeam);
+
+  // Roles + direction, plain English.
+  if (giveCtx.role !== 'unknown' && getCtx.role !== 'unknown') {
+    lines.push(`<span>${giveTeam}</span> (${giveCtx.record}, ${giveCtx.label}) adds now; <span>${getTeam}</span> (${getCtx.record}, ${getCtx.label}) adds later. The right kind of phone call for both sides.`);
+  }
+
+  // What the buyer gets NOW.
   const targets = getList.filter(p => !p.isComp && !p.isCash && p.level === 'mlb');
-  const prospectsOut = giveList.filter(p => !p.isComp && !p.isCash && (p.isProspect || p.level === 'minors'));
-
-  if (targets.length && prospectsOut.length) {
-    const roleBit = giveCtx.role !== 'unknown' && getCtx.role !== 'unknown'
-      ? ` <span>${giveTeam}</span> (${giveCtx.record}, ${giveCtx.label}) sends prospects; <span>${getTeam}</span> (${getCtx.record}, ${getCtx.label}) sends MLB value —`
-      : '';
-    lines.push(`${roleBit} controllable future value flows to the rebuilder, 2026 production to the contender. Correct deadline flow.`);
-  }
-
-  try {
-    const needs = vsFinderSellerNeeds(getTeam);
-    const fit = vsFinderNeedFitScore(prospectsOut, getTeam);
-    if (fit.fitNames.length) {
-      const holeDesc = needs.holes
-        .filter(h => prospectsOut.some(p => finderPosBucket(p.pos) === h.bucket))
-        .map(h => `${h.bucket} (${h.expiring.slice(0, 2).map(e => e.name + ' ctrl thru ' + e.lastYear).join(', ')})`)
-        .join('; ');
-      lines.push(`Selected because it fills <span>${getTeam}</span>'s real gaps before its ~${needs.peak} peak: ${holeDesc}. Fits: <span>${fit.fitNames.join('</span>, <span>')}</span>.`);
-    } else if (needs.holes.length) {
-      lines.push(`Note: <span>${getTeam}</span>'s expiration gaps are at ${needs.holes.map(h => h.bucket).join('/')} — this clears the value bands on value, not need-fit.`);
+  if (targets.length) {
+    const t = targets[0];
+    const b = finderPosBucket(t.pos);
+    const slots = vsBuyerDepthSlots(giveTeam);
+    const slotVal = b != null && slots[b] != null ? slots[b] : null;
+    if (slotVal != null && (t.val2026 || 0) > slotVal + 0.3) {
+      lines.push(`<span>${t.name}</span> (${(t.val2026 || 0).toFixed(2)} 2026 value) is a clear upgrade on what <span>${giveTeam}</span> currently runs out at ${b} (${slotVal.toFixed(2)} at the depth slot he'd take over).`);
+    } else {
+      lines.push(`<span>${t.name}</span> brings ${(t.val2026 || 0).toFixed(2)} of 2026 value to a roster in win-now mode.`);
     }
-  } catch (e) { /* never break rendering */ }
-
-  const rentals = targets.filter(t => vsControlThrough(t) <= 2026);
-  if (rentals.length) {
-    lines.push(`<span>${rentals.map(r => r.name).join(', ')}</span> ${rentals.length > 1 ? 'are rentals' : 'is a rental'} — generated in the future-skewed band so the seller extracts a long-term premium. Fair-band offers were rejected for this target.`);
-  }
-
-  // Cite the age lean if it drove the recommendation.
-  try {
-    const age = vsAgePeakAnalysis(giveList, getList, giveTeam, getTeam, giveCtx, getCtx);
-    if (age && age.lean && age.lean.startsWith('young')) {
-      lines.push(`Age curve reinforces it: the younger incoming asset carries years of additional pre-peak control at comparable value — a rebuilder takes that every time.`);
+    if (vsControlThrough(t) <= 2026) {
+      lines.push(`He's a rental — so the return skews long-term in <span>${getTeam}</span>'s favor, which is the price of deadline production.`);
     }
-  } catch (e) { /* */ }
-
-  lines.push(`Passed all construction gates: diversity (max 1 C / max 2 OF), no hard-blocked prospects, no hole created on <span>${giveTeam}</span>.`);
-
-  // Verify the gates actually clear (rather than just asserting it) and report the
-  // actual result instead of asserting compliance.
-  let html = lines.join('<br>');
-  const gateResult = (function () {
-    try { return vsFinderGateCombo(giveList, giveTeam, getTeam, getList, 'future'); }
-    catch (e) { return null; }
-  })();
-  const assertLine = /Passed all construction gates[^<]*<br>|Passed all construction gates[^<]*$/;
-  if (gateResult) {
-    html = html.replace(assertLine, '');
-    html += `<br>⚠ Gate check: this package does <span>not</span> clear all methodology gates (${gateResult}). It should not have been recommended — if you're seeing this, report it.`;
-  } else {
-    // Replace the asserted line with the verified one (same text, now actually checked).
-    html = html.replace('Passed all construction gates', 'Verified against all construction gates');
   }
-  return html;
+
+  // Soft seller-fit (bonus framing only — never a requirement).
+  try {
+    const thin = vsSellerThinBuckets(getTeam).slice(0, 2);
+    const fits = giveList.filter(p => (p.isProspect || p.level === 'minors') && thin.includes(finderPosBucket(p.pos)));
+    if (fits.length) {
+      lines.push(`The return also happens to feed the thinnest part of <span>${getTeam}</span>'s system (${fits.map(p => `<span>${p.name}</span>`).join(', ')}) — a package a rebuilding front office says yes to quickly.`);
+    }
+  } catch (e) { /* framing only — never break the card */ }
+
+  return lines.join('<br>');
 }
 
 // Rendering entry point for the finder's hand-pick flow: full asymmetric verdict
@@ -6354,33 +6320,53 @@ function vsTbOverallWinner(sides) {
   return best && best.pct >= 56 ? best : null;
 }
 
-// Full three-section retrospective (At The Time / What's Moved / Where It Stands).
-// Wrapped by tbVerdictHtml below, which shortcuts to a "Depth swap" read for
-// sub-2-value trades instead of running this.
-function tbVerdictHtmlDetailed(atTradeSides, currentSides, unavailable) {
+// Self-contained tracker verdict: short depth-swap voice for sub-2-value trades,
+// otherwise the full three-section retrospective (At The Time / What's Moved /
+// Where It Stands).
+function tbVerdictHtml(atTradeSides, currentSides, unavailable) {
+  const sideAvg = (s) => s.players.reduce((sum, p) => sum + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
+  const side26 = (s) => s.players.reduce((sum, p) => sum + (p.val2026 != null && !isNaN(p.val2026) ? p.val2026 : 0), 0);
+  const isDepth = atTradeSides.every(s => sideAvg(s) < 2 && side26(s) < 2);
+
+  /* ---- Depth swap voice ---- */
+  if (isDepth) {
+    let body = 'A depth swap — nobody in this deal was moving the needle when it happened, and nobody expected them to. This is two front offices tidying the 40-man.';
+    if (!unavailable) {
+      const cur = (typeof vsTbShares === 'function') ? vsTbShares(currentSides, p => p.avgVal) : null;
+      if (cur && currentSides.length === 2) {
+        const i = cur[0] >= cur[1] ? 0 : 1;
+        if (cur[i] >= 62) body += ` Since then it's leaned <span>${esc(currentSides[i].receivingTeam)}</span>'s way (${Math.round(cur[i])}% of what's left) — which in a deal this size means somebody's pro scouting department found a useful player in the bargain bin. Tip of the cap, nothing more.`;
+        else body += ' Neither side has found a diamond in it yet.';
+      }
+      const ledger = (typeof vsTbLedger === 'function') ? vsTbLedger(atTradeSides, currentSides) : null;
+      if (ledger) body += '<br>' + ledger.map(l => `<span>${esc(l.team)}</span>: ${l.then.toFixed(2)} then, ${l.now.toFixed(2)} now`).join('<br>');
+    }
+    return tbVerdictBox('verdict-box v-neutral', 'Depth swap — low stakes, then and now', vsTbSection('The Read', body));
+  }
+
+  /* ---- Real trades: three-section retrospective ---- */
   const alignedAt = vsTbAlignedShape(atTradeSides);
   const atOverall = vsTbOverallWinner(atTradeSides);
 
-  /* ---------- Section 1: AT THE TIME ---------- */
+  /* Section 1: AT THE TIME */
   let atBody, atGradeHint = 'fair';
   if (alignedAt) {
-    atBody = `Structured deadline shape: <span>${esc(alignedAt.nowTeam)}</span> took the 2026 production side (${Math.round(alignedAt.nowPct)}% of this season's value) while <span>${esc(alignedAt.avgTeam)}</span> took the long-term premium (${Math.round(alignedAt.avgPct)}% of Avg value). Both sides got the currency they were shopping for — the day-one question was never "who won," it was whose clock pays off.`;
+    atBody = `This was a proper deadline deal the day it was signed off: <span>${esc(alignedAt.nowTeam)}</span> bought the season (${Math.round(alignedAt.nowPct)}% of the now), <span>${esc(alignedAt.avgTeam)}</span> bought the future (${Math.round(alignedAt.avgPct)}% of the later). Nobody "won" at the podium — both GMs got exactly the currency they walked in asking for. The scoreboard was always going to be written later.`;
   } else if (!atOverall) {
-    atBody = `Even on both clocks at the time — comparable 2026 production and comparable long-term value moved in each direction.`;
+    atBody = `Dead even on the day — comparable production and comparable future moving both directions. The kind of trade two evenly-matched front offices shake hands on and defend to their owners identically.`;
   } else {
-    atBody = `<span>${esc(atOverall.team)}</span> took the larger share on day one — ${Math.round(atOverall.pct)}% of combined value across both clocks. A day-one edge by the numbers.`;
+    atBody = `<span>${esc(atOverall.team)}</span> walked away from the table ahead — ${Math.round(atOverall.pct)}% of the combined value on day one, on both clocks. Around the league, this one got graded in their favor before the ink dried.`;
     atGradeHint = 'warn';
   }
 
-  /* ---------- Unavailable: at-time only ---------- */
   if (unavailable) {
-    const headline = atGradeHint === 'fair' ? 'Trade looked balanced at the time' : `${esc(atOverall.team)} appeared to win this trade at the time`;
+    const headline = atGradeHint === 'fair' ? 'Looked even on the day' : `${esc(atOverall.team)} looked like the winner on the day`;
     return tbVerdictBox('verdict-box ' + (atGradeHint === 'fair' ? 'v-neutral' : 'v-warn'), headline,
       vsTbSection('At The Time', atBody) +
-      vsTbSection('Where It Stands', 'Current value data isn’t available yet for every player involved, so the retrospective half of this verdict has to wait. Check back soon.'));
+      vsTbSection('Where It Stands', 'The retrospective half has to wait — live numbers aren’t in yet for everyone in the deal. Check back once they’re playing.'));
   }
 
-  /* ---------- Section 2: WHAT'S MOVED ---------- */
+  /* Section 2: WHAT'S MOVED */
   const deltas = vsTbDeltas(atTradeSides, currentSides);
   const moveLines = [];
   for (const side of deltas) {
@@ -6397,55 +6383,54 @@ function tbVerdictHtmlDetailed(atTradeSides, currentSides, unavailable) {
   allMovers.sort((x, y) => y.mag - x.mag);
   const swing = allMovers.length && allMovers[0].mag >= 0.5 ? allMovers[0] : null;
   const moveBody = moveLines.length
-    ? moveLines.join('<br>') + (swing ? `<br>The swing piece: <span>${esc(swing.name)}</span> has ${((swing.dAvg ?? swing.d26) >= 0 ? 'gained' : 'lost')} the most value since the deal — the single biggest reason this verdict reads the way it does.` : '')
-    : 'No meaningful value movement since the deal — every piece is worth roughly what it was on trade day.';
+    ? moveLines.join('<br>') + (swing ? `<br>The whole verdict turns on one name: <span>${esc(swing.name)}</span> has ${((swing.dAvg ?? swing.d26) >= 0 ? 'become a different player since the deal — for the better' : 'gone backwards since the deal')}. Everything else is noise next to that.` : '')
+    : 'Nothing’s moved. Every player in this deal is worth about what he was on trade day — the deal is still exactly what both teams thought they were making.';
 
-  /* ---------- Section 3: WHERE IT STANDS ---------- */
+  /* Section 3: WHERE IT STANDS */
   const alignedCur = vsTbAlignedShape(currentSides);
   const curOverall = vsTbOverallWinner(currentSides);
   const ledger = vsTbLedger(atTradeSides, currentSides);
   const ledgerLine = ledger.map(l =>
-    `<span>${esc(l.team)}</span>: received ${l.then.toFixed(2)} Avg on trade day → worth ${l.now.toFixed(2)} today${l.pct != null ? ` (${l.pct >= 0 ? '+' : ''}${l.pct}%)` : ''}`).join('<br>');
+    `<span>${esc(l.team)}</span>: took in ${l.then.toFixed(2)} on trade day, holding ${l.now.toFixed(2)} today${l.pct != null ? ` (${l.pct >= 0 ? '+' : ''}${l.pct}%)` : ''}`).join('<br>');
 
   let cls = 'verdict-box v-fair', headline, standsBody;
-  const flipDriver = swing ? ` The swing runs through <span>${esc(swing.name)}</span>.` : '';
+  const flipDriver = swing ? ` The swing piece is <span>${esc(swing.name)}</span> — that’s the name that changed the story.` : '';
 
   if (alignedAt) {
-    // Aligned deal: judge each side's bet by its own clock, plus the ledger.
     const avgSide = ledger[alignedAt.avgIdx];
     const nowSide = ledger[alignedAt.nowIdx];
     const avgBetPaying = (avgSide.pct != null && avgSide.pct >= 5);
     const avgBetFading = (avgSide.pct != null && avgSide.pct <= -5);
     if (avgBetPaying) {
       cls = 'verdict-box v-warn';
-      headline = `${esc(avgSide.team)}'s side of the bet is paying off`;
-      standsBody = `Both sides got what they shopped for on day one, but <span>${esc(avgSide.team)}</span>'s long-term currency has appreciated (${avgSide.pct >= 0 ? '+' : ''}${avgSide.pct}% since the deal) while <span>${esc(nowSide.team)}</span>'s win-now asset is static by design — a rental's value only converts if the season does.${flipDriver}`;
+      headline = `${esc(avgSide.team)}'s bet is the one cashing`;
+      standsBody = `Both sides bought what they wanted — but <span>${esc(avgSide.team)}</span>'s futures have appreciated ${avgSide.pct >= 0 ? '+' : ''}${avgSide.pct}% while <span>${esc(nowSide.team)}</span>'s win-now piece is worth exactly what a win-now piece is: the season it was bought for. If <span>${esc(nowSide.team)}</span> got their October, they'd do it again. If they didn't, this is the receipt.${flipDriver}`;
     } else if (avgBetFading) {
       cls = 'verdict-box v-warn';
       headline = `${esc(nowSide.team)}'s win-now side is aging better`;
-      standsBody = `<span>${esc(avgSide.team)}</span>'s long-term haul has shed value since the deal (${avgSide.pct}%) — the classic risk of prospect currency. <span>${esc(nowSide.team)}</span>'s production bet looks stronger by the day.${flipDriver}`;
+      standsBody = `The prospect haul has bled value since the deal (${avgSide.pct}%) — and that’s the eternal risk of prospect currency: some of it never cashes. <span>${esc(nowSide.team)}</span> took the sure thing and the sure thing is looking smarter by the month.${flipDriver}`;
     } else {
       headline = 'Both bets are still live';
-      standsBody = `Neither side's currency has meaningfully appreciated or faded yet — the deal is still being decided on the field.`;
+      standsBody = `Neither currency has moved enough to call it. This one’s still being decided between the lines — check back after the kids get their at-bats.`;
     }
   } else if (!atOverall && !curOverall) {
     headline = 'Fair trade, then and now';
-    standsBody = 'Balanced on trade day, balanced today, on both clocks.';
+    standsBody = 'Even on the day, even today, on both clocks. Two front offices did honest business and nobody needs to apologize.';
   } else if (atOverall && curOverall && atOverall.idx === curOverall.idx) {
     cls = 'verdict-box v-warn';
-    headline = `${esc(atOverall.team)} has won this trade from day one`;
-    standsBody = `<span>${esc(atOverall.team)}</span> took the better combined value at the time (${Math.round(atOverall.pct)}%) and still holds the edge today (${Math.round(curOverall.pct)}%).`;
+    headline = `${esc(atOverall.team)} has owned this trade from day one`;
+    standsBody = `They were ahead when it was signed (${Math.round(atOverall.pct)}%) and they’re ahead now (${Math.round(curOverall.pct)}%). Some trades get relitigated for years — this one was over at the press conference.`;
   } else if (atOverall && curOverall && atOverall.idx !== curOverall.idx) {
     cls = 'verdict-box v-warn';
-    headline = 'The verdict has flipped since the trade';
-    standsBody = `<span>${esc(atOverall.team)}</span> looked like the winner on trade day (${Math.round(atOverall.pct)}%), but <span>${esc(curOverall.team)}</span> now holds ${Math.round(curOverall.pct)}% of the combined value.${flipDriver}`;
+    headline = 'This trade has flipped';
+    standsBody = `<span>${esc(atOverall.team)}</span> got the headlines on trade day (${Math.round(atOverall.pct)}%), but baseball had other plans — <span>${esc(curOverall.team)}</span> holds ${Math.round(curOverall.pct)}% of what’s left, and the day-one grades aged badly.${flipDriver}`;
   } else if (!atOverall && curOverall) {
     cls = 'verdict-box v-warn';
-    headline = `${esc(curOverall.team)} has since pulled ahead`;
-    standsBody = `Even on trade day; <span>${esc(curOverall.team)}</span> has picked up the edge since (${Math.round(curOverall.pct)}%).${flipDriver}`;
+    headline = `${esc(curOverall.team)} has pulled ahead`;
+    standsBody = `Even money on the day; not anymore. <span>${esc(curOverall.team)}</span> has quietly banked the edge (${Math.round(curOverall.pct)}%) since.${flipDriver}`;
   } else {
-    headline = 'The gap has closed since the trade';
-    standsBody = `<span>${esc(atOverall.team)}</span> appeared to win at the time (${Math.round(atOverall.pct)}%), but the sides have evened out.`;
+    headline = 'The gap has closed';
+    standsBody = `<span>${esc(atOverall.team)}</span> looked like the clear winner at the time (${Math.round(atOverall.pct)}%), but the sides have played their way back to even. Day-one grades are written in pencil for a reason.`;
   }
 
   const detail =
@@ -6454,33 +6439,6 @@ function tbVerdictHtmlDetailed(atTradeSides, currentSides, unavailable) {
     vsTbSection('Where It Stands', standsBody + '<br>' + ledgerLine);
 
   return tbVerdictBox(cls, headline, detail);
-}
-
-// Magnitude-aware entry point: short "Depth swap" read for sub-2-value trades,
-// otherwise the full three-section retrospective above.
-function tbVerdictHtml(atTradeSides, currentSides, unavailable) {
-  // Depth-swap voice for small trades.
-  const sideAvg = (s) => s.players.reduce((sum, p) => sum + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
-  const side26 = (s) => s.players.reduce((sum, p) => sum + (p.val2026 != null && !isNaN(p.val2026) ? p.val2026 : 0), 0);
-  const isDepth = atTradeSides.every(s => sideAvg(s) < 2 && side26(s) < 2);
-
-  if (isDepth) {
-    let body = 'A depth swap — pieces on both sides were under 2 value when it happened. Trades like this are roster-margin maintenance, not needle-movers.';
-    if (!unavailable) {
-      const cur = vsTbShares(currentSides, p => p.avgVal);
-      if (cur && currentSides.length === 2) {
-        const i = cur[0] >= cur[1] ? 0 : 1;
-        if (cur[i] >= 62) body += ` It has leaned toward <span>${esc(currentSides[i].receivingTeam)}</span> since (${Math.round(cur[i])}% of current value), which in a deal this size means one org found a useful piece — nothing more.`;
-        else body += ' Neither side has gained anything meaningful since.';
-      }
-      const ledger = vsTbLedger(atTradeSides, currentSides);
-      if (ledger) body += '<br>' + ledger.map(l => `<span>${esc(l.team)}</span>: ${l.then.toFixed(2)} then → ${l.now.toFixed(2)} now`).join('<br>');
-    }
-    return tbVerdictBox('verdict-box v-neutral', 'Depth swap — low stakes, then and now', vsTbSection('The Read', body));
-  }
-
-  // Real trades: the full three-section retrospective.
-  return tbVerdictHtmlDetailed(atTradeSides, currentSides, unavailable);
 }
 
 // Convert a trade record's side (comp picks / cash / real players, with refreshed
