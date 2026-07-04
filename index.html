@@ -6062,18 +6062,18 @@ function vsSellerThinBuckets(team) {
   return Object.keys(depth).sort((a, b) => depth[a] - depth[b]); // thinnest first
 }
 
-/* ---- Give pool (target-aware) ----
-   Non-top-100 prospects/minors are always available. MLB top-100 prospects unlock
-   ONLY when the target warrants it (star-level: 2026 value >= 5) — you part with a
-   top-100 arm for Logan Webb, not for a fourth reliever. The user's protected
-   prospect (finderState.untouchableProspect) is always excluded. */
+/* ---- Give pool (target-aware, MINORS ONLY) ----
+   Buyers never trade off the MLB roster — anyone at MLB level is out, prospect or
+   not. Minors top-100s unlock only for star-level targets (2026 value >= 5) — you
+   part with a top-100 arm for Logan Webb, not for a fourth reliever. Protected
+   prospect (finderState.untouchableProspect) always excluded. */
 function vsPool6(team, target) {
   const starTarget = target && (target.val2026 || 0) >= 5;
   const protectedName = (typeof finderState !== 'undefined' && finderState.untouchableProspect)
     ? finderState.untouchableProspect.name : null;
   return allPlayers.filter(p => {
     if (p.team !== team || p.isComp || p.isCash) return false;
-    if (!(p.isProspect || p.level === 'minors')) return false;
+    if (p.level !== 'minors') return false;                 // NOBODY off the MLB roster
     if (protectedName && p.name === protectedName) return false;
     if (finderIsInjured(p)) return false;
     if (!((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5)) return false;
@@ -6100,28 +6100,45 @@ function vsBands6(combo, targetList, mode) {
   return true;
 }
 
-/* ---- Package builder: fewest pieces, closest value, silent caps, soft seller-fit ---- */
-function vsBuild6(target, buyerTeam, pool, mode) {
+/* ---- Package builder. `shape`:
+     'quality'  → fewest pieces, closest value; up to 2 minors top-100s allowed
+     'quantity' → 3–4 pieces; at most ONE fringe top-100 (rank 51–100), never a
+                  top-50; the rest org depth and well-valued unranked minors guys ---- */
+function vsBuild6(target, buyerTeam, pool, mode, shape) {
+  shape = shape || 'quality';
   const targetList = [target];
   const t26 = target.val2026 || 0;
   const thin = vsSellerThinBuckets(target.team).slice(0, 2);
   const fitBonus = (p) => thin.includes(finderPosBucket(p.pos)) ? 1 : 0;
+  const rankOf = (p) => vsMlbRankNum(p);
 
+  let src = [...pool];
+  if (shape === 'quantity') {
+    src = src.filter(p => { const r = rankOf(p); return r == null || r > 50; }); // no top-50s
+  }
   // Closeness ordering with a soft fit nudge (fit breaks ties, never gates).
-  const src = [...pool].sort((a, b) => {
+  src = src.sort((a, b) => {
     const da = Math.abs((a.val2026 || 0) - t26), db = Math.abs((b.val2026 || 0) - t26);
     if (Math.abs(da - db) > 0.3) return da - db;
     return fitBonus(b) - fitBonus(a);
   }).slice(0, 16);
 
-  const ok = (c) => !vsCapViolation(c) && vsBands6(c, targetList, mode);
+  const top100Count = (c) => c.filter(p => { const r = rankOf(p); return r != null && r <= 100; }).length;
+  const ok = (c) => {
+    if (vsCapViolation(c)) return false;
+    if (!vsBands6(c, targetList, mode)) return false;
+    if (shape === 'quality' && top100Count(c) > 2) return false;   // "a couple" max
+    if (shape === 'quantity' && top100Count(c) > 1) return false;  // one fringe guy max
+    return true;
+  };
 
-  for (const a of src) if (ok([a])) return [a];
-  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++)
-    if (ok([src[i], src[j]])) return [src[i], src[j]];
+  if (shape !== 'quantity') {
+    for (const a of src) if (ok([a])) return [a];
+    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++)
+      if (ok([src[i], src[j]])) return [src[i], src[j]];
+  }
   for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++)
     if (ok([src[i], src[j], src[k]])) return [src[i], src[j], src[k]];
-  // 4-piece: star-level targets legitimately command quantity+quality packages.
   for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++)
     if (ok([src[i], src[j], src[k], src[m]])) return [src[i], src[j], src[k], src[m]];
   return null;
@@ -6146,12 +6163,29 @@ function vsOffer6(combo, target, buyerTeam, mode) {
 function vsGenerateBuyerOffersV4() {
   const userTeam = finderState.team;
   if (!vsRole6(userTeam).canBuy) return [];
-  // Direct player search: pool is target-aware (star targets unlock top-100 arms)
+  // Direct player search: star targets get two packages (quality + quantity);
+  // role-player targets get one.
   if (finderState.targetPlayers && finderState.targetPlayers.length) {
     const offers = [];
     for (const target of finderState.targetPlayers) {
-      const combo = vsBuild6(target, userTeam, vsPool6(userTeam, target), 'buy');
-      if (combo) offers.push(vsOffer6(combo, target, userTeam, 'buy'));
+      const pool = vsPool6(userTeam, target);
+      const star = (target.val2026 || 0) >= 5;
+      const quality = vsBuild6(target, userTeam, pool, 'buy', 'quality');
+      if (quality) {
+        const o = vsOffer6(quality, target, userTeam, 'buy');
+        if (star) o.label = 'Quality package — via ' + target.team;
+        offers.push(o);
+      }
+      if (star) {
+        const qty = vsBuild6(target, userTeam, pool, 'buy', 'quantity');
+        const same = quality && qty && quality.length === qty.length &&
+          quality.every(p => qty.some(q => q.name === p.name));
+        if (qty && !same) {
+          const o = vsOffer6(qty, target, userTeam, 'buy');
+          o.label = 'Quantity package — via ' + target.team;
+          offers.push(o);
+        }
+      }
     }
     return offers;
   }
