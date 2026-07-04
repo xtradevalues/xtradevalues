@@ -1567,14 +1567,30 @@ async function loadData() {
 
     // Join real ETA from the 2026 Pipeline Rankings sheet by Player ID — the finder/verdict
     // need true ETA (e.g. an A+ player with ETA 2027, not the level-guess default of 2028).
+    // Column C (index 2) is the join key on this sheet, not column A — its "Player ID"
+    // header is a different, unrelated ID (same gotcha documented in loadPipelineRankings/
+    // renderProspects), so joining on row['Player ID'] silently matched nothing.
     const pipe = await fetchSheetTab('2026 Pipeline Rankings');
     if (pipe) {
       for (const row of pipe) {
-        const pid = row['Player ID'] != null ? String(Math.round(Number(row['Player ID']))) : null;
+        const pid = row['_2'] != null ? String(Math.round(Number(row['_2']))) : null;
         const pl  = pid ? playerIndex[pid] : null;
         if (!pl) continue;
         const eta = parseInt(row['ETA'], 10);
         if (!isNaN(eta)) pl.pipelineETA = eta;
+        // Backfill rank/prospect flag from the dedicated pipeline sheet when the player's
+        // own team roster tab hasn't been updated yet — a fresh MLB call-up's Org Rank/
+        // MLB Rank cells (AE/AF) often go blank once he graduates off the farm, even though
+        // this sheet still carries his real rank.
+        if (!pl.orgRank) {
+          const orgRankNum = numOrNull(colVal(row, 'Org Rank', 10));
+          if (orgRankNum != null) pl.orgRank = `${pl.team} ${Math.round(orgRankNum)}`;
+        }
+        if (!pl.mlbRank) {
+          const mlbRankNum = numOrNull(colVal(row, 'MLB Top 100 Rank', 11));
+          if (mlbRankNum != null) pl.mlbRank = `MLB ${Math.round(mlbRankNum)}`;
+        }
+        if (!pl.isProspect && (pl.orgRank || pl.mlbRank)) pl.isProspect = true;
       }
     }
 
@@ -6133,6 +6149,10 @@ function vsSellerCoreUntouchable(p) {
   const mlbN = vsMlbRankNum(p);
   if (mlbN != null && mlbN <= 100) return true;                       // top-100 prospect on the roster
   if (p.age != null && p.age < 26 && vsControlThrough(p) >= 2030) return true; // young + controlled deep
+  // Data-gap backstop: a flagged prospect can still be missing his rank/control fields
+  // (e.g. a fresh call-up the sheet hasn't backfilled yet) — don't let that data gap put
+  // him on the market. Age + Avg value alone is enough signal to hold him back.
+  if (p.isProspect && p.age != null && p.age < 26 && (p.avgVal || 0) >= 5) return true;
   return false;
 }
 
