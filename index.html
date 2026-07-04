@@ -4801,31 +4801,29 @@ function tbVerdictBox(cls,headline,detail){
 function renderTradeBreakdown(trade, liveOk){
   const sides=groupTradeSides(trade);
 
-  // liveTradeAssetValue() searches the full 30-team merged roster (allPlayers) for real players —
-  // a miss there means the player genuinely isn't findable anywhere yet (traded off-system, or
-  // the roster sheet just hasn't caught up to a very recent move) — grey out the Current block
-  // rather than blend in a misleading partial total. Comp picks always resolve (fixed value); an
-  // unspecified cash amount resolves to a zero-ish contribution without forcing the grey-out,
-  // since that's a "nothing to add" case rather than a lookup failure.
-  let currentSides=sides, unavailable=!liveOk;
-  // Real players (not comp picks/cash) who don't resolve on any of the 30 current rosters
-  // are genuinely out of affiliated baseball — flagged separately from the general
-  // "unavailable" grey-out so the verdict copy can call that out by name.
+  // liveTradeAssetValue() searches the full 30-team merged roster (allPlayers) for real players.
+  // "unavailable" (grey-out, whole block replaced with a placeholder) is reserved for when the
+  // live data never loaded at all — a single player who's out of affiliated baseball is a known,
+  // real outcome (val2026/avgVal of 0), not a data gap, so it must not blank out the rest of the
+  // trade's current-value bars/verdict. Comp picks always resolve (fixed value); an unspecified
+  // cash amount already resolves to a zero-ish contribution the same way.
+  let currentSides=sides;
+  const unavailable=!liveOk;
+  // Real players (not comp picks/cash) who don't resolve on any of the 30 current rosters are
+  // genuinely out of affiliated baseball — called out by name in a note, and counted as 0
+  // (not null) so they still contribute to — rather than block — the rest of the totals.
   const outOfLeagueNames=[];
   if(liveOk){
-    let anyMissing=false;
     currentSides=sides.map(s=>({
       receivingTeam:s.receivingTeam,
       players:s.players.map(p=>{
         const live=liveTradeAssetValue(p);
-        if(!live){
-          anyMissing=true;
-          if(!p.asset) outOfLeagueNames.push(p.playerName);
-        }
-        return {...p, val2026:live?live.val2026:null, avgVal:live?live.avgVal:null};
+        // liveTradeAssetValue() always resolves comp picks/cash (fixed/computed value), so a
+        // miss here only ever means a real player who's out of affiliated baseball.
+        if(!live) outOfLeagueNames.push(p.playerName);
+        return {...p, val2026:live?live.val2026:0, avgVal:live?live.avgVal:0};
       })
     }));
-    unavailable=anyMissing;
   }
 
   // Historical (non-2026) trades still label their at-trade block with the year it actually
