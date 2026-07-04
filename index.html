@@ -6114,8 +6114,9 @@ function vsOffer6(combo, target, buyerTeam, mode) {
   const thin = vsSellerThinBuckets(target.team).slice(0, 2);
   const fits = combo.some(p => thin.includes(finderPosBucket(p.pos)));
   const rental = vsControlThrough(target) <= 2026;
-  // Organic label: what the trade IS, never how it was constructed.
-  let label = rental ? 'Rental pickup — via ' + target.team : 'Via ' + target.team;
+  // Organic label: what the trade IS, never how it was constructed. The card
+  // renderer appends "— via {team}" itself, so no team name here.
+  let label = rental ? 'Rental pickup' : 'Value match';
   if (fits && mode === 'buy') label += ' · fits their rebuild';
   return {
     players: combo, target, giveTeam: buyerTeam, getTeam: target.team, getPlayers: [target],
@@ -6123,6 +6124,16 @@ function vsOffer6(combo, target, buyerTeam, mode) {
     isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(buyerTeam, target.team) : false,
     tax: 0
   };
+}
+
+// A seller's rebuild core — never available in the finder. The sim still allows
+// building such trades manually; the finder just never proposes them.
+function vsSellerCoreUntouchable(p) {
+  if (p.level !== 'mlb') return false;
+  const mlbN = vsMlbRankNum(p);
+  if (mlbN != null && mlbN <= 100) return true;                       // top-100 prospect on the roster
+  if (p.age != null && p.age < 26 && vsControlThrough(p) >= 2030) return true; // young + controlled deep
+  return false;
 }
 
 /* ---- BUYER MODE (position optional) ---- */
@@ -6134,12 +6145,14 @@ function vsGenerateBuyerOffersV4() {
   if (finderState.targetPlayers && finderState.targetPlayers.length) {
     const offers = [];
     for (const target of finderState.targetPlayers) {
+      if (vsSellerCoreUntouchable(target)) continue;  // finder won't propose a seller's
+                                                       // core piece; build it in the sim if you must
       const pool = vsPool6(userTeam, target);
       const star = (target.val2026 || 0) >= 5;
       const quality = vsBuild6(target, userTeam, pool, 'buy', 'quality');
       if (quality) {
         const o = vsOffer6(quality, target, userTeam, 'buy');
-        if (star) o.label = 'Quality package — via ' + target.team;
+        if (star) o.label = 'Quality package';
         offers.push(o);
       }
       if (star) {
@@ -6148,7 +6161,7 @@ function vsGenerateBuyerOffersV4() {
           quality.every(p => qty.some(q => q.name === p.name));
         if (qty && !same) {
           const o = vsOffer6(qty, target, userTeam, 'buy');
-          o.label = 'Quantity package — via ' + target.team;
+          o.label = 'Quantity package';
           offers.push(o);
         }
       }
@@ -6175,6 +6188,7 @@ function vsGenerateBuyerOffersV4() {
     if (!finderState.position && slots[b] >= 3.0) continue;   // don't upgrade stars in any-mode
     if (finderIsInjured(p)) continue;
     if (!vsRole6(p.team).canSell) continue;                   // sellers/hold only — no contender raids
+    if (vsSellerCoreUntouchable(p)) continue;                 // rebuild core stays home
     if (typeof finderIsSellerAvailable === 'function' && !finderIsSellerAvailable(p)) continue;
     if ((perTeam[p.team] || 0) >= 2) continue;
     const combo = vsBuild6(p, userTeam, vsPool6(userTeam, p), 'buy');
@@ -6197,7 +6211,7 @@ function vsGenerateSellerAutoOffers() {
 
   const shopList = allPlayers.filter(p =>
     p.team === userTeam && p.level === 'mlb' && !p.isComp && !p.isCash &&
-    (p.val2026 || 0) >= 1.5 && !finderIsInjured(p))
+    (p.val2026 || 0) >= 1.5 && !finderIsInjured(p) && !vsSellerCoreUntouchable(p))
     .sort((a, b) => (b.val2026 || 0) - (a.val2026 || 0))
     .slice(0, 10);
 
@@ -6221,7 +6235,7 @@ function vsGenerateSellerAutoOffers() {
         players: [player], target: null,
         giveTeam: userTeam, getTeam: buyer,
         getPlayers: combo,
-        label: (rental ? 'Rental sale — premium haul from ' : 'Haul from ') + buyer,
+        label: rental ? 'Rental sale — premium haul' : 'Prospect haul',
         isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, buyer) : false,
         tax: 0
       });
