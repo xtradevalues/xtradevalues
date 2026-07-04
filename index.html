@@ -871,6 +871,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 
 <!-- TRADE TRACKER PAGE -->
 <div id="page-tradetracker" class="page">
+  <div class="roster-controls">
+    <select id="ttYearFilter" onchange="onTradeTrackerYearChange()" style="flex:1;margin-bottom:0"></select>
+  </div>
   <div id="tradeTrackerContent" class="tt-list">
     <div class="roster-placeholder">Loading trades...</div>
   </div>
@@ -1196,10 +1199,10 @@ function showPage(p) {
   }
   if(p==='standings') renderStandingsPage();
   if(p==='tradetracker'){
-    if(tradesData){ renderTradeTrackerList(tradesData); }
+    if(tradesData){ ttPopulateYearFilter(tradesData); onTradeTrackerYearChange(); }
     else {
       document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Loading trades…</div>';
-      ensureTradesLoaded().then(t=>renderTradeTrackerList(t)).catch(e=>{
+      ensureTradesLoaded().then(t=>{ ttPopulateYearFilter(t); onTradeTrackerYearChange(); }).catch(e=>{
         document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Unable to load trades: '+esc(e.message)+'</div>';
       });
     }
@@ -1282,17 +1285,34 @@ function ensureDataLoaded(){
 // Columns: A=Trade Number, B=Player ID, C=Player Name, D=Trading Team, E=Receiving Team,
 // F=Trade Description, G=Date, H=2026 Value (at time of trade), I=Avg Value (at time of trade).
 let tradesData=null, tradesLoadPromise=null;
+const TT_CURRENT_YEAR=2026;
+// A trade's "season year" runs 10/24 of year Y-1 through 10/23 of year Y, labeled year Y —
+// so a trade in the 2025-26 offseason (e.g. 11/15/2025) counts as a 2026 trade, while one
+// right before the 10/24 cutoff (e.g. 10/20/2025) still belongs to the season that just ended.
+function seasonYearForDate(d){
+  if(!d) return null;
+  const cutoffThisYear=new Date(d.getFullYear(), 9, 24); // Oct 24, month is 0-indexed
+  return d>=cutoffThisYear ? d.getFullYear()+1 : d.getFullYear();
+}
 function ensureTradesLoaded(){
   if(tradesData) return Promise.resolve(tradesData);
   if(!tradesLoadPromise){
-    tradesLoadPromise=fetchSheetTab('Trades').then(rows=>{
-      tradesData=buildTrades(rows||[]);
+    tradesLoadPromise=Promise.all([
+      fetchSheetTab('Trades'),
+      fetchSheetTab('Historical Trades')
+    ]).then(([currentRows, historicRows])=>{
+      const current=buildTrades(currentRows||[], 'Trades');
+      const historic=buildTrades(historicRows||[], 'Historical Trades');
+      tradesData=[...current, ...historic].sort((a,b)=>{
+        const byDate=(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0);
+        return byDate;
+      });
       return tradesData;
     }).catch(e=>{tradesLoadPromise=null;throw e;});
   }
   return tradesLoadPromise;
 }
-function buildTrades(rows){
+function buildTrades(rows, sourceSheet){
   const byNum={}, order=[];
   for(const row of rows){
     const tradeNumber=String(colVal(row,'Trade Number',0)||'').trim();
@@ -1314,11 +1334,14 @@ function buildTrades(rows){
     const val2026=numOrNull(colVal(row,'2026 Value',7));
     const avgVal=numOrNull(colVal(row,'Avg Value',8));
     const cashAmount=asset==='cash'?parseCashAmount(playerName):null;
-    if(!byNum[tradeNumber]){
-      byNum[tradeNumber]={tradeNumber,description,date,players:[]};
-      order.push(tradeNumber);
+    // Trade numbers can repeat across the two sheets (e.g. "1" exists in both Trades and
+    // Historical Trades) — key grouping by sheet+number so they never collide.
+    const groupKey=sourceSheet+'|'+tradeNumber;
+    if(!byNum[groupKey]){
+      byNum[groupKey]={tradeNumber,sourceSheet,description,date,seasonYear:seasonYearForDate(date),players:[]};
+      order.push(groupKey);
     }
-    byNum[tradeNumber].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal,asset,cashAmount});
+    byNum[groupKey].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal,asset,cashAmount});
   }
   // Most recent trade first; ties (same date) break by Trade Number descending, since trade
   // numbers are assigned in chronological order.
@@ -1385,11 +1408,12 @@ function liveTradeAssetValue(p){
   if(p.asset==='cash') return {val2026:p.cashAmount?cashDollarsToValue(p.cashAmount):null, avgVal:null};
   return liveTradePlayerValues(p.playerID);
 }
-function renderTradeTrackerList(trades){
+function renderTradeTrackerList(trades, selectedYear){
   const c=document.getElementById('tradeTrackerContent');
-  if(!trades.length){c.innerHTML='<div class="roster-placeholder">No trades yet</div>';return;}
-  c.innerHTML=trades.map(t=>`
-    <div class="tt-card" onclick="openTradeBreakdown('${esc(t.tradeNumber)}')">
+  const filtered=selectedYear ? trades.filter(t=>t.seasonYear===selectedYear) : trades;
+  if(!filtered.length){c.innerHTML='<div class="roster-placeholder">No trades yet</div>';return;}
+  c.innerHTML=filtered.map(t=>`
+    <div class="tt-card" onclick="openTradeBreakdown('${esc(t.tradeNumber)}','${esc(t.sourceSheet)}')">
       <div class="tt-card-left">
         <div class="tt-card-desc">${esc(t.description||'Trade')}</div>
         <div class="tt-card-date">${esc(fmtDate(t.date))}</div>
@@ -1397,6 +1421,22 @@ function renderTradeTrackerList(trades){
       <div class="tt-card-icon-btn" title="View trade breakdown"><i class="fa-solid fa-chart-simple"></i></div>
     </div>
   `).join('');
+}
+// Populate the year filter once per session from whatever season years are actually present
+// in the merged Trades + Historical Trades data — doesn't hardcode which historical years
+// exist since Historical Trades is still being backfilled. Leaves an existing selection alone
+// on repeat visits to the page.
+function ttPopulateYearFilter(trades){
+  const sel=document.getElementById('ttYearFilter');
+  if(!sel || sel.options.length) return;
+  const years=[...new Set(trades.map(t=>t.seasonYear).filter(y=>y!=null))].sort((a,b)=>b-a);
+  sel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value=years.includes(TT_CURRENT_YEAR) ? String(TT_CURRENT_YEAR) : (years[0]!=null ? String(years[0]) : '');
+}
+function onTradeTrackerYearChange(){
+  const sel=document.getElementById('ttYearFilter');
+  const year=sel && sel.value ? parseInt(sel.value,10) : null;
+  renderTradeTrackerList(tradesData||[], year);
 }
 // Map full team names (from roster Team column) → abbreviation
 const TEAM_NAME_TO_ABBR = {
@@ -4634,13 +4674,13 @@ function closeShare(){document.getElementById('shareModal').classList.remove('op
 function closeShareOut(e){if(e.target.id==='shareModal')closeShare();}
 
 // ===== TRADE BREAKDOWN MODAL (Trade Tracker page) =====
-async function openTradeBreakdown(tradeNumber){
+async function openTradeBreakdown(tradeNumber, sourceSheet){
   document.getElementById('tradeBreakdownModal').classList.add('open');
   document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Loading…</div>';
   let trades;
   try { trades=await ensureTradesLoaded(); }
   catch(e){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Unable to load trade: '+esc(e.message)+'</div>'; return; }
-  const trade=trades.find(t=>t.tradeNumber===tradeNumber);
+  const trade=trades.find(t=>t.tradeNumber===tradeNumber && t.sourceSheet===sourceSheet);
   if(!trade){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Trade not found</div>'; return; }
   let liveOk=true;
   try { await ensureDataLoaded(); } catch(e){ liveOk=false; }
@@ -4706,13 +4746,13 @@ function tbBarHtml(sides, getVal){
 function tbEmptyBarHtml(label){
   return `<div class="tb-bar-track tb-bar-track-empty"><div class="tb-bar-empty-label">${esc(label)}</div></div>`;
 }
-function tbBlockHtml(dateLabel, sides, unavailable){
+function tbBlockHtml(dateLabel, sides, unavailable, valueLabel){
   const val26Html=unavailable ? tbEmptyBarHtml('No Data Available') : tbBarHtml(sides,p=>p.val2026);
   const avgHtml=unavailable ? tbEmptyBarHtml('Check Back Soon') : tbBarHtml(sides,p=>p.avgVal);
   return `<div class="tb-block">
     <div class="tb-block-date">${esc(dateLabel)}</div>
     <div class="share-bars">
-      <div><div class="share-bar-lbl">2026 VALUE</div>${val26Html}</div>
+      <div><div class="share-bar-lbl">${esc(valueLabel)} VALUE</div>${val26Html}</div>
       <div><div class="share-bar-lbl">AVG VALUE</div>${avgHtml}</div>
     </div>
   </div>`;
@@ -4727,12 +4767,31 @@ function tbPlayerNameHtml(p){
   }
   return `<div class="share-player-name">${esc(p.playerName)}</div>`;
 }
-function tbSideStatsHtml(sides){
+// A player later moved again in some other trade (either sheet) — a plain informational
+// link to that later trade's own breakdown. Does not fold its return package into this
+// trade's totals; the bars/values here stay exactly as computed elsewhere.
+function findLaterTrade(playerID, currentDate, currentSourceSheet, currentTradeNumber, allTrades){
+  if(!playerID || !currentDate) return null;
+  const later=allTrades.filter(t=>{
+    if(t.sourceSheet===currentSourceSheet && t.tradeNumber===currentTradeNumber) return false;
+    if(!t.date || t.date<=currentDate) return false;
+    return t.players.some(p=>p.playerID===playerID && p.tradingTeam);
+  }).sort((a,b)=>a.date-b.date);
+  return later.length ? later[0] : null;
+}
+function tbLaterTradeNoteHtml(p, trade){
+  if(!p.playerID) return ''; // comp picks/cash were never "traded again"
+  const laterTrade=findLaterTrade(p.playerID, trade.date, trade.sourceSheet, trade.tradeNumber, tradesData||[]);
+  if(!laterTrade) return '';
+  return `<div style="font-size:10px;color:var(--accent);cursor:pointer;margin-top:2px" onclick="openTradeBreakdown('${esc(laterTrade.tradeNumber)}','${esc(laterTrade.sourceSheet)}')">Later traded ${esc(fmtDate(laterTrade.date))} →</div>`;
+}
+function tbSideStatsHtml(sides, trade){
   // Cash considerations don't carry a meaningful Avg Value — same display rule trade sim's own
   // share-player line uses for isCash entries.
   const playerLine=(p)=>{
-    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div></div>`;
-    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div></div>`;
+    const laterNote=trade ? tbLaterTradeNoteHtml(p, trade) : '';
+    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div>${laterNote}</div>`;
+    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div>${laterNote}</div>`;
   };
   return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
 }
@@ -4749,25 +4808,41 @@ function renderTradeBreakdown(trade, liveOk){
   // unspecified cash amount resolves to a zero-ish contribution without forcing the grey-out,
   // since that's a "nothing to add" case rather than a lookup failure.
   let currentSides=sides, unavailable=!liveOk;
+  // Real players (not comp picks/cash) who don't resolve on any of the 30 current rosters
+  // are genuinely out of affiliated baseball — flagged separately from the general
+  // "unavailable" grey-out so the verdict copy can call that out by name.
+  const outOfLeagueNames=[];
   if(liveOk){
     let anyMissing=false;
     currentSides=sides.map(s=>({
       receivingTeam:s.receivingTeam,
       players:s.players.map(p=>{
         const live=liveTradeAssetValue(p);
-        if(!live) anyMissing=true;
+        if(!live){
+          anyMissing=true;
+          if(!p.asset) outOfLeagueNames.push(p.playerName);
+        }
         return {...p, val2026:live?live.val2026:null, avgVal:live?live.avgVal:null};
       })
     }));
     unavailable=anyMissing;
   }
 
-  document.getElementById('tbdBody').innerHTML=tbSideStatsHtml(sides)
-    + tbBlockHtml(fmtDate(trade.date), sides, false)
+  // Historical (non-2026) trades still label their at-trade block with the year it actually
+  // happened; the live/current block is always "2026" since that's the present state of the
+  // data regardless of which sheet the trade came from.
+  const atTradeLabel=trade.seasonYear===TT_CURRENT_YEAR ? '2026' : String(trade.seasonYear);
+  const outOfLeagueNote=outOfLeagueNames.length
+    ? `<div style="margin-top:10px;font-size:11px;color:var(--text-muted)">${outOfLeagueNames.map(esc).join(', ')} ${outOfLeagueNames.length===1?'is':'are'} no longer in affiliated baseball.</div>`
+    : '';
+
+  document.getElementById('tbdBody').innerHTML=tbSideStatsHtml(sides, trade)
+    + tbBlockHtml(fmtDate(trade.date), sides, false, atTradeLabel)
     + `<div style="margin-top:14px">${tbSideStatsHtml(currentSides)}</div>`
-    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable)
+    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable, '2026')
     + tbVerdictHtml(sides, currentSides, unavailable)
-    + tbSmartVerdictHtml(currentSides, unavailable);
+    + tbSmartVerdictHtml(currentSides, unavailable)
+    + outOfLeagueNote;
 }
 
 // ===== SCORE MODAL =====
