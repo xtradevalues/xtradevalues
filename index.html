@@ -314,8 +314,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .share-player{padding:5px 0;border-bottom:1px solid var(--border-light)}
 .share-player:last-child{border-bottom:none}
 .share-player-name{font-size:11px;font-weight:400;color:var(--text-primary)}
-.share-player-stats{display:flex;gap:7px;margin-top:2px;font-size:10px;color:var(--text-muted)}
-.share-player-stats span{color:var(--text-primary);font-weight:400}
+.share-player-stats{display:flex;flex-wrap:wrap;row-gap:2px;column-gap:7px;margin-top:2px;font-size:10px;color:var(--text-muted)}
+.share-player-stats .stat-pair{white-space:nowrap}
+.share-player-stats b{color:var(--text-primary);font-weight:400}
 .share-bars{margin:9px 0;display:flex;flex-direction:column;gap:5px}
 .share-bar-lbl{font-size:8px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:2px}
 .share-bar-track{position:relative;height:7px;background:var(--bg-light);border-radius:4px;overflow:visible}
@@ -3927,9 +3928,9 @@ async function generateOffers(){
 
 // ===== FINDER RESULTS DISPLAY =====
 function finderPlayerLine(p){
-  if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
-  if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
-  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${vsCtrlThruLabel(p)||'—'}</span></div></div>`;
+  if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div></div>`;
+  if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div></div>`;
+  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span> <span class="stat-pair">Ctrl: <b>${vsCtrlThruLabel(p)||'—'}</b></span></div></div>`;
 }
 
 function finderBuildBarsHtml(giveList, getList){
@@ -4605,9 +4606,9 @@ function openShareModal(){
   const tB=document.getElementById('teamB').value||'Side B';
   // SWAPPED: left card shows tB's name with what tA gave (tB receives), right shows tA's name with what tB gave (tA receives)
   const playerLine=(p)=>{
-    if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
-    if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
-    return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span> Ctrl: <span>${vsCtrlThruLabel(p)||'—'}</span></div></div>`;
+    if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div></div>`;
+    if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div></div>`;
+    return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span> <span class="stat-pair">Ctrl: <b>${vsCtrlThruLabel(p)||'—'}</b></span></div></div>`;
   };
   const side=(list,lbl)=>{
     if(!list.length) return `<div><div class="share-side-label">${lbl} Receives</div><div style="font-size:11px;color:var(--text-muted)">Nothing</div></div>`;
@@ -4730,8 +4731,8 @@ function tbSideStatsHtml(sides){
   // Cash considerations don't carry a meaningful Avg Value — same display rule trade sim's own
   // share-player line uses for isCash entries.
   const playerLine=(p)=>{
-    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats">26: <span>${fmt(p.val2026)}</span></div></div>`;
-    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats">26: <span>${fmt(p.val2026)}</span> Avg: <span>${fmt(p.avgVal)}</span></div></div>`;
+    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div></div>`;
+    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div></div>`;
   };
   return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
 }
