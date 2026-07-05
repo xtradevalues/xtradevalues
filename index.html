@@ -48,7 +48,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%}
 body{
-  min-height:100%;
+  height:100%;
   display:flex;flex-direction:column;
   background:var(--bg);color:var(--text-primary);
   font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
@@ -86,7 +86,7 @@ button,select,input{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:g
 .menu-item:hover,.menu-item.active{color:var(--accent);background:var(--accent-soft)}
 
 /* PAGES */
-.page{display:none;flex:1;flex-direction:column}
+.page{display:none;flex:1;flex-direction:column;min-height:0;overflow-y:auto}
 .page.active{display:flex}
 
 /* TRADE PAGE */
@@ -198,7 +198,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .roster-controls select{flex:1;margin-bottom:0}
 .roster-subgroup-header{padding:9px 12px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
 .roster-table{width:100%;border-collapse:collapse}
-.roster-table th{padding:9px 8px;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;text-align:right}
+.roster-table th{padding:9px 8px;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;text-align:right;position:sticky;top:0;z-index:1}
 .roster-table th:first-child{text-align:left}
 .roster-table th.pos-col{text-align:center}
 .roster-table tbody tr:nth-child(even){background:var(--row-alt)}
@@ -1545,7 +1545,7 @@ async function loadData() {
           obp: null, slg: null, wrcPlus: null,
           era: null, fip: null, k9: null,
           hr: null, k: null, vWAR: null,
-          ip: null, whip: null, pa: null, h: null, avg26: null,
+          ip: null, sv: null, pa: null, h: null, avg26: null,
           rbi: null, w: null, l: null, sb: null,
           vWARHit: null, vWARPitch: null,
           fgUrl: null,
@@ -1596,7 +1596,7 @@ async function loadData() {
         p.era  = numOrNull(row['ERA']);
         p.k    = numOrNull(row['K']);
         p.ip   = numOrNull(row['IP']);
-        p.whip = numOrNull(row['WHIP']);
+        p.sv   = numOrNull(colVal(row,'SV',25));
         p.k9   = numOrNull(row['K9']);
         p.fip  = calcFIP(colVal(row,'IP',9), colVal(row,'HR',13), colVal(row,'BB',14), colVal(row,'HBP',15), colVal(row,'K',16));
         p.w    = numOrNull(colVal(row,'W',4));
@@ -1915,9 +1915,9 @@ function renderPlayers(){
   });
   // For Players tab we show 2026 stat line from allPlayers (PLAYERS tab stats)
   // Hitters: PA, H, HR, AVG, OBP, SLG, vWAR + 2026 Val + Avg Val
-  // Pitchers: IP, K, ERA, FIP, WHIP, K9, vWAR + 2026 Val + Avg Val
+  // Pitchers: IP, K, ERA, FIP, S (Saves), K9, vWAR + 2026 Val + Avg Val
   const hCols=['#','Player','Pos','PA','H','HR','AVG','OBP','SLG','vWAR','2026','Avg'];
-  const pCols=['#','Player','Pos','IP','K','ERA','FIP','WHIP','K/9','vWAR','2026','Avg'];
+  const pCols=['#','Player','Pos','IP','K','ERA','FIP','S','K/9','vWAR','2026','Avg'];
   const cols=isHitter?hCols:pCols;
   const thSort={};thSort['2026']='val2026';thSort['Avg']='avgVal';thSort['vWAR']='vWAR';
   thSort['HR']='hr';thSort['ERA']='era';thSort['K']='k';thSort['IP']='ip';
@@ -1965,7 +1965,7 @@ function renderPlayers(){
         `<td>${fmtI(p.k)}</td>`,
         `<td>${fmt2(p.era)}</td>`,
         `<td>${fmt2(p.fip)}</td>`,
-        `<td>${fmt2(p.whip)}</td>`,
+        `<td>${fmtI(p.sv)}</td>`,
         `<td>${fmtF(p.k9)}</td>`,
         `<td>${vWARDisp}</td>`,
         `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
@@ -2113,7 +2113,7 @@ function computeMiLBPitcherStats(r){
   return {
     ip:numOrNull(colVal(r,'IP',9)), k:numOrNull(colVal(r,'K',16)), era:numOrNull(r['ERA']),
     fip:sheetFip!==null?sheetFip:calcFIP(colVal(r,'IP',9), colVal(r,'HR',13), colVal(r,'BB',14), colVal(r,'HBP',15), colVal(r,'K',16)),
-    whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+    sv:numOrNull(colVal(r,'SV',30)), k9:numOrNull(r['K9']),
     w:numOrNull(colVal(r,'W',5)), l:numOrNull(colVal(r,'L',6)), vWAR:numOrNull(r['vWAR'])
   };
 }
@@ -2187,20 +2187,22 @@ async function ppRenderStats(){
   if(isPitcher){
     const rows=[];
     // FIP is computed with the sheet's own formula (calcFIP), not read from a column.
-    const pRow=(season,r)=>{
+    // Saves live at column Z (idx 25) on the yearly MLB Pitchers sheets, but column X
+    // (idx 23) on Updated Career Pitching — pass the right index per source.
+    const pRow=(season,r,svIdx)=>{
       if(!r) return null;
       return {season, ip:numOrNull(colVal(r,'IP',9)), k:numOrNull(colVal(r,'K',16)),
-        era:numOrNull(r['ERA']), whip:numOrNull(r['WHIP']), k9:numOrNull(r['K9']),
+        era:numOrNull(r['ERA']), sv:numOrNull(colVal(r,'SV',svIdx)), k9:numOrNull(r['K9']),
         vWAR:numOrNull(r['vWAR']),
         fip:calcFIP(colVal(r,'IP',9), colVal(r,'HR',13), colVal(r,'BB',14), colVal(r,'HBP',15), colVal(r,'K',16)),
         w:numOrNull(colVal(r,'W',4)), l:numOrNull(colVal(r,'L',5))};
     };
     [r23&&{season:'2023',r:r23},r24&&{season:'2024',r:r24},r25&&{season:'2025',r:r25},r26&&{season:'2026',r:r26}].filter(Boolean).forEach(({season,r})=>{
-      const row=pRow(season,r); if(row) rows.push(row);
+      const row=pRow(season,r,25); if(row) rows.push(row);
     });
     // Career row is pre-blended server-side — read it directly, no frontend blending.
     if(rCareer){
-      const cRow=pRow('Career',rCareer);
+      const cRow=pRow('Career',rCareer,23);
       if(cRow){cRow.isCareer=true;rows.push(cRow);}
     }
     section.innerHTML=rows.length?ppPitcherTable(rows):'<div class="pp-no-data">No stats available</div>';
@@ -2252,9 +2254,9 @@ function ppPitcherTable(rows){
   const fmtI=v=>v!==null&&!isNaN(v)?Math.round(v):'-';
   const fmtF=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'-';
   const fmtWL=r=>(r.w!==null&&!isNaN(r.w)&&r.l!==null&&!isNaN(r.l))?`${Math.round(r.w)}-${Math.round(r.l)}`:'-';
-  let html=`<table class="pp-stat-table"><thead><tr><th>Season</th><th>IP</th><th>W-L</th><th>ERA</th><th>K</th><th>FIP</th><th>WHIP</th><th>K/9</th><th>vWAR</th></tr></thead><tbody>`;
+  let html=`<table class="pp-stat-table"><thead><tr><th>Season</th><th>IP</th><th>W-L</th><th>ERA</th><th>K</th><th>FIP</th><th>S</th><th>K/9</th><th>vWAR</th></tr></thead><tbody>`;
   rows.forEach(r=>{
-    html+=`<tr class="${r.isCareer?'career-row':''}"><td>${esc(String(r.season))}</td><td>${fmtF(r.ip)}</td><td>${fmtWL(r)}</td><td>${fmt2(r.era)}</td><td>${fmtI(r.k)}</td><td>${fmt2(r.fip)}</td><td>${fmt2(r.whip)}</td><td>${fmtF(r.k9)}</td><td>${fmtF(r.vWAR)}</td></tr>`;
+    html+=`<tr class="${r.isCareer?'career-row':''}"><td>${esc(String(r.season))}</td><td>${fmtF(r.ip)}</td><td>${fmtWL(r)}</td><td>${fmt2(r.era)}</td><td>${fmtI(r.k)}</td><td>${fmt2(r.fip)}</td><td>${fmtI(r.sv)}</td><td>${fmtF(r.k9)}</td><td>${fmtF(r.vWAR)}</td></tr>`;
   });
   html+=`</tbody></table>`;
   return html;
@@ -4133,7 +4135,7 @@ function isValidCssColor(c){
 }
 function pmDash(v){return(v===null||v===undefined||isNaN(v))?'-':v;}
 function pmWL(w,l){return(w!==null&&w!==undefined&&!isNaN(w)&&l!==null&&l!==undefined&&!isNaN(l))?`${Math.round(w)}-${Math.round(l)}`:'-';}
-// Stat set per section 4: Hitters PA,H,HR,RBI,AVG,OPS,SB,vWAR | Pitchers IP,W-L,ERA,K,FIP,WHIP,K/9,vWAR
+// Stat set per section 4: Hitters PA,H,HR,RBI,AVG,OPS,SB,vWAR | Pitchers IP,W-L,ERA,K,FIP,S,K/9,vWAR
 function pmHitterStats(s){
   if(!s) s={};
   return [
@@ -4155,7 +4157,7 @@ function pmPitcherStats(s){
     {lbl:'ERA',val:pmDash(s.era!=null&&!isNaN(s.era)?s.era.toFixed(2):null)},
     {lbl:'K',val:pmDash(s.k!=null&&!isNaN(s.k)?Math.round(s.k):null)},
     {lbl:'FIP',val:pmDash(s.fip!=null&&!isNaN(s.fip)?s.fip.toFixed(2):null)},
-    {lbl:'WHIP',val:pmDash(s.whip!=null&&!isNaN(s.whip)?s.whip.toFixed(2):null)},
+    {lbl:'S',val:pmDash(s.sv!=null&&!isNaN(s.sv)?Math.round(s.sv):null)},
     {lbl:'K/9',val:pmDash(s.k9!=null&&!isNaN(s.k9)?s.k9.toFixed(1):null)},
     {lbl:'vWAR',val:pmDash(s.vWAR!=null&&!isNaN(s.vWAR)?s.vWAR.toFixed(1):null)},
   ];
