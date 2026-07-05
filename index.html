@@ -2623,12 +2623,12 @@ let finderState = {
   untouchableProspect: null, // buyer path: one of the user's own prospects, protected from any offer
   sellPlayers: [],  // seller path: array of player objects. Multiple players = OPTIONAL combos, not forced together.
   haulType: null,  // seller path: 'mlbready' | 'dev'
-  partnerTeam: null, // seller path: specific trade partner, or null for 'any'
+  sellerPartner: null, // seller path: specific trade partner (team abbreviation), or null for 'any'
   sellerAuto: false // seller path: true = auto-scan for best trade chips, false/null = hand-pick
 };
 
 function finderRestart(){
-  finderState = {team:null, intent:null, position:null, caliber:null, targetPlayers:[], untouchableProspect:null, sellPlayers:[], haulType:null, partnerTeam:null, sellerAuto:false};
+  finderState = {team:null, intent:null, position:null, caliber:null, targetPlayers:[], untouchableProspect:null, sellPlayers:[], haulType:null, sellerPartner:null, sellerAuto:false};
   document.getElementById('finderTeam').value='';
   document.getElementById('finderPartnerTeam').value='';
   document.getElementById('finderPosSelect').value='';
@@ -2666,7 +2666,7 @@ function finderResetCaliberTier(){
   finderResetResultsTier();
 }
 function finderResetPartnerTier(){
-  finderState.partnerTeam=null;
+  finderState.sellerPartner=null;
   document.getElementById('finderPartnerTeam').value='';
   finderResetResultsTier();
 }
@@ -2991,7 +2991,7 @@ function finderHaulChosen(haul,el){
 
 function finderPartnerChosen(){
   finderCloseResultsIfOpen();
-  finderState.partnerTeam = document.getElementById('finderPartnerTeam').value || null;
+  finderState.sellerPartner = document.getElementById('finderPartnerTeam').value || null;
 }
 
 document.addEventListener('click', e => {
@@ -3481,402 +3481,6 @@ function finderGenerateBuyerOffers(){
   return offers;
 }
 
-// ===== SELLER PATH =====
-
-// Determine the buyer's Nth-best at a position for comparison purposes (mirrors "Any Improvement" logic)
-function finderBuyerComparisonVal(buyerTeam, posBucket){
-  const buyerRank=finderUserPosRank(buyerTeam,posBucket); // reuse: ranks any team's MLB players at a position
-  if(posBucket==='OF') return buyerRank[2]?buyerRank[2].val2026:-Infinity;
-  if(posBucket==='SP') return buyerRank[4]?buyerRank[4].val2026:-Infinity;
-  if(posBucket==='RP') return buyerRank[3]?buyerRank[3].val2026:-Infinity;
-  return buyerRank[0]?buyerRank[0].val2026:-Infinity;
-}
-
-// Get all qualifying Buyer teams who would see the seller's player as a genuine upgrade
-// sellPackage: array of 1+ players being sold together AS ONE OFFER UNIT (a "combo")
-function finderGetBuyerSuitors(sellPackage){
-  const headliner=[...sellPackage].sort((a,b)=>(b.avgVal||0)-(a.avgVal||0))[0];
-  const posBucket=finderPosBucket(headliner.pos);
-  console.log('posBucket for sell package headliner:', posBucket, 'teamPosture keys count:', Object.keys(teamPosture).length);
-  if(!posBucket) return [];
-  const sellTeam=headliner.team;
-  const combinedV26=sellPackage.reduce((s,p)=>s+(p.val2026||0),0);
-  const buyerTeams=Object.keys(teamPosture).filter(t=>(teamPosture[t]==='buyer'||teamPosture[t]==='either') && t!==sellTeam);
-  console.log('Buyer teams total:', buyerTeams.length, buyerTeams);
-  const result = buyerTeams.filter(t=>{
-    const compVal=finderBuyerComparisonVal(t,posBucket);
-    const qualifies = combinedV26>compVal;
-    if(!qualifies) console.log('  ', t, 'comp val:', compVal, '- NOT an upgrade (combined val2026:', combinedV26, ')');
-    return qualifies;
-  });
-  return result;
-}
-
-// Find the best eligible prospect or minors player within a buyer's system matching the chosen ETA tier
-// For prospects: MLB-Ready = ETA 2026-2027, Developmental = ETA 2028+
-// For minors: MLB-Ready = age 22-27, Developmental = age 21 and under
-// No RP prospects or minors. Injured minors CAN be included.
-function finderGetTopPiece(buyerTeam, haulType){
-  const isMlbReady = haulType==='mlbready';
-  const candidates=allPlayers.filter(p=>{
-    if(p.team!==buyerTeam) return false;
-    if(finderFirstPos(p.pos)==='RP') return false; // no RP prospects or minors
-
-    if(p.isProspect && p.level==='minors'){
-      // Prospect: use ETA tiers
-      const eta=parseInt(p.etaRaw);
-      if(isNaN(eta)) return false;
-      const matchesTier = isMlbReady ? (eta===2026||eta===2027) : (eta>=2028);
-      if(!matchesTier) return false;
-      return finderIsBuyerProspectEligible(p, buyerTeam);
-    }
-
-    if(!p.isProspect && p.level==='minors'){
-      // Minors: use age tiers instead of ETA
-      if(p.age===null) return false;
-      const matchesTier = isMlbReady ? (p.age>=22 && p.age<=27) : (p.age<=21);
-      if(!matchesTier) return false;
-      return finderIsBuyerMinorsEligible(p, buyerTeam);
-    }
-
-    return false;
-  }).sort((a,b)=>(b.avgVal||0)-(a.avgVal||0));
-  return candidates.length?candidates[0]:null;
-}
-
-// Build return package scenarios for a given buyer team, headlined by the top piece, filled with lower-rated eligible prospects
-// sellPackage: array of 1+ players being sold together as one combo
-function finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece){
-  const sellTeam=sellPackage[0].team;
-  const sellV26=sellPackage.reduce((s,p)=>s+(p.val2026||0),0);
-  const sellAvg=sellPackage.reduce((s,p)=>s+(p.avgVal||0),0);
-  const topPieceVal=topPiece.avgVal||0;
-
-  // Pool of other eligible prospects AND minors from this buyer's system, lower-rated than the top piece
-  // Injured minors CAN be included; no RP prospects or minors
-  const fillerPool=allPlayers.filter(p=>{
-    if(p.team!==buyerTeam) return false;
-    if(p.name===topPiece.name) return false;
-    if((p.avgVal||0)>=topPieceVal) return false; // must be lower-rated than top piece
-    if(p.isProspect && p.level==='minors') return finderIsBuyerProspectEligible(p, buyerTeam);
-    if(!p.isProspect && p.level==='minors') return finderIsBuyerMinorsEligible(p, buyerTeam);
-    return false;
-  }).sort((a,b)=>(b.avgVal||0)-(a.avgVal||0));
-
-  const scenarios=[];
-  // Global used-names across ALL seller scenarios — no player appears in more than one offer
-  const usedNames=new Set();
-  // Dedup signatures for combo-based scenarios (e.g. The Blockbuster)
-  const usedNameSets=new Set();
-
-  // In-Division Tax
-  const isInDivision = finderIsSameDivision(sellTeam, buyerTeam);
-  const tax = isInDivision ? 5 : 0;
-
-  // giveV26/giveAvg = value the BUYER gives up (the prospect/minors package)
-  function getPcts(giveV26, giveAvg){
-    const tot26=giveV26+sellV26, totAvg=giveAvg+sellAvg;
-    const pct26=tot26>0?(giveV26/tot26)*100:50;
-    const pctAvg=totAvg>0?(giveAvg/totAvg)*100:50;
-    return {pct26, pctAvg};
-  }
-  function inFairBand(giveV26, giveAvg){
-    const {pct26, pctAvg}=getPcts(giveV26, giveAvg);
-    return pct26>=(40+tax) && pct26<=(60+tax) && pctAvg>=(40+tax) && pctAvg<=(60+tax);
-  }
-  function inFutureSkewedBand(giveV26, giveAvg){
-    const {pct26, pctAvg}=getPcts(giveV26, giveAvg);
-    return pct26>=(50+tax) && pct26<=(60+tax) && pctAvg>=(60+tax);
-  }
-  function fitScoreFair(giveV26, giveAvg){
-    const {pct26, pctAvg}=getPcts(giveV26, giveAvg);
-    const mid=50+tax;
-    return Math.abs(pct26-mid)+Math.abs(pctAvg-mid);
-  }
-  function fitScoreFutureSkewed(giveV26, giveAvg){
-    const {pct26, pctAvg}=getPcts(giveV26, giveAvg);
-    return Math.abs(pct26-(55+tax))+Math.abs(pctAvg-(65+tax));
-  }
-
-  // availableFiller: fillerPool minus any already-used players
-  function availableFiller(){
-    return fillerPool.filter(p=>!usedNames.has(p.name));
-  }
-
-  function anyAlreadyUsed(combo){
-    return combo.some(p=>usedNames.has(p.name));
-  }
-  function markUsed(combo){
-    combo.forEach(p=>usedNames.add(p.name));
-  }
-
-  function addScenario(combo, label, bandFn){
-    if(anyAlreadyUsed(combo)) return false;
-    if(finderViolatesPositionCap(combo)) return false;
-    const giveV26=combo.reduce((s,p)=>s+(p.val2026||0),0);
-    const giveAvg=combo.reduce((s,p)=>s+(p.avgVal||0),0);
-    if(!bandFn(giveV26,giveAvg)) return false;
-    markUsed(combo);
-    scenarios.push({players:combo,label,isInDivision,tax});
-    return true;
-  }
-
-  function findBestFiller(bandFn, scoreFn){
-    if(usedNames.has(topPiece.name)) return null; // topPiece already used
-    let best=null, bestScore=Infinity;
-    for(const filler of availableFiller()){
-      const combo=[topPiece,filler];
-      const giveV26=combo.reduce((s,p)=>s+(p.val2026||0),0);
-      const giveAvg=combo.reduce((s,p)=>s+(p.avgVal||0),0);
-      if(!bandFn(giveV26,giveAvg)) continue;
-      const score=scoreFn(giveV26,giveAvg);
-      if(score<bestScore){ bestScore=score; best=combo; }
-    }
-    return best;
-  }
-  function findSpread(bandFn, size){
-    if(usedNames.has(topPiece.name)) return null; // topPiece already used
-    const pool=availableFiller().slice(0,15);
-    for(let attempt=0; attempt<400; attempt++){
-      const indices=new Set();
-      while(indices.size<size && indices.size<pool.length){
-        indices.add(Math.floor(Math.random()*pool.length));
-      }
-      if(indices.size<size) continue;
-      const extras=[...indices].map(idx=>pool[idx]);
-      const combo=[topPiece,...extras];
-      if(anyAlreadyUsed(combo)) continue;
-      const giveV26=combo.reduce((s,p)=>s+(p.val2026||0),0);
-      const giveAvg=combo.reduce((s,p)=>s+(p.avgVal||0),0);
-      if(bandFn(giveV26,giveAvg)) return combo;
-    }
-    return null;
-  }
-
-  // ===== 1: Fair Headliner (top piece alone, or top piece + 1 filler) =====
-  let fairHeadliner=null;
-  if(!usedNames.has(topPiece.name)){
-    const giveV26=topPiece.val2026||0, giveAvg=topPiece.avgVal||0;
-    if(inFairBand(giveV26,giveAvg)) fairHeadliner=[topPiece];
-  }
-  if(!fairHeadliner) fairHeadliner=findBestFiller(inFairBand, fitScoreFair);
-  if(fairHeadliner) addScenario(fairHeadliner, 'Fair Headliner Package', inFairBand);
-
-  // ===== 2: Fair Balanced (top piece + 2-3 fillers) =====
-  let fairBalanced = findSpread(inFairBand, 2) || findSpread(inFairBand, 3);
-  if(fairBalanced) addScenario(fairBalanced, 'Fair Balanced Package', inFairBand);
-
-  // ===== 3: Future-Skewed Headliner =====
-  let fsHeadliner=null;
-  if(!usedNames.has(topPiece.name)){
-    const giveV26=topPiece.val2026||0, giveAvg=topPiece.avgVal||0;
-    if(inFutureSkewedBand(giveV26,giveAvg)) fsHeadliner=[topPiece];
-  }
-  if(!fsHeadliner) fsHeadliner=findBestFiller(inFutureSkewedBand, fitScoreFutureSkewed);
-  if(fsHeadliner) addScenario(fsHeadliner, 'Future-Skewed Headliner Package', inFutureSkewedBand);
-
-  // ===== 4: Future-Skewed Balanced =====
-  let fsBalanced = findSpread(inFutureSkewedBand, 2) || findSpread(inFutureSkewedBand, 3);
-  if(fsBalanced) addScenario(fsBalanced, 'Future-Skewed Balanced Package', inFutureSkewedBand);
-
-  // ===== 5: The Blockbuster - buyerTeam includes one of THEIR protected (already-called-up, col AC = MLB) =====
-  // prospects, forcing the seller (user's team) to add a matching MLB player on their side
-  const protectedProspects=allPlayers.filter(p=>
-    p.team===buyerTeam &&
-    p.isProspect &&
-    finderFirstPos(p.pos)!=='RP' &&
-    !finderIsInjured(p) &&
-    finderIsCalledUp(p)
-  ).sort((a,b)=>(b.avgVal||0)-(a.avgVal||0));
-
-  if(protectedProspects.length){
-    for(const protectedP of protectedProspects){
-      const matchingMlb=finderFindBlockbusterMatch(protectedP, sellTeam, sellPackage.map(p=>p.name));
-      if(!matchingMlb) continue;
-      let blockbusterGive=[protectedP];
-      const giveV26=protectedP.val2026||0, giveAvg=protectedP.avgVal||0;
-      if(!inFutureSkewedBand(giveV26,giveAvg)){
-        let found=null;
-        for(const filler of fillerPool){
-          const combo=[protectedP, filler];
-          const gV=combo.reduce((s,p)=>s+(p.val2026||0),0);
-          const gA=combo.reduce((s,p)=>s+(p.avgVal||0),0);
-          if(inFutureSkewedBand(gV,gA)){ found=combo; break; }
-        }
-        if(found) blockbusterGive=found;
-        else continue;
-      }
-      const key='The Blockbuster|'+blockbusterGive.map(p=>p.name).sort().join('|');
-      if(usedNameSets.has(key)) continue;
-      if(finderViolatesPositionCap(blockbusterGive)) continue;
-      usedNameSets.add(key);
-      scenarios.push({
-        players: blockbusterGive,
-        label: 'The Blockbuster',
-        isInDivision, tax,
-        extraMlbAddOn: matchingMlb // gets added to the seller's (user's) side in the offer
-      });
-      break;
-    }
-  }
-
-  // ===== 6: 1-for-1 Fallback =====
-  // When no scenarios were generated (usually a lower-value seller), try any single eligible
-  // prospect or minors player from the buyer that comes within 30% on both 2026 and avg value.
-  // This broadens the band so players like Jarren Duran (val ~4.5) can always get an offer.
-  if(!scenarios.length){
-    const allEligible=[topPiece, ...fillerPool].filter(p=>!usedNames.has(p.name));
-    let bestOne=null, bestOneScore=Infinity;
-    for(const p of allEligible){
-      const gV=p.val2026||0, gA=p.avgVal||0;
-      const tot26=gV+sellV26, totAvg=gA+sellAvg;
-      const pct26=tot26>0?(gV/tot26)*100:50;
-      const pctAvg=totAvg>0?(gA/totAvg)*100:50;
-      // Relaxed band: 30-70 on both metrics (vs normal 40-60)
-      if(pct26>=30 && pct26<=70 && pctAvg>=30 && pctAvg<=70){
-        const score=Math.abs(pct26-50)+Math.abs(pctAvg-50);
-        if(score<bestOneScore){ bestOneScore=score; bestOne=p; }
-      }
-    }
-    if(bestOne && !finderViolatesPositionCap([bestOne])){
-      markUsed([bestOne]);
-      scenarios.push({players:[bestOne], label:'1-for-1 Package', isInDivision, tax});
-    }
-  }
-
-  // ===== 7: Guaranteed Scrub Throw-In =====
-  // A seller shopping a specific player should never come back empty-handed, even if nothing
-  // fit the fairness bands above (e.g. a very low-value or very high-value sell piece). Fall back
-  // to whichever eligible piece from this buyer is closest in value to what's being sold, with
-  // no band requirement at all - or, as a last resort, the cheapest eligible piece of any kind.
-  if(!scenarios.length){
-    const scrubPool=[topPiece, ...fillerPool].filter(p=>!usedNames.has(p.name));
-    if(scrubPool.length){
-      const scrub=scrubPool.reduce((best,p)=>{
-        const diff=Math.abs((p.avgVal||0)-sellAvg);
-        const bestDiff=Math.abs((best.avgVal||0)-sellAvg);
-        return diff<bestDiff?p:best;
-      }, scrubPool[0]);
-      markUsed([scrub]);
-      scenarios.push({players:[scrub], label:'Scrub Throw-In', isInDivision, tax});
-    }
-  }
-
-  return scenarios;
-}
-
-// Build the list of sell "packages" to try. Each selected player is tried alone.
-// If more than one player is selected, the full combo of all of them is ALSO tried.
-// This makes multi-select purely additive/optional - it never forces players together.
-function finderBuildSellPackages(){
-  const players=finderState.sellPlayers;
-  if(!players || !players.length) return [];
-  const packages=players.map(p=>[p]); // every player alone
-  if(players.length>1){
-    packages.push([...players]); // plus the full combo together
-  }
-  return packages;
-}
-
-function finderGenerateSellerOffers(){
-  const packages=finderBuildSellPackages();
-  if(!packages.length) return [];
-  const offers=[];
-  for(const sellPackage of packages){
-    const sellTeam=sellPackage[0].team;
-    const calledUpInPackage=sellPackage.filter(finderIsCalledUpProspect);
-
-    // A combo that bundles a called-up prospect with other players doesn't fit the Blockbuster
-    // pattern (which is strictly one prospect for one higher-value MLB player) - skip it entirely.
-    if(calledUpInPackage.length && sellPackage.length>1){
-      continue;
-    }
-
-    // A called-up prospect sold by itself is NEVER offered in trades except via the Blockbuster:
-    // the seller must get back a genuine, strictly-higher-value MLB player at the same position.
-    if(calledUpInPackage.length===1){
-      const prospect=sellPackage[0];
-      const candidateTeams = finderState.partnerTeam
-        ? [finderState.partnerTeam].filter(t=>t!==sellTeam)
-        : TEAMS.filter(t=>t!==sellTeam);
-      for(const buyerTeam of candidateTeams){
-        const match=finderFindBlockbusterMatch(prospect, buyerTeam);
-        if(!match) continue;
-        const isInDivision=finderIsSameDivision(sellTeam, buyerTeam);
-        offers.push({
-          buyerTeam: buyerTeam,
-          sellPlayers: [prospect],
-          returnPlayers: [match],
-          label: 'The Blockbuster',
-          isInDivision,
-          tax: isInDivision?5:0
-        });
-      }
-      continue;
-    }
-
-    let suitors=finderGetBuyerSuitors(sellPackage);
-    if(finderState.partnerTeam){
-      suitors=suitors.filter(t=>t===finderState.partnerTeam);
-    }
-    console.log('Sell package:', sellPackage.map(p=>p.name).join(' + '), 'combined val2026:', sellPackage.reduce((s,p)=>s+(p.val2026||0),0));
-    console.log('Suitors found:', suitors);
-    const offersBefore=offers.length;
-    function tryTeam(buyerTeam, haulType){
-      const topPiece=finderGetTopPiece(buyerTeam, haulType);
-      console.log('Buyer:', buyerTeam, 'topPiece:', topPiece?topPiece.name+' (avgVal:'+topPiece.avgVal+', eta:'+topPiece.etaRaw+')':'NONE FOUND');
-      if(!topPiece) return;
-      const scenarios=finderBuildSellerScenarios(sellPackage, buyerTeam, topPiece);
-      console.log('Scenarios for', buyerTeam, ':', scenarios.length);
-      for(const scenario of scenarios){
-        const sellersWithAddOn = scenario.extraMlbAddOn ? [...sellPackage, scenario.extraMlbAddOn] : sellPackage;
-        offers.push({
-          buyerTeam: buyerTeam,
-          sellPlayers: sellersWithAddOn,
-          returnPlayers: scenario.players,
-          label: scenario.label,
-          isInDivision: scenario.isInDivision,
-          tax: scenario.tax
-        });
-      }
-    }
-    for(const buyerTeam of suitors){
-      tryTeam(buyerTeam, finderState.haulType);
-    }
-    // GUARANTEE: shopping a specific player must always surface at least one trade idea.
-    // If the normal "is this team an upgrade-seeking buyer at this position" filter found
-    // no suitors (common for replacement-level or duplicated-position pieces), broaden the
-    // search to any buyer/either-posture team, then - as an absolute last resort - every team
-    // in the league across both haul types.
-    if(offers.length===offersBefore){
-      let fallbackTeams = finderState.partnerTeam
-        ? [finderState.partnerTeam].filter(t=>t!==sellTeam)
-        : Object.keys(teamPosture).filter(t=>(teamPosture[t]==='buyer'||teamPosture[t]==='either') && t!==sellTeam);
-      for(const buyerTeam of fallbackTeams){
-        if(offers.length>offersBefore) break;
-        tryTeam(buyerTeam, finderState.haulType);
-      }
-      if(offers.length===offersBefore && !finderState.partnerTeam){
-        for(const buyerTeam of TEAMS.filter(t=>t!==sellTeam)){
-          if(offers.length>offersBefore) break;
-          tryTeam(buyerTeam, finderState.haulType);
-          if(offers.length===offersBefore) tryTeam(buyerTeam, finderState.haulType==='mlbready'?'dev':'mlbready');
-        }
-      }
-    }
-  }
-  // Dedupe: same buyerTeam + same sell names + same return names = same offer
-  const seen=new Set();
-  const deduped=[];
-  for(const o of offers){
-    const key=o.buyerTeam+'|'+o.sellPlayers.map(p=>p.name).sort().join(',')+'|'+o.returnPlayers.map(p=>p.name).sort().join(',');
-    if(seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(o);
-  }
-  return deduped;
-}
-
 async function generateOffers(){
   if(!allPlayers.length){
     const resultsModal=document.getElementById('finderResultsModal');
@@ -3910,45 +3514,25 @@ async function generateOffers(){
         targetTeam: o.getTeam,
       };
     });
-  } else if(finderState.sellerAuto){
-    // Seller auto-scan: normalize {players,getTeam,getPlayers} into the sellPlayers/
-    // returnPlayers/buyerTeam shape finderRenderOfferCard, openFinderResults, and
-    // finderEditTrade already expect for seller-intent offers.
-    offers=vsGenerateSellerAutoOffers().map(o=>({ ...o,
+  } else {
+    // Seller path (auto-scan or hand-pick): both routes through the v6 builder and
+    // normalize its {players,getTeam,getPlayers} shape into the sellPlayers/
+    // returnPlayers/buyerTeam fields finderRenderOfferCard, openFinderResults, and
+    // finderEditTrade already expect for seller-intent offers. Each route enforces
+    // its own bands/caps/role gates inline (vsBands6/vsCapViolation/vsRole6) — no
+    // separate post-filter needed.
+    const sellerOffers = finderState.sellerAuto ? vsGenerateSellerAutoOffers() : vsGenerateSellerManualOffers();
+    offers = sellerOffers.map(o=>({ ...o,
       sellPlayers: o.players,
       returnPlayers: o.getPlayers,
       buyerTeam: o.getTeam,
     }));
-  } else {
-    offers=finderGenerateSellerOffers();
-  }
-  // v3.1 hotfix: belt-and-suspenders gate check on the FINAL offers array, right before
-  // the empty-state check / rendering, so no scenario-generation path (fair/future-skewed/
-  // blockbuster/scrub/1-for-1, buyer or seller intent) can slip a non-compliant package
-  // onto a card. Runs ahead of the empty-state branch below so a fully-filtered result
-  // still shows the existing "No trade found" message instead of a blank card list.
-  // v6: buyer offers (always) and seller auto-scan offers already enforce their own
-  // bands/caps/role gates inline (vsBands6/vsCapViolation/vsRole6) — deliberately without
-  // the old blocking-analysis/B2B/hole checks the v6 philosophy drops. Re-running the old
-  // gate on them here would silently reintroduce roster-need audits v6 is meant to skip,
-  // so this legacy re-check only still applies to the untouched hand-pick seller flow.
-  if(finderState.intent==='seller' && !finderState.sellerAuto){
-    offers = offers.filter(o=>{
-      const userTeam=finderState.team;
-      const combo=o.returnPlayers, givingTeam=o.buyerTeam, receivingTeam=userTeam, targetList=o.sellPlayers;
-      return vsFinderPostFilter([{players:combo, label:o.label}], givingTeam, receivingTeam, targetList||[]).length>0;
-    });
   }
   if(!offers.length){
     const intent=finderState.intent;
     let msg='';
-    if(intent==='seller' && finderState.sellerAuto){
-      msg='No haul found — no buyer\'s prospect pool currently clears a 50% return on your tradeable players.';
-    } else if(intent==='seller'){
-      const sp=finderState.sellPlayers;
-      msg=(sp && sp.length)
-        ? `No trade found for <strong>${sp.map(p=>p.name).join(' / ')}</strong>. This can happen when no buyer's prospect or minors pool fits the value range, or no teams qualify as suitors at that position. Try a different partner team or haul type.`
-        : 'No trade found. Try adjusting your criteria.';
+    if(intent==='seller'){
+      msg='No haul found — no qualified buyer\'s farm clears the realistic price for this piece. Try shopping a different player or opening it up to all teams.';
     } else if(finderState.targetPlayers && finderState.targetPlayers.length){
       msg='No compliant trade found — no package from your farm lands in the realistic price band for this target.';
     } else {
@@ -5976,31 +5560,6 @@ function vsFinderGateCombo(combo, givingTeam, receivingTeam, targetList, bandNam
   return null;
 }
 
-// Filters the FINAL offers array immediately before rendering. Works on the offer
-// objects the card renderer consumes ({players, label, ...}). Any offer failing the
-// master gate is dropped and the reason logged. This closes every bypass path,
-// including legacy fallbacks and future scenario types.
-function vsFinderPostFilter(offers, givingTeam, receivingTeam, targetList) {
-  if (!Array.isArray(offers)) return offers;
-  const kept = [];
-  for (const offer of offers) {
-    const combo = offer.players || [];
-    if (!combo.length) continue;
-    // Never allow the legacy scrub fallback through, regardless of gate result.
-    if (/scrub/i.test(offer.label || '')) {
-      console.debug('[finder-v3.1] dropped legacy scrub fallback offer');
-      continue;
-    }
-    const fail = vsFinderGateCombo(combo, givingTeam, receivingTeam, targetList, offer.bandName || 'future');
-    if (fail) {
-      console.debug('[finder-v3.1] post-filter dropped offer "' + (offer.label || '') + '":', fail);
-      continue;
-    }
-    kept.push(offer);
-  }
-  return kept;
-}
-
 /* ---- Why This Trade Was Recommended + finder verdict render ---- */
 
 function vsFinderWhySection(giveList, getList, giveTeam, getTeam) {
@@ -6140,8 +5699,9 @@ function vsPool6(team, target) {
 }
 
 /* ---- Value bands ----
-   mode 'buy': give-side 2026 share 45–55. mode 'sell': the SELLER must clear 50%
-   of 2026 (user rule) → buyer's give share 50–55. Rental premium in both modes. */
+   mode 'buy': give-side 2026 share 45–55. mode 'sell': RENTAL band fix — the
+   seller's compensation lives in Avg (>=58% of combined Avg), so 2026 may sit
+   anywhere in the 45–55 band. Non-rental sales keep a hard 50% floor on 2026. */
 function vsBands6(combo, targetList, mode) {
   const g26 = combo.reduce((s, p) => s + (p.val2026 || 0), 0);
   const gAv = combo.reduce((s, p) => s + (p.avgVal || 0), 0);
@@ -6149,22 +5709,25 @@ function vsBands6(combo, targetList, mode) {
   const tAv = targetList.reduce((s, p) => s + (p.avgVal || 0), 0);
   const share26 = (g26 + t26) > 0 ? g26 / (g26 + t26) : 0.5;
   const shareAv = (gAv + tAv) > 0 ? gAv / (gAv + tAv) : 0.5;
-  const lo = mode === 'sell' ? 0.50 : 0.45;
-  if (share26 < lo || share26 > 0.55) return false;
   const rental = targetList.some(t => t.level === 'mlb' && vsControlThrough(t) <= 2026 && (t.val2026 || 0) >= 3);
+  const lo = (mode === 'sell' && !rental) ? 0.50 : 0.45;
+  if (share26 < lo || share26 > 0.55) return false;
   if (rental && shareAv < 0.58) return false;
   return true;
 }
 
-/* ---- Package builder. `shape`:
+/* ---- Package builder. `targets` may be a single player or an array (manual
+   seller flow can shop a package). `shape`:
      'quality'  → fewest pieces, closest value; up to 2 minors top-100s allowed
      'quantity' → 3–4 pieces; at most ONE fringe top-100 (rank 51–100), never a
-                  top-50; the rest org depth and well-valued unranked minors guys ---- */
-function vsBuild6(target, buyerTeam, pool, mode, shape) {
+                  top-50; the rest org depth and well-valued unranked minors guys
+   5-piece combos unlock when the target side is worth 8+ in 2026. ---- */
+function vsBuild6(targets, buyerTeam, pool, mode, shape) {
+  const targetList = Array.isArray(targets) ? targets : [targets];
   shape = shape || 'quality';
-  const targetList = [target];
-  const t26 = target.val2026 || 0;
-  const thin = vsSellerThinBuckets(target.team).slice(0, 2);
+  const t26 = targetList.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const sellerTeam = targetList[0] ? targetList[0].team : null;
+  const thin = sellerTeam ? vsSellerThinBuckets(sellerTeam).slice(0, 2) : [];
   const fitBonus = (p) => thin.includes(finderPosBucket(p.pos)) ? 1 : 0;
   const rankOf = (p) => vsMlbRankNum(p);
 
@@ -6177,7 +5740,7 @@ function vsBuild6(target, buyerTeam, pool, mode, shape) {
     const da = Math.abs((a.val2026 || 0) - t26), db = Math.abs((b.val2026 || 0) - t26);
     if (Math.abs(da - db) > 0.3) return da - db;
     return fitBonus(b) - fitBonus(a);
-  }).slice(0, 16);
+  }).slice(0, 18);
 
   const top100Count = (c) => c.filter(p => { const r = rankOf(p); return r != null && r <= 100; }).length;
   const ok = (c) => {
@@ -6197,6 +5760,11 @@ function vsBuild6(target, buyerTeam, pool, mode, shape) {
     if (ok([src[i], src[j], src[k]])) return [src[i], src[j], src[k]];
   for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++)
     if (ok([src[i], src[j], src[k], src[m]])) return [src[i], src[j], src[k], src[m]];
+  // 5-piece: the blockbuster shape — unlocked only for premium targets.
+  if (t26 >= 8) {
+    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++) for (let n = m + 1; n < src.length; n++)
+      if (ok([src[i], src[j], src[k], src[m], src[n]])) return [src[i], src[j], src[k], src[m], src[n]];
+  }
   return null;
 }
 
@@ -6295,41 +5863,125 @@ function vsGenerateBuyerOffersV4() {
   return offers.sort((a, b) => (b.target.val2026 || 0) - (a.target.val2026 || 0));
 }
 
+/* ---- SELLER MODE: who a seller actually shops ----
+   Sell-appeal, in real front-office terms:
+     · control expiring now or next year (walk-year value that dies on the roster)
+     · aging vets (29+) still carrying real value — sell before the cliff
+     · decent non-core pieces (2+ value) with short-to-mid control
+   Rebuild core (top-100 on roster, young + controlled deep) is never here.
+   Returns candidates sorted by sell-appeal (expiring stars first). */
+function vsExpendables(team) {
+  const out = [];
+  for (const p of allPlayers) {
+    if (p.team !== team || p.level !== 'mlb' || p.isComp || p.isCash) continue;
+    if (finderIsInjured(p)) continue;
+    if (vsSellerCoreUntouchable(p)) continue;
+    const v = p.val2026 || 0;
+    if (v < 1.5) continue;
+    const ctrl = vsControlThrough(p);
+    const age = p.age != null ? p.age : 27;
+    let appeal = 0;
+    if (ctrl <= 2026) appeal += 4;                 // pure rental — sell or lose him for nothing
+    else if (ctrl <= 2027) appeal += 2.5;          // one year beyond — peak leverage window
+    if (age >= 31) appeal += 2; else if (age >= 29) appeal += 1;   // sell before the cliff
+    appeal += Math.min(4, v / 2.5);                // value drives the phone ringing
+    if (appeal < 2) continue;                      // long-controlled mid-20s role players aren't sale items
+    out.push({ p, appeal });
+  }
+  return out.sort((a, b) => b.appeal - a.appeal).map(x => x.p);
+}
+
 /* ---- SELLER MODE: auto-scan (sits ALONGSIDE the existing hand-pick flow) ----
-   Scans the user's team for anyone with real value; finds buyer/hold teams where
+   Scans the user's expendables (not just raw value); finds buyer/hold teams where
    that player upgrades an MLB depth slot; builds a prospect haul from THAT buyer's
-   pool. Seller must clear 50% of 2026 value (mode 'sell'). */
+   pool. Star pieces (6+ 2026 value) fan out to every qualified buyer, up to the
+   offer cap; other pieces cap at 3 buyers so the deck doesn't flood. */
 function vsGenerateSellerAutoOffers() {
   const userTeam = finderState.team;
   if (!vsRole6(userTeam).canSell) return [];
+  const partner = finderState.sellerPartner || null;   // wired per notes below
 
-  const shopList = allPlayers.filter(p =>
-    p.team === userTeam && p.level === 'mlb' && !p.isComp && !p.isCash &&
-    (p.val2026 || 0) >= 1.5 && !finderIsInjured(p) && !vsSellerCoreUntouchable(p))
-    .sort((a, b) => (b.val2026 || 0) - (a.val2026 || 0))
-    .slice(0, 10);
+  const shopList = vsExpendables(userTeam).slice(0, 10);
+  const offers = [];
+  const perBuyerPerPlayer = {};
 
-  const offers = [], perBuyer = {};
   for (const player of shopList) {
     if (offers.length >= 13) break;
-    const b = finderPosBucket(player.pos);
-    for (const buyer of standingsData.map(r => r.team)) {
+    const star = (player.val2026 || 0) >= 6;             // star pieces fan out to many buyers
+    const buyers = (partner ? [partner] : standingsData.map(r => r.team))
+      .filter(t => t !== userTeam && vsRole6(t).canBuy);
+    for (const buyer of buyers) {
       if (offers.length >= 13) break;
-      if (buyer === userTeam) continue;
-      if (!vsRole6(buyer).canBuy) continue;
-      if ((perBuyer[buyer] || 0) >= 2) continue;
+      const key = buyer + '|' + player.name;
+      if (perBuyerPerPlayer[key]) continue;
+      // Non-star pieces: don't flood the deck — 3 buyers max per player.
+      if (!star && !partner) {
+        const already = offers.filter(o => o.players[0] && o.players[0].name === player.name).length;
+        if (already >= 3) break;
+      }
+      const b = finderPosBucket(player.pos);
       const slots = vsBuyerDepthSlots(buyer);
-      if ((player.val2026 || 0) <= (slots[b] || 0) + 0.5) continue;   // must upgrade them
-      const combo = vsBuild6(player, buyer, vsPool6(buyer, player), 'sell');
+      if ((player.val2026 || 0) <= ((slots[b] || 0) + 0.5)) continue;   // must upgrade them
+      const pool = vsPool6(buyer, player);
+      let combo = vsBuild6(player, buyer, pool, 'sell', 'quality');
+      if (!combo) combo = vsBuild6(player, buyer, pool, 'sell', 'quantity');
       if (!combo) continue;
-      perBuyer[buyer] = (perBuyer[buyer] || 0) + 1;
-      // In seller mode the card flips: user GIVES the player, RECEIVES the haul.
+      perBuyerPerPlayer[key] = true;
       const rental = vsControlThrough(player) <= 2026;
       offers.push({
         players: [player], target: null,
-        giveTeam: userTeam, getTeam: buyer,
-        getPlayers: combo,
+        giveTeam: userTeam, getTeam: buyer, getPlayers: combo,
         label: rental ? 'Rental sale — premium haul' : 'Prospect haul',
+        isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, buyer) : false,
+        tax: 0
+      });
+    }
+  }
+  return offers;
+}
+
+/* ---- SELLER MODE: hand-pick (replaces the legacy finderGenerateSellerOffers path) ----
+   User hand-picked players to shop (finderState.sellPlayers — may be several,
+   shopped as one package). Builds hauls from every qualified buyer's pool — or
+   only the chosen partner's — through the same v6 machinery. */
+function vsGenerateSellerManualOffers() {
+  const userTeam = finderState.team;
+  const shopped = (finderState.sellPlayers || []).filter(p => p && !p.isComp && !p.isCash);
+  if (!shopped.length) return [];
+  const partner = finderState.sellerPartner || null;
+
+  const shop26 = shopped.reduce((s, p) => s + (p.val2026 || 0), 0);
+  const buyers = (partner ? [partner] : standingsData.map(r => r.team))
+    .filter(t => t !== userTeam && vsRole6(t).canBuy);
+
+  const offers = [];
+  for (const buyer of buyers) {
+    if (offers.length >= 13) break;
+    // The headline piece must upgrade the buyer somewhere.
+    const head = [...shopped].sort((a, b) => (b.val2026 || 0) - (a.val2026 || 0))[0];
+    const b = finderPosBucket(head.pos);
+    const slots = vsBuyerDepthSlots(buyer);
+    if ((head.val2026 || 0) <= ((slots[b] || 0) + 0.5)) continue;
+    const pool = vsPool6(buyer, head);
+    let combo = vsBuild6(shopped, buyer, pool, 'sell', 'quality');
+    if (!combo) combo = vsBuild6(shopped, buyer, pool, 'sell', 'quantity');
+    if (!combo) continue;
+    const rental = shopped.some(p => vsControlThrough(p) <= 2026 && (p.val2026 || 0) >= 3);
+    offers.push({
+      players: [...shopped], target: null,
+      giveTeam: userTeam, getTeam: buyer, getPlayers: combo,
+      label: rental ? 'Rental sale — premium haul' : 'Prospect haul',
+      isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, buyer) : false,
+      tax: 0
+    });
+    // A premium piece (8+) deserves shape variety from the same buyer when possible.
+    if (shop26 >= 8 && offers.length < 13) {
+      const qty = vsBuild6(shopped, buyer, pool, 'sell', 'quantity');
+      const same = combo && qty && combo.length === qty.length && combo.every(p => qty.some(q => q.name === p.name));
+      if (qty && !same) offers.push({
+        players: [...shopped], target: null,
+        giveTeam: userTeam, getTeam: buyer, getPlayers: qty,
+        label: 'Quantity haul',
         isInDivision: (typeof finderIsSameDivision === 'function') ? finderIsSameDivision(userTeam, buyer) : false,
         tax: 0
       });
