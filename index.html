@@ -86,8 +86,14 @@ button,select,input{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:g
 .menu-item:hover,.menu-item.active{color:var(--accent);background:var(--accent-soft)}
 
 /* PAGES */
-.page{display:none;flex:1;flex-direction:column;min-height:0;overflow-y:auto}
+.page{display:none;flex:1;flex-direction:column}
 .page.active{display:flex}
+/* Only these three pages hold long, single-table lists that need their own bounded
+   scroll region (so their sticky column headers actually have something to stick
+   within) — every other page keeps the natural document-scroll behavior, since
+   their layouts (e.g. Trade Sim's give/get columns + verdict box) assume the page
+   can grow past the viewport rather than being clipped to it. */
+#page-roster.page,#page-players.page,#page-prospects.page{min-height:0;overflow-y:auto}
 
 /* TRADE PAGE */
 .trade-page-inner{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
@@ -2040,7 +2046,8 @@ function showPlayerPage(p){
   const ppNameLen=p.name.length;
   ppNameEl.className='player-page-name'+(ppNameLen>22?' vlong':ppNameLen>16?' long':'');
   const levelLabel=p.level==='mlb'?'MLB':getPlayerDetailLevel(p);
-  document.getElementById('ppMeta').innerHTML=`<span>${esc(p.team)}</span><span>${esc(p.pos||'?')}</span><span>${levelLabel}</span>`;
+  const ppAgeLabel=p.age!=null&&!isNaN(p.age)?Math.floor(p.age):'—';
+  document.getElementById('ppMeta').textContent=`${ppAgeLabel} | ${p.pos||'?'} | ${p.team} | ${levelLabel}`;
   // Badges — orgRank = "KC 8", mlbRank = "MLB 35" (raw strings from sheet)
   let badges='';
   if(p.isProspect){
@@ -4188,9 +4195,10 @@ async function showPM(name,team,pos){
   const nameSizeClass=nameLen>22?'pm-name vlong':nameLen>16?'pm-name long':'pm-name';
   const pmProspectBadges=p.isProspect?(p.mlbRank?'<span class="player-badge player-badge-prospect">'+esc(p.mlbRank)+'</span>':'')+(p.orgRank?'<span class="player-badge player-badge-prospect">'+esc(p.orgRank)+'</span>':''):'';
   nameEl.innerHTML=`<span class="${nameSizeClass}">${p.name}</span>${pmProspectBadges}`;
-  // Meta line: Position | Team | Level
+  // Meta line: Age | Position | Team | Level
   const levelLabel=p.level==='mlb'?'MLB':getPlayerDetailLevel(p);
-  document.getElementById('pmMeta').textContent=`${p.pos||'—'} | ${p.team} | ${levelLabel}`;
+  const ageLabel=p.age!=null&&!isNaN(p.age)?Math.floor(p.age):'—';
+  document.getElementById('pmMeta').textContent=`${ageLabel} | ${p.pos||'—'} | ${p.team} | ${levelLabel}`;
   // Status: gray text when healthy, red "+ IL" when injured (never both)
   const statusEl=document.getElementById('pmStatus');
   if(playerHasInjury(p)){
