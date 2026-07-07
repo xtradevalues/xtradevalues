@@ -1455,18 +1455,22 @@ async function loadData() {
 
 // ===== STANDINGS / BUYER-SELLER POSTURE =====
 const teamPosture = {}; // team abbrev -> 'buyer' | 'seller' | 'either'
-// Four standalone standings tabs, each laid out Team | Wins | Losses | Win% | GB | Run Diff.
+// Four standalone standings tabs. Division tabs: Team|Wins|Losses|Win%|GB|Run Diff (A-F).
+// Wild Card tabs use a different layout: Team=A, GB=D, Wins=E, Losses=F, Win%=G, Run Diff=H.
 const standingsSheets = { curDiv:[], curWC:[], projDiv:[], projWC:[] };
-function parseStandingsRows(rows){
+const STANDINGS_DIV_COLS={team:0,wins:1,losses:2,winPct:3,gb:4,runDiff:5};
+const STANDINGS_WC_COLS={team:0,gb:3,wins:4,losses:5,winPct:6,runDiff:7};
+function parseStandingsRows(rows, colMap){
+  const map=colMap||STANDINGS_DIV_COLS;
   const out=[];
   for(const row of (rows||[])){
-    const team=String(colVal(row,'Team',0)||'').trim().toUpperCase();
+    const team=String(colVal(row,'Team',map.team)||'').trim().toUpperCase();
     if(!team || !TEAMS.includes(team)) continue;
-    const wins=numOrNull(colVal(row,'Wins',1));
-    const losses=numOrNull(colVal(row,'Losses',2));
-    const winPctRaw=numOrNull(colVal(row,'Win%',3));
-    const gb=numOrNull(colVal(row,'GB',4));
-    const runDiff=numOrNull(colVal(row,'Run Diff',5));
+    const wins=numOrNull(colVal(row,'Wins',map.wins));
+    const losses=numOrNull(colVal(row,'Losses',map.losses));
+    const winPctRaw=numOrNull(colVal(row,'Win%',map.winPct));
+    const gb=numOrNull(colVal(row,'GB',map.gb));
+    const runDiff=numOrNull(colVal(row,'Run Diff',map.runDiff));
     const winPct=winPctRaw!==null?winPctRaw:(wins!==null&&losses!==null&&wins+losses>0?wins/(wins+losses):null);
     out.push({team,wins,losses,winPct,gb,runDiff});
   }
@@ -1481,9 +1485,9 @@ async function loadStandings(){
       fetchSheetTab('Projected Wild Card')
     ]);
     standingsSheets.curDiv=parseStandingsRows(curDivRows);
-    standingsSheets.curWC=parseStandingsRows(curWCRows);
+    standingsSheets.curWC=parseStandingsRows(curWCRows, STANDINGS_WC_COLS);
     standingsSheets.projDiv=parseStandingsRows(projDivRows);
-    standingsSheets.projWC=parseStandingsRows(projWCRows);
+    standingsSheets.projWC=parseStandingsRows(projWCRows, STANDINGS_WC_COLS);
 
     // standingsData/teamPosture (buyer/seller posture used by Trade Finder) are sourced from
     // the Current Division tab since it's the only one guaranteed to carry all 30 teams; the
