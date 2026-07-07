@@ -38,6 +38,8 @@
   --pos-soft: rgba(111,184,154,0.12);
   --neg: #C9A05B;
   --neg-soft: rgba(201,160,91,0.12);
+  --yellow: #eab308;
+  --yellow-soft: rgba(234,179,8,0.16);
   --border: #222222;
   --border-strong: #333333;
   --border-light: #1a1a1a;
@@ -332,6 +334,8 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 
 /* SCORE MODAL */
 .score-desc{font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:13px}
+.score-subheader{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:9px;font-family:'Space Grotesk','Inter',sans-serif}
+.score-subheader-spaced{margin-top:18px;padding-top:15px;border-top:1px solid var(--border-light)}
 .score-defs{border-top:1px solid var(--border-light);padding-top:11px;display:flex;flex-direction:column;gap:9px}
 .score-def-label{font-size:11px;font-weight:500;color:var(--accent);margin-bottom:2px}
 .score-def-text{font-size:11px;color:var(--text-secondary);line-height:1.6}
@@ -345,10 +349,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .privacy-scroll.open{display:block}
 
 /* STANDINGS PAGE */
-.standings-tabs{display:flex;gap:8px;padding:12px 16px 0}
-.standings-subtabs{display:flex;gap:8px;padding:10px 16px 12px;border-bottom:1px solid var(--border-light)}
-.standings-tab-btn{padding:7px 16px;border-radius:20px;font-size:11px;font-weight:400;cursor:pointer;border:1px solid var(--border);color:var(--text-muted);background:none;transition:all 0.15s}
-.standings-tab-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
 .standings-table-wrap{overflow-x:auto;flex:1}
 .standings-table{width:100%;border-collapse:separate;border-spacing:0;min-width:340px}
 .standings-table th{padding:12px 14px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;position:sticky;top:0;z-index:2}
@@ -370,7 +370,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
 .players-table th.player-col{text-align:left;min-width:112px;left:40px;z-index:3}
-.players-table th.sort-active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+.players-table th.sort-active{color:var(--accent);background:var(--bg-mid);box-shadow:inset 0 0 0 999px var(--accent-soft),inset 0 -2px 0 var(--accent)}
 .players-table tbody tr{background:var(--bg-card)}
 .players-table tbody tr:nth-child(even){background:var(--row-alt)}
 .players-table td{padding:12px 10px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -401,6 +401,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .player-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:10px;font-weight:500;letter-spacing:0.02em}
 .player-badge-prospect{background:var(--neg-soft);color:var(--neg);border:1px solid rgba(201,160,91,0.3)}
 .player-badge-injury{background:rgba(215,34,41,0.1);color:#D72229;border:1px solid rgba(215,34,41,0.3)}
+.prospect-pill{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:8px;font-size:9px;font-weight:600;letter-spacing:0.02em;vertical-align:middle;white-space:nowrap}
+.prospect-pill-mlb{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(239,68,68,0.35)}
+.prospect-pill-org{background:var(--yellow-soft);color:var(--yellow);border:1px solid rgba(234,179,8,0.35)}
 .player-page-toggle-wrap{padding:12px 16px;display:flex;gap:8px;border-bottom:1px solid var(--border-light)}
 .pp-toggle-btn{padding:7px 16px;border-radius:20px;font-size:11px;font-weight:400;cursor:pointer;border:1px solid var(--border);color:var(--text-muted);background:none;transition:all 0.15s}
 .pp-toggle-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
@@ -547,11 +550,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
             <select id="groupFilterA" onchange="onGroupFilterChange('A')">
               <option value="">All</option>
               <option value="mlb">MLB</option>
-              <option value="aaa">AAA</option>
-              <option value="aa">AA</option>
-              <option value="aplus">A+</option>
-              <option value="a">A</option>
-              <option value="rk">Rk</option>
+              <option value="minors">MiLB</option>
               <option value="prospects">Prospects</option>
               <option value="comppicks">Comp Picks</option>
               <option value="cash">Cash</option>
@@ -562,7 +561,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
               <option value="C">C</option><option value="1B">1B</option>
               <option value="2B">2B</option><option value="3B">3B</option>
               <option value="SS">SS</option><option value="OF">OF</option>
-              <option value="LF">LF</option><option value="CF">CF</option><option value="RF">RF</option>
+              <option value="LF" class="of-split-opt">LF</option><option value="CF" class="of-split-opt">CF</option><option value="RF" class="of-split-opt">RF</option>
               <option value="DH">DH/UT</option>
             </select>
           </div>
@@ -587,11 +586,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
             <select id="groupFilterB" onchange="onGroupFilterChange('B')">
               <option value="">All</option>
               <option value="mlb">MLB</option>
-              <option value="aaa">AAA</option>
-              <option value="aa">AA</option>
-              <option value="aplus">A+</option>
-              <option value="a">A</option>
-              <option value="rk">Rk</option>
+              <option value="minors">MiLB</option>
               <option value="prospects">Prospects</option>
               <option value="comppicks">Comp Picks</option>
               <option value="cash">Cash</option>
@@ -602,7 +597,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
               <option value="C">C</option><option value="1B">1B</option>
               <option value="2B">2B</option><option value="3B">3B</option>
               <option value="SS">SS</option><option value="OF">OF</option>
-              <option value="LF">LF</option><option value="CF">CF</option><option value="RF">RF</option>
+              <option value="LF" class="of-split-opt">LF</option><option value="CF" class="of-split-opt">CF</option><option value="RF" class="of-split-opt">RF</option>
               <option value="DH">DH/UT</option>
             </select>
           </div>
@@ -810,15 +805,18 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <div class="rankings-controls">
     <input type="text" id="playersSearch" placeholder="Search players..." oninput="playersFilterChanged()" style="margin-bottom:6px">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-      <select id="playersLevel" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
-        <option value="">All Levels</option>
+      <select id="playersTeam" onchange="playersFilterChanged()" style="flex:1;min-width:100px;margin-bottom:0">
+        <option value="">All Teams</option>
+      </select>
+      <select id="playersLevel" onchange="playersLevelChanged()" style="flex:1;min-width:80px;margin-bottom:0">
         <option value="mlb" selected>MLB</option>
         <option value="prospects">Prospects</option>
-        <option value="aaa">AAA</option>
-        <option value="aa">AA</option>
-        <option value="aplus">A+</option>
-        <option value="a">A</option>
-        <option value="rk">Rk</option>
+        <option value="minors">MiLB</option>
+      </select>
+      <select id="playersSplit" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0;display:none">
+        <option value="">Auto (most PA/IP)</option>
+        <option value="mlb">MLB</option>
+        <option value="minors">MiLB</option>
       </select>
       <select id="playersPos" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
         <option value="">All Pos</option>
@@ -832,9 +830,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
         <option value="3B">3B</option>
         <option value="SS">SS</option>
         <option value="OF">OF</option>
-        <option value="LF">LF</option>
-        <option value="CF">CF</option>
-        <option value="RF">RF</option>
+        <option value="LF" class="of-split-opt">LF</option>
+        <option value="CF" class="of-split-opt">CF</option>
+        <option value="RF" class="of-split-opt">RF</option>
         <option value="DH">DH</option>
       </select>
     </div>
@@ -864,13 +862,15 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 
 <!-- STANDINGS PAGE -->
 <div id="page-standings" class="page">
-  <div class="standings-tabs">
-    <button class="standings-tab-btn active" id="standingsTab-current" onclick="standingsSetView('current')">Current Standings</button>
-    <button class="standings-tab-btn" id="standingsTab-projected" onclick="standingsSetView('projected')">Projected Standings</button>
-  </div>
-  <div class="standings-subtabs">
-    <button class="standings-tab-btn active" id="standingsSubtab-div" onclick="standingsSetSubView('div')">Divisions</button>
-    <button class="standings-tab-btn" id="standingsSubtab-wc" onclick="standingsSetSubView('wc')">Wild Card</button>
+  <div class="roster-controls">
+    <select id="standingsViewSelect" onchange="standingsSetView(this.value)" style="flex:1;margin-bottom:0">
+      <option value="current">Current Standings</option>
+      <option value="projected">Projected Standings</option>
+    </select>
+    <select id="standingsSubViewSelect" onchange="standingsSetSubView(this.value)" style="flex:1;margin-bottom:0">
+      <option value="div">Divisions</option>
+      <option value="wc">Wild Card</option>
+    </select>
   </div>
   <div id="standingsContent" class="standings-table-wrap" style="overflow-y:auto">
     <div class="roster-placeholder">Loading standings...</div>
@@ -979,13 +979,16 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 <div class="overlay-base overlay-bottom" id="scoreModal" onclick="closeScoreOut(event)">
   <div class="modal-box-bottom">
     <button class="modal-close" onclick="closeScore()">✕</button>
-    <div class="modal-title">How do we score?</div>
+    <div class="modal-title">Methodology</div>
+    <div class="score-subheader">Player Values</div>
     <div class="score-desc">ValueSavant projects future performance using a weighted 4-year window of MLB/MiLB statistics, scouting grades, and expected metrics — then factors in surplus value and age across a player's remaining control window through 2031.</div>
     <div class="score-defs">
       <div><div class="score-def-label">2026</div><div class="score-def-text">A player's projected value for the current season</div></div>
       <div><div class="score-def-label">Avg</div><div class="score-def-text">The average annual value across a player's remaining control window</div></div>
       <div><div class="score-def-label">Ctrl Thru</div><div class="score-def-text">The final year a player remains under team control</div></div>
     </div>
+    <div class="score-subheader score-subheader-spaced">Team Record Projections</div>
+    <div class="score-desc">Rest of season record projections are based on 2026 performance of team, as well as current and expected statistics of players on the Active Roster. Injuries/Returns/Acquisitions of impact players will influence the projections.</div>
   </div>
 </div>
 
@@ -1220,6 +1223,14 @@ function dotClass(status){
   if(status==='top100') return 'dot-top100';
   if(status==='org') return 'dot-org';
   return 'dot-minors';
+}
+// Single prospect-status pill: MLB top-100 rank takes priority over org rank — a player
+// never shows both at once.
+function prospectPillHtml(p){
+  if(!p.isProspect) return '';
+  if(p.mlbRank) return `<span class="prospect-pill prospect-pill-mlb">${esc(p.mlbRank)}</span>`;
+  if(p.orgRank) return `<span class="prospect-pill prospect-pill-org">${esc(p.orgRank)}</span>`;
+  return '';
 }
 function matchesGroup(p, g) {
   if(!g) return true;
@@ -1664,14 +1675,10 @@ let standingsView='current';   // 'current' | 'projected'
 let standingsSubView='div';    // 'div' | 'wc'
 function standingsSetView(v){
   standingsView=v;
-  document.getElementById('standingsTab-current').classList.toggle('active', v==='current');
-  document.getElementById('standingsTab-projected').classList.toggle('active', v==='projected');
   renderStandingsPage();
 }
 function standingsSetSubView(v){
   standingsSubView=v;
-  document.getElementById('standingsSubtab-div').classList.toggle('active', v==='div');
-  document.getElementById('standingsSubtab-wc').classList.toggle('active', v==='wc');
   renderStandingsPage();
 }
 function renderStandingsPage(){
@@ -1704,17 +1711,40 @@ function renderStandingsPage(){
   groupOrder.forEach(g=>{
     const groupRows=byGroup[g];
     if(!groupRows.length) return;
+    // Wild Card GB is relative to the 3rd wild card spot (the cutoff line for making the
+    // playoffs), not the group leader: 1st/2nd show "+N" ahead of the cutoff, the cutoff
+    // team itself shows "--", and teams below it show "N" games back of the cutoff.
+    const wcGbCol=standingsSubView==='wc'?wcCutoffGB(groupRows):null;
     html+=`<div class="standings-division-header">${esc(g)}${standingsSubView==='wc'?' Wild Card':''}</div>`;
     html+=`<table class="standings-table"><thead><tr><th class="rank-col">#</th><th class="team-col">Team</th><th>W</th><th>L</th><th>Win%</th><th>GB</th><th>Run Diff</th></tr></thead><tbody>`;
     groupRows.forEach((row,i)=>{
       const winPctStr=row.winPct!==null?row.winPct.toFixed(3).replace(/^0\./,'.'):'-';
-      const gbStr=row.gb!==null?(row.gb===0?'—':row.gb):'-';
+      const gbStr=wcGbCol?wcGbCol[i]:(row.gb!==null?(row.gb===0?'—':row.gb):'-');
       const rdStr=row.runDiff!==null?(row.runDiff>0?'+'+row.runDiff:String(row.runDiff)):'-';
       html+=`<tr><td class="rank-col">${i+1}</td><td class="team-col" onclick="showPage('roster');document.getElementById('rosterTeam').value='${esc(row.team)}';document.getElementById('rosterBackBar').style.display='block';onRosterTeamChange()">${esc(row.team)}</td><td>${row.wins!==null?row.wins:'-'}</td><td>${row.losses!==null?row.losses:'-'}</td><td>${winPctStr}</td><td>${gbStr}</td><td>${rdStr}</td></tr>`;
     });
     html+=`</tbody></table>`;
   });
   el.innerHTML=html || '<div class="roster-placeholder">No standings data</div>';
+}
+// Wild Card GB, relative to the 3rd wild card spot (index 2 of rows already sorted by wins
+// desc): ranks 1-2 show "+N" ahead of the cutoff, the cutoff team shows "--", and everyone
+// below it shows "N" games back of the cutoff.
+function wcCutoffGB(rows){
+  const cutoff=rows[2];
+  if(!cutoff || cutoff.wins==null || cutoff.losses==null) return rows.map(()=>'-');
+  const fmtHalf=v=>{
+    const half=Math.round(v*2)/2;
+    return Number.isInteger(half)?String(half):half.toFixed(1);
+  };
+  return rows.map((row,i)=>{
+    if(row.wins==null||row.losses==null) return '-';
+    if(i===2) return '--';
+    const diff=i<2
+      ? ((cutoff.losses-row.losses)+(row.wins-cutoff.wins))/2
+      : ((cutoff.wins-row.wins)+(row.losses-cutoff.losses))/2;
+    return (i<2?'+':'')+fmtHalf(diff);
+  });
 }
 
 // ===== PLAYERS PAGE (replaces Rankings) =====
@@ -1736,15 +1766,29 @@ function abbrevName(name){
 }
 let playersSortCol='vWAR', playersSortDir=1, playersViewHitters=true;
 function playersFilterChanged(){renderPlayers();}
-// Levels below MLB switch the displayed stat columns over to MiLB stats (fetched lazily,
-// same per-year MiLB sheets the player detail page's Minors toggle already uses).
-const PLAYERS_MILB_LEVELS=['aaa','aa','aplus','a','rk'];
-function renderPlayers(){
+// Level changed: show/hide the Prospects split dropdown, and consolidate LF/CF/RF into OF
+// on the position dropdown whenever MiLB is the selected level.
+function playersLevelChanged(){
   const levelF=document.getElementById('playersLevel').value;
+  const splitSel=document.getElementById('playersSplit');
+  splitSel.style.display=(levelF==='prospects')?'block':'none';
+  if(levelF!=='prospects') splitSel.value='';
+  const posSel=document.getElementById('playersPos');
+  const hideSplitPos=(levelF==='minors');
+  posSel.querySelectorAll('.of-split-opt').forEach(o=>o.hidden=hideSplitPos);
+  if(hideSplitPos && ['LF','CF','RF'].includes(posSel.value)) posSel.value='OF';
+  renderPlayers();
+}
+function renderPlayers(){
+  const teamF=document.getElementById('playersTeam').value;
+  const levelF=document.getElementById('playersLevel').value;
+  const splitF=document.getElementById('playersSplit').value;
   const posF=document.getElementById('playersPos').value;
   const searchF=document.getElementById('playersSearch').value.trim().toLowerCase();
-  const showMiLB=PLAYERS_MILB_LEVELS.includes(levelF);
-  if(showMiLB && !Object.keys(miLBHitters).length && !Object.keys(miLBPitchers).length){
+  // MiLB level always needs MiLB stats; Prospects needs them too since the auto/forced split
+  // can pull a player's MiLB side.
+  const needsMiLB=(levelF==='minors'||levelF==='prospects');
+  if(needsMiLB && !Object.keys(miLBHitters).length && !Object.keys(miLBPitchers).length){
     document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading minor league stats…</td></tr>';
     loadMiLBStats().then(()=>renderPlayers());
     return;
@@ -1753,10 +1797,15 @@ function renderPlayers(){
   if(posF==='pitcher'||posF==='SP'||posF==='RP') playersViewHitters=false;
   else if(posF==='hitter'||['C','1B','2B','3B','SS','OF','LF','CF','RF','DH'].includes(posF)) playersViewHitters=true;
   let pl=[...allPlayers];
+  // Team filter
+  if(teamF) pl=pl.filter(x=>x.team===teamF);
   // Name search
   if(searchF) pl=pl.filter(x=>x.name.toLowerCase().includes(searchF));
-  // Level filter
-  if(levelF) pl=pl.filter(x=>matchesGroup(x,levelF));
+  // Level filter — MLB/MiLB(minors) match the player's actual level; Prospects matches any
+  // ranked player regardless of level (the split dropdown decides which stat line is shown).
+  if(levelF==='mlb') pl=pl.filter(x=>x.level==='mlb');
+  else if(levelF==='minors') pl=pl.filter(x=>x.level==='minors');
+  else if(levelF==='prospects') pl=pl.filter(x=>x.isProspect);
   // Position filter — Ohtani (pos:"TWP") belongs on both the Hitters and Pitchers views
   if(posF==='hitter') pl=pl.filter(x=>!['SP','RP'].includes(finderFirstPos(x.pos)));
   else if(posF==='pitcher') pl=pl.filter(x=>['SP','RP'].includes(finderFirstPos(x.pos))||x.name==='Shohei Ohtani');
@@ -1770,12 +1819,29 @@ function renderPlayers(){
     if(!posF) return (p.vWARHit||0)+(p.vWARPitch||0);
     return isHitter?p.vWARHit:p.vWARPitch;
   };
-  // MiLB stat lookups, only consulted when showMiLB is true — otherwise the MLB-sourced
-  // fields already on the player object (populated at load time) are used unchanged.
+  // Per-player effective split (MLB vs MiLB stat line). MLB/MiLB levels force it outright;
+  // within Prospects, the 4th dropdown forces it for every row, and left on Auto each player
+  // defaults to whichever split has more playing time (PA for hitters, IP for pitchers).
+  const splitCache=new Map();
+  const effSplit=(p)=>{
+    if(levelF==='mlb') return 'mlb';
+    if(levelF==='minors') return 'minors';
+    if(splitF==='mlb'||splitF==='minors') return splitF;
+    if(splitCache.has(p)) return splitCache.get(p);
+    const pIsPitcher=['SP','RP'].includes(finderFirstPos(p.pos));
+    const mlbAmt=(pIsPitcher?p.ip:p.pa)||0;
+    const milbRaw=pIsPitcher?computeMiLBPitcherStats(miLBPitchers[p.playerID]):computeMiLBHitterStats(miLBHitters[p.playerID]);
+    const milbAmt=(milbRaw&&(pIsPitcher?milbRaw.ip:milbRaw.pa))||0;
+    const result=milbAmt>mlbAmt?'minors':'mlb';
+    splitCache.set(p,result);
+    return result;
+  };
+  // MiLB stat lookups, only consulted when a given row's effective split is MiLB — otherwise
+  // the MLB-sourced fields already on the player object (populated at load time) are used.
   const milbStatFor=p=>isHitter?computeMiLBHitterStats(miLBHitters[p.playerID]):computeMiLBPitcherStats(miLBPitchers[p.playerID]);
   const milbSwitchFields=isHitter?['pa','h','hr','avg26','obp','slg','vWAR']:['ip','k','era','fip','sv','k9','vWAR'];
   const getDisplayStat=(p,field)=>{
-    if(showMiLB && milbSwitchFields.includes(field)){
+    if(effSplit(p)==='minors' && milbSwitchFields.includes(field)){
       const ms=milbStatFor(p);
       if(!ms) return null;
       const key=field==='avg26'?'avg':field;
@@ -1821,7 +1887,7 @@ function renderPlayers(){
   const fmtF=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'-';
   const body=pl.slice(0,500).map((p,idx)=>{
     const inj=playerHasInjury(p)?'<span style="color:#D72229">✚</span>':'';
-    const nameCell=`<td class="player-col">${miniJerseySvg(p.team)}${esc(abbrevName(p.name))}${inj}</td>`;
+    const nameCell=`<td class="player-col">${miniJerseySvg(p.team)}${esc(abbrevName(p.name))}${prospectPillHtml(p)}${inj}</td>`;
     const vWARDisp=fmtF(getDisplayStat(p,'vWAR'));
     let cells;
     if(isHitter){
@@ -3554,7 +3620,7 @@ function finderEditTrade(offerIndex){
 }
 
 function populateDDs(){
-  ['teamA','teamB','rosterTeam','finderTeam','finderPartnerTeam','prospectsScope'].forEach(id=>{
+  ['teamA','teamB','rosterTeam','finderTeam','finderPartnerTeam','prospectsScope','playersTeam'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel) return;
     TEAMS.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;sel.appendChild(o);});
@@ -3690,7 +3756,13 @@ function onGroupFilterChange(side){
     dropdownWrap.style.display='block';
     cashWrap.style.display='none';
   }
-  document.getElementById('posFilter'+side).style.display=(g==='cash'||g==='comppicks')?'none':'block';
+  const posFilter=document.getElementById('posFilter'+side);
+  posFilter.style.display=(g==='cash'||g==='comppicks')?'none':'block';
+  // MiLB consolidates LF/CF/RF into the single OF option, matching the site-wide rule.
+  const splitOpts=posFilter.querySelectorAll('.of-split-opt');
+  const hideSplit=(g==='minors');
+  splitOpts.forEach(o=>o.hidden=hideSplit);
+  if(hideSplit && ['LF','CF','RF'].includes(posFilter.value)) posFilter.value='OF';
   onSearch(side);
 }
 
@@ -4196,7 +4268,7 @@ function loadRoster(){
       const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
       const dc=dotClass(p.status);
       const inj=playerHasInjury(p)?'<span style="color:#D72229" title="'+injuredLabel(p.injuredRaw)+'">✚</span>':'';
-      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p)||'—'}</td></tr>`;
+      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p)||'—'}</td></tr>`;
     }).join('');
     return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div>`;
   }
