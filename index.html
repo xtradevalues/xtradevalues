@@ -331,26 +331,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .share-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;border:2px solid var(--bg-mid);z-index:2}
 .share-footer{text-align:center;font-size:10px;color:var(--text-muted);letter-spacing:0.06em;margin-bottom:9px}
 
-/* TRADE TRACKER */
-.tt-list{padding:10px 12px;flex:1;overflow-y:auto}
-.tt-card{padding:12px 13px;border-radius:9px;margin-bottom:5px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-card);border:1px solid var(--border-light);cursor:pointer;transition:background 0.15s,border-color 0.15s}
-.tt-card:nth-child(even){background:var(--row-alt)}
-.tt-card:hover{border-color:var(--border-strong)}
-.tt-card-left{flex:1;min-width:0}
-.tt-card-desc{font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.35}
-.tt-card-date{font-size:11px;color:var(--text-muted);margin-top:3px}
-.tt-card-icon-btn{width:34px;height:34px;flex-shrink:0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent);background:var(--accent-soft);font-size:13px}
-
-/* TRADE BREAKDOWN MODAL */
-.tb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:11px}
-.tb-block{margin-top:14px}
-.tb-block-date{text-align:center;font-size:15px;font-weight:500;color:var(--text-primary);margin-bottom:8px;font-family:'Space Grotesk','Inter',sans-serif}
-.tb-bar-track{position:relative;height:7px;background:var(--bg-light);border-radius:4px;overflow:visible}
-.tb-bar-seg{position:absolute;top:0;bottom:0}
-.tb-bar-bubble{position:absolute;top:50%;transform:translate(-50%,-50%);min-width:18px;height:18px;padding:0 3px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:7px;font-weight:600;background:#fff;color:var(--accent);border:2px solid var(--bg-mid);z-index:2}
-.tb-bar-track-empty{background:var(--border-light)}
-.tb-bar-empty-label{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);white-space:nowrap;font-size:9px;font-weight:500;color:var(--text-muted);background:var(--bg-card);padding:2px 8px;border-radius:9px;border:1px solid var(--border-light);z-index:2}
-
 /* SCORE MODAL */
 .score-desc{font-size:12px;color:var(--text-secondary);line-height:1.7;margin-bottom:13px}
 .score-defs{border-top:1px solid var(--border-light);padding-top:11px;display:flex;flex-direction:column;gap:9px}
@@ -366,30 +346,39 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .privacy-scroll.open{display:block}
 
 /* STANDINGS PAGE */
+.standings-tabs{display:flex;gap:8px;padding:12px 16px 0}
+.standings-subtabs{display:flex;gap:8px;padding:10px 16px 12px;border-bottom:1px solid var(--border-light)}
+.standings-tab-btn{padding:7px 16px;border-radius:20px;font-size:11px;font-weight:400;cursor:pointer;border:1px solid var(--border);color:var(--text-muted);background:none;transition:all 0.15s}
+.standings-tab-btn.active{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:500}
 .standings-table-wrap{overflow-x:auto;flex:1}
 .standings-table{width:100%;border-collapse:collapse;min-width:340px}
-.standings-table th{padding:12px 14px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;position:sticky;top:0}
-.standings-table th:first-child{text-align:left}
+.standings-table th{padding:12px 14px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;position:sticky;top:0;z-index:2}
+.standings-table th.rank-col,.standings-table td.rank-col{text-align:center;width:38px;min-width:38px;max-width:38px;padding-left:6px;padding-right:6px}
+.standings-table th:nth-child(-n+2){text-align:left;position:sticky;left:0;z-index:3;background:var(--bg-mid)}
+.standings-table th.team-col{left:38px}
 .standings-table td{padding:13px 14px;font-size:13px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.standings-table td:first-child{text-align:left;color:var(--accent);font-weight:600;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
-.standings-table td:first-child:hover{text-decoration:underline}
+.standings-table td:nth-child(-n+2){position:sticky;left:0;z-index:1;background:var(--bg-mid)}
+.standings-table td.rank-col{color:var(--text-muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.standings-table td.team-col{left:38px;text-align:left;color:var(--accent);font-weight:600;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:13px}
+.standings-table td.team-col:hover{text-decoration:underline}
 .standings-table tbody tr:nth-child(even){background:var(--row-alt)}
-.standings-clinched{display:inline-block;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:var(--pos-soft);color:var(--pos);margin-left:4px;letter-spacing:0.04em}
+.standings-table tbody tr:nth-child(even) td:nth-child(-n+2){background:color-mix(in srgb, var(--bg-mid), white 1.8%)}
 .standings-division-header{padding:9px 14px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
 
-/* PLAYERS TAB (replaces Rankings) */
+/* PLAYERS TAB (replaces Rankings) — shared by the Prospects table too */
 .players-table-wrap{overflow-x:auto;flex:1}
 .players-table{width:100%;border-collapse:collapse;min-width:480px}
-.players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;transition:background 0.15s,color 0.15s}
-.players-table th.rank-col{text-align:center;width:1%;padding-left:6px;padding-right:6px}
-.players-table th.player-col{text-align:left;min-width:150px}
+.players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
+.players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
+.players-table th.player-col{text-align:left;min-width:150px;left:40px;z-index:3}
 .players-table th.sort-active{color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
 .players-table tbody tr{background:var(--bg-card)}
 .players-table tbody tr:nth-child(even){background:var(--row-alt)}
 .players-table td{padding:12px 10px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.players-table td.rank-col{text-align:center;color:var(--text-muted);padding-left:6px;padding-right:6px}
-.players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
+.players-table td.rank-col{text-align:center;color:var(--text-muted);padding-left:6px;padding-right:6px;position:sticky;left:0;z-index:1;background:var(--bg-card)}
+.players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:40px;z-index:1;background:var(--bg-card)}
 .players-table td.player-col:hover{color:var(--accent)}
+.players-table tbody tr:nth-child(even) td.rank-col,.players-table tbody tr:nth-child(even) td.player-col{background:var(--row-alt)}
 .mini-jersey{display:inline-block;vertical-align:middle;margin-right:6px;flex-shrink:0}
 
 /* PLAYER PAGE */
@@ -509,7 +498,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   <nav class="desktop-nav">
     <div class="desktop-nav-item active" id="dmenu-trade" onclick="showPage('trade')">Trade Sim</div>
     <div class="desktop-nav-item" id="dmenu-finder" onclick="showPage('finder')">Trade Finder</div>
-    <div class="desktop-nav-item" id="dmenu-tradetracker" onclick="showPage('tradetracker')">Trade Tracker</div>
     <div class="desktop-nav-item" id="dmenu-roster" onclick="showPage('roster')">Rosters</div>
     <div class="desktop-nav-item" id="dmenu-players" onclick="showPage('players')">Players</div>
     <div class="desktop-nav-item" id="dmenu-prospects" onclick="showPage('prospects')">Prospects</div>
@@ -528,7 +516,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <button class="menu-close" onclick="closeMenu()">✕</button>
     <div class="menu-item active" id="menu-trade" onclick="showPage('trade')">Trade Sim</div>
     <div class="menu-item" id="menu-finder" onclick="showPage('finder')">Trade Finder</div>
-    <div class="menu-item" id="menu-tradetracker" onclick="showPage('tradetracker')">Trade Tracker</div>
     <div class="menu-item" id="menu-roster" onclick="showPage('roster')">Rosters</div>
     <div class="menu-item" id="menu-players" onclick="showPage('players')">Players</div>
     <div class="menu-item" id="menu-prospects" onclick="showPage('prospects')">Prospects</div>
@@ -576,6 +563,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
               <option value="C">C</option><option value="1B">1B</option>
               <option value="2B">2B</option><option value="3B">3B</option>
               <option value="SS">SS</option><option value="OF">OF</option>
+              <option value="LF">LF</option><option value="CF">CF</option><option value="RF">RF</option>
               <option value="DH">DH/UT</option>
             </select>
           </div>
@@ -615,6 +603,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
               <option value="C">C</option><option value="1B">1B</option>
               <option value="2B">2B</option><option value="3B">3B</option>
               <option value="SS">SS</option><option value="OF">OF</option>
+              <option value="LF">LF</option><option value="CF">CF</option><option value="RF">RF</option>
               <option value="DH">DH/UT</option>
             </select>
           </div>
@@ -715,6 +704,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
         <option value="3B">3B</option>
         <option value="SS">SS</option>
         <option value="OF">OF</option>
+        <option value="LF">LF</option>
+        <option value="CF">CF</option>
+        <option value="RF">RF</option>
         <option value="DH">DH</option>
         <option value="SP">SP</option>
         <option value="RP">RP</option>
@@ -841,6 +833,9 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
         <option value="3B">3B</option>
         <option value="SS">SS</option>
         <option value="OF">OF</option>
+        <option value="LF">LF</option>
+        <option value="CF">CF</option>
+        <option value="RF">RF</option>
         <option value="DH">DH</option>
       </select>
     </div>
@@ -870,18 +865,16 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 
 <!-- STANDINGS PAGE -->
 <div id="page-standings" class="page">
+  <div class="standings-tabs">
+    <button class="standings-tab-btn active" id="standingsTab-current" onclick="standingsSetView('current')">Current Standings</button>
+    <button class="standings-tab-btn" id="standingsTab-projected" onclick="standingsSetView('projected')">Projected Standings</button>
+  </div>
+  <div class="standings-subtabs">
+    <button class="standings-tab-btn active" id="standingsSubtab-div" onclick="standingsSetSubView('div')">Divisions</button>
+    <button class="standings-tab-btn" id="standingsSubtab-wc" onclick="standingsSetSubView('wc')">Wild Card</button>
+  </div>
   <div id="standingsContent" class="standings-table-wrap" style="overflow-y:auto">
     <div class="roster-placeholder">Loading standings...</div>
-  </div>
-</div>
-
-<!-- TRADE TRACKER PAGE -->
-<div id="page-tradetracker" class="page">
-  <div class="roster-controls">
-    <select id="ttYearFilter" onchange="onTradeTrackerYearChange()" style="flex:1;margin-bottom:0"></select>
-  </div>
-  <div id="tradeTrackerContent" class="tt-list">
-    <div class="roster-placeholder">Loading trades...</div>
   </div>
 </div>
 
@@ -969,16 +962,6 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     <div class="modal-title">Trade Breakdown</div>
     <div class="share-grid" id="shareGrid"></div>
     <div class="share-bars" id="shareBars"></div>
-    <div class="share-footer">valuesavant.com</div>
-  </div>
-</div>
-
-<!-- TRADE BREAKDOWN MODAL (historical trade detail, Trade Tracker page) -->
-<div class="overlay-base overlay-center" id="tradeBreakdownModal" onclick="closeTradeBreakdownOut(event)">
-  <div class="modal-box" style="max-width:440px">
-    <button class="modal-close" onclick="closeTradeBreakdown()">✕</button>
-    <div class="modal-title">Trade Breakdown</div>
-    <div id="tbdBody"></div>
     <div class="share-footer">valuesavant.com</div>
   </div>
 </div>
@@ -1073,7 +1056,7 @@ const careerStatsHitters = {}; // mlbam_id -> row
 const careerStatsPitchers = {};
 const miLBHitters = {};        // player_name -> row
 const miLBPitchers = {};
-const standingsData = [];      // array of {team, wins, losses, winPct, gb, clinched}
+const standingsData = [];      // array of {team, wins, losses, winPct, gb, runDiff, wcGb} — sourced from the Current Division tab
 const teamLevelMap = {};       // player name+team -> level string (AAA/AA/A+/A/Rk)
 
 // ===== DIVISIONS (for In-Division Tax) =====
@@ -1088,6 +1071,9 @@ const TEAM_DIVISIONS = {
 function finderIsSameDivision(teamA, teamB){
   return TEAM_DIVISIONS[teamA] && TEAM_DIVISIONS[teamA]===TEAM_DIVISIONS[teamB];
 }
+// Derived from TEAM_DIVISIONS — used to group the Wild Card standings tabs by league.
+const TEAM_LEAGUE = {};
+Object.keys(TEAM_DIVISIONS).forEach(t=>{ TEAM_LEAGUE[t]=TEAM_DIVISIONS[t].startsWith('AL')?'AL':'NL'; });
 
 // Finds an MLB player on `otherTeam` matching the protected prospect's position, with a STRICTLY
 // HIGHER 2026 Value than the prospect, and satisfying the seller-untouchable exception
@@ -1204,15 +1190,6 @@ function showPage(p) {
     }
   }
   if(p==='standings') renderStandingsPage();
-  if(p==='tradetracker'){
-    if(tradesData){ ttPopulateYearFilter(tradesData); onTradeTrackerYearChange(); }
-    else {
-      document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Loading trades…</div>';
-      ensureTradesLoaded().then(t=>{ ttPopulateYearFilter(t); onTradeTrackerYearChange(); }).catch(e=>{
-        document.getElementById('tradeTrackerContent').innerHTML='<div class="roster-placeholder">Unable to load trades: '+esc(e.message)+'</div>';
-      });
-    }
-  }
   // Reset finder to step 1 when navigating to it from any page except player (research flow)
   if(p==='finder' && _leavingPage!=='player') finderRestart();
 }
@@ -1285,183 +1262,6 @@ function ensureDataLoaded(){
     dataLoadPromise=loadData().then(()=>{dataLoaded=true;}).catch(e=>{dataLoadPromise=null;throw e;});
   }
   return dataLoadPromise;
-}
-
-// ===== TRADE TRACKER (Trades sheet) =====
-// Columns: A=Trade Number, B=Player ID, C=Player Name, D=Trading Team, E=Receiving Team,
-// F=Trade Description, G=Date, H=2026 Value (at time of trade), I=Avg Value (at time of trade).
-let tradesData=null, tradesLoadPromise=null;
-const TT_CURRENT_YEAR=2026;
-// A trade's "season year" runs 10/24 of year Y-1 through 10/23 of year Y, labeled year Y —
-// so a trade in the 2025-26 offseason (e.g. 11/15/2025) counts as a 2026 trade, while one
-// right before the 10/24 cutoff (e.g. 10/20/2025) still belongs to the season that just ended.
-function seasonYearForDate(d){
-  if(!d) return null;
-  const cutoffThisYear=new Date(d.getFullYear(), 9, 24); // Oct 24, month is 0-indexed
-  return d>=cutoffThisYear ? d.getFullYear()+1 : d.getFullYear();
-}
-function ensureTradesLoaded(){
-  if(tradesData) return Promise.resolve(tradesData);
-  if(!tradesLoadPromise){
-    tradesLoadPromise=Promise.all([
-      fetchSheetTab('Trades'),
-      fetchSheetTab('Historical Trades')
-    ]).then(([currentRows, historicRows])=>{
-      const current=buildTrades(currentRows||[], 'Trades');
-      const historic=buildTrades(historicRows||[], 'Historical Trades');
-      tradesData=[...current, ...historic].sort((a,b)=>{
-        const byDate=(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0);
-        return byDate;
-      });
-      return tradesData;
-    }).catch(e=>{tradesLoadPromise=null;throw e;});
-  }
-  return tradesLoadPromise;
-}
-function buildTrades(rows, sourceSheet){
-  const byNum={}, order=[];
-  for(const row of rows){
-    const tradeNumber=String(colVal(row,'Trade Number',0)||'').trim();
-    if(!tradeNumber || tradeNumber==='Trade Number') continue;
-    const playerIDRaw=colVal(row,'Player ID',1);
-    const playerIDCandidate=playerIDRaw!=null?String(Math.round(Number(playerIDRaw))):null;
-    const playerID=(playerIDCandidate && playerIDCandidate!=='0' && playerIDCandidate!=='NaN')?playerIDCandidate:null;
-    const playerName=String(colVal(row,'Player Name',2)||'').trim();
-    if(!playerName) continue;
-    // Rows with no Player ID aren't real roster players — they're a comp pick or cash
-    // consideration. Identify which from the Player Name text; anything else unrecognized
-    // without an ID is skipped, same as before.
-    const asset=playerID?null:classifyTradeAsset(playerName);
-    if(!playerID && !asset) continue;
-    const tradingTeam=normTeamAbbr(colVal(row,'Trading Team',3));
-    const receivingTeam=normTeamAbbr(colVal(row,'Receiving Team',4));
-    const description=String(colVal(row,'Trade Description',5)||'').trim();
-    const date=parseGvizDate(colVal(row,'Date',6));
-    const val2026=numOrNull(colVal(row,'2026 Value',7));
-    const avgVal=numOrNull(colVal(row,'Avg Value',8));
-    const cashAmount=asset==='cash'?parseCashAmount(playerName):null;
-    // Trade numbers can repeat across the two sheets (e.g. "1" exists in both Trades and
-    // Historical Trades) — key grouping by sheet+number so they never collide.
-    const groupKey=sourceSheet+'|'+tradeNumber;
-    if(!byNum[groupKey]){
-      byNum[groupKey]={tradeNumber,sourceSheet,description,date,seasonYear:seasonYearForDate(date),players:[]};
-      order.push(groupKey);
-    }
-    byNum[groupKey].players.push({playerID,playerName,tradingTeam,receivingTeam,val2026,avgVal,asset,cashAmount});
-  }
-  // Most recent trade first; ties (same date) break by Trade Number descending, since trade
-  // numbers are assigned in chronological order.
-  return order.map(n=>byNum[n]).sort((a,b)=>{
-    const byDate=(b.date?b.date.getTime():0)-(a.date?a.date.getTime():0);
-    return byDate!==0 ? byDate : b.tradeNumber.localeCompare(a.tradeNumber);
-  });
-}
-// Google's gviz endpoint encodes date cells as the literal string "Date(Y,M,D)" (M is 0-based)
-function parseGvizDate(raw){
-  if(raw==null || raw==='') return null;
-  const s=String(raw);
-  const m=s.match(/^Date\((\d+),(\d+),(\d+)/);
-  if(m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
-  const d=new Date(s);
-  return isNaN(d.getTime())?null:d;
-}
-function fmtDate(d){
-  return d ? (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear() : '—';
-}
-// Group a trade's player rows by Trading Team (the org giving up the player) — players leaving
-// the same team land in the same column, headed by the team that received them.
-function groupTradeSides(trade){
-  const groups={}, order=[];
-  for(const p of trade.players){
-    const key=p.tradingTeam||'—';
-    if(!groups[key]){groups[key]={receivingTeam:p.receivingTeam,players:[]};order.push(key);}
-    groups[key].players.push(p);
-  }
-  return order.map(k=>groups[k]);
-}
-// allPlayers is already a live merge of all 30 current roster tabs (built by loadData()), so a
-// plain lookup here doubles as the "search all 30 team sheets" fallback for players who've since
-// been traded again off the team in the Trades sheet's Receiving Team column.
-function liveTradePlayerValues(playerID){
-  const p=allPlayers.find(x=>x.playerID===playerID);
-  return p ? {val2026:p.val2026, avgVal:p.avgVal} : null;
-}
-function classifyTradeAsset(name){
-  const n=String(name||'').toLowerCase();
-  if(/comp\s*pick\s*a/.test(n)) return 'compA';
-  if(/comp\s*pick\s*b/.test(n)) return 'compB';
-  if(/cash/.test(n)) return 'cash';
-  return null;
-}
-function parseCashAmount(name){
-  const m=String(name||'').match(/\$\s*([\d,]+)/);
-  if(!m) return null;
-  const dollars=parseInt(m[1].replace(/,/g,''),10);
-  return (dollars>0 && !isNaN(dollars)) ? dollars : null;
-}
-// Same conversion trade sim's addCash() uses: dollars -> trade value.
-function cashDollarsToValue(dollars){
-  return Math.round((dollars/100000)*0.01*100)/100;
-}
-// Comp picks and cash aren't real roster players, so there's no live team-sheet lookup for their
-// "current" value — comp picks carry the same fixed value trade sim assigns them
-// (getCompPicksForTeam(): Comp Pick A = 1.7, Comp Pick B = 1.3, unaffected by time or team), and
-// cash only has a computable current value when a specific dollar amount was actually noted on
-// the trade (mirrors addCash()) — we don't invent one otherwise.
-function liveTradeAssetValue(p){
-  if(p.asset==='compA') return {val2026:1.7, avgVal:1.7};
-  if(p.asset==='compB') return {val2026:1.3, avgVal:1.3};
-  if(p.asset==='cash') return {val2026:p.cashAmount?cashDollarsToValue(p.cashAmount):null, avgVal:null};
-  return liveTradePlayerValues(p.playerID);
-}
-function renderTradeTrackerList(trades, selectedYear){
-  const c=document.getElementById('tradeTrackerContent');
-  const filtered=selectedYear ? trades.filter(t=>t.seasonYear===selectedYear) : trades;
-  if(!filtered.length){c.innerHTML='<div class="roster-placeholder">No trades yet</div>';return;}
-  c.innerHTML=filtered.map(t=>`
-    <div class="tt-card" onclick="openTradeBreakdown('${esc(t.tradeNumber)}','${esc(t.sourceSheet)}')">
-      <div class="tt-card-left">
-        <div class="tt-card-desc">${esc(t.description||'Trade')}</div>
-        <div class="tt-card-date">${esc(fmtDate(t.date))}</div>
-      </div>
-      <div class="tt-card-icon-btn" title="View trade breakdown"><i class="fa-solid fa-chart-simple"></i></div>
-    </div>
-  `).join('');
-}
-// Populate the year filter once per session from whatever season years are actually present
-// in the merged Trades + Historical Trades data — doesn't hardcode which historical years
-// exist since Historical Trades is still being backfilled. Leaves an existing selection alone
-// on repeat visits to the page.
-function ttPopulateYearFilter(trades){
-  const sel=document.getElementById('ttYearFilter');
-  if(!sel || sel.options.length) return;
-  const years=[...new Set(trades.map(t=>t.seasonYear).filter(y=>y!=null))].sort((a,b)=>b-a);
-  sel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
-  sel.value=years.includes(TT_CURRENT_YEAR) ? String(TT_CURRENT_YEAR) : (years[0]!=null ? String(years[0]) : '');
-}
-function onTradeTrackerYearChange(){
-  const sel=document.getElementById('ttYearFilter');
-  const year=sel && sel.value ? parseInt(sel.value,10) : null;
-  renderTradeTrackerList(tradesData||[], year);
-}
-// Map full team names (from roster Team column) → abbreviation
-const TEAM_NAME_TO_ABBR = {
-  'Arizona Diamondbacks':'AZ','Atlanta Braves':'ATL','Baltimore Orioles':'BAL',
-  'Boston Red Sox':'BOS','Chicago Cubs':'CHC','Chicago White Sox':'CWS',
-  'Cincinnati Reds':'CIN','Cleveland Guardians':'CLE','Colorado Rockies':'COL',
-  'Detroit Tigers':'DET','Houston Astros':'HOU','Kansas City Royals':'KC',
-  'Los Angeles Angels':'LAA','Los Angeles Dodgers':'LAD','Miami Marlins':'MIA',
-  'Milwaukee Brewers':'MIL','Minnesota Twins':'MIN','New York Mets':'NYM',
-  'New York Yankees':'NYY','Athletics':'ATH','Philadelphia Phillies':'PHI',
-  'Pittsburgh Pirates':'PIT','San Diego Padres':'SD','San Francisco Giants':'SF',
-  'Seattle Mariners':'SEA','St. Louis Cardinals':'STL','Tampa Bay Rays':'TB',
-  'Texas Rangers':'TEX','Toronto Blue Jays':'TOR','Washington Nationals':'WSH',
-};
-// Trading Team / Receiving Team cells in the Trades sheet may contain either the abbreviation
-// already or the full team name — normalize to the abbreviation either way.
-function normTeamAbbr(v){
-  const s=String(v||'').trim();
-  return TEAM_NAME_TO_ABBR[s] || s;
 }
 
 async function loadData() {
@@ -1655,42 +1455,53 @@ async function loadData() {
 
 // ===== STANDINGS / BUYER-SELLER POSTURE =====
 const teamPosture = {}; // team abbrev -> 'buyer' | 'seller' | 'either'
+// Four standalone standings tabs, each laid out Team | Wins | Losses | Win% | GB | Run Diff.
+const standingsSheets = { curDiv:[], curWC:[], projDiv:[], projWC:[] };
+function parseStandingsRows(rows){
+  const out=[];
+  for(const row of (rows||[])){
+    const team=String(colVal(row,'Team',0)||'').trim().toUpperCase();
+    if(!team || !TEAMS.includes(team)) continue;
+    const wins=numOrNull(colVal(row,'Wins',1));
+    const losses=numOrNull(colVal(row,'Losses',2));
+    const winPctRaw=numOrNull(colVal(row,'Win%',3));
+    const gb=numOrNull(colVal(row,'GB',4));
+    const runDiff=numOrNull(colVal(row,'Run Diff',5));
+    const winPct=winPctRaw!==null?winPctRaw:(wins!==null&&losses!==null&&wins+losses>0?wins/(wins+losses):null);
+    out.push({team,wins,losses,winPct,gb,runDiff});
+  }
+  return out;
+}
 async function loadStandings(){
   try {
-    const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=Standings&headers=1&_cb=${Date.now()}`;
-    const r=await fetch(url, {cache: 'no-store'});
-    if(!r.ok) return;
-    const text=await r.text();
-    const match=text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-    if(!match) return;
-    const json=JSON.parse(match[1]);
-    const rows=json.table&&json.table.rows;
-    if(!rows) return;
+    const [curDivRows,curWCRows,projDivRows,projWCRows]=await Promise.all([
+      fetchSheetTab('Current Division'),
+      fetchSheetTab('Current Wild Card'),
+      fetchSheetTab('Projected Division'),
+      fetchSheetTab('Projected Wild Card')
+    ]);
+    standingsSheets.curDiv=parseStandingsRows(curDivRows);
+    standingsSheets.curWC=parseStandingsRows(curWCRows);
+    standingsSheets.projDiv=parseStandingsRows(projDivRows);
+    standingsSheets.projWC=parseStandingsRows(projWCRows);
+
+    // standingsData/teamPosture (buyer/seller posture used by Trade Finder) are sourced from
+    // the Current Division tab since it's the only one guaranteed to carry all 30 teams; the
+    // Current Wild Card tab's GB is merged in as wcGb for the wild-card-aware role logic.
+    const wcGbMap={};
+    standingsSheets.curWC.forEach(r=>{ wcGbMap[r.team]=r.gb; });
     standingsData.length=0;
-    for(let i=0; i<rows.length; i++){
-      const row=rows[i]&&rows[i].c;
-      if(!row) continue;
-      const getS=idx=>row[idx]&&row[idx].v!==null?String(row[idx].v).trim():'';
-      const getN=idx=>row[idx]&&row[idx].v!==null?parseFloat(row[idx].v):null;
-      const team=getS(0).toUpperCase();
-      if(!team || !TEAMS.includes(team)) continue;
-      const wins=getN(1), losses=getN(2);
-      const winPctRaw=getN(3); // Win %
-      const gb=getN(4);
-      const clinched=getS(5);
-      const wcGb=getN(6);      // WC GB — appended by pullStandings_with_wildcard.gs
-      const wcRank=getS(7);    // WC Rank — appended by pullStandings_with_wildcard.gs
-      const winPct=winPctRaw!==null?winPctRaw:(wins!==null&&losses!==null&&wins+losses>0?wins/(wins+losses):null);
-      standingsData.push({team,wins,losses,winPct,gb,clinched,wcGb,wcRank});
-      // Compute buyer/seller posture from standings
+    standingsSheets.curDiv.forEach(row=>{
+      const wcGb=Object.prototype.hasOwnProperty.call(wcGbMap,row.team)?wcGbMap[row.team]:null;
+      standingsData.push({...row, wcGb});
       let posture='either';
-      if(winPct!==null){
-        const gbVal=gb!==null?gb:0;
-        if(winPct>=0.500 || (winPct>=0.460 && gbVal<=5)) posture='buyer';
-        else if(winPct<0.420 && gbVal>8) posture='seller';
+      if(row.winPct!==null){
+        const gbVal=row.gb!==null?row.gb:0;
+        if(row.winPct>=0.500 || (row.winPct>=0.460 && gbVal<=5)) posture='buyer';
+        else if(row.winPct<0.420 && gbVal>8) posture='seller';
       }
-      teamPosture[team]=posture;
-    }
+      teamPosture[row.team]=posture;
+    });
   } catch(e){
     console.error('loadStandings error:', e);
   }
@@ -1846,55 +1657,83 @@ async function loadMiLBStats(){
 }
 
 // ===== STANDINGS PAGE =====
+let standingsView='current';   // 'current' | 'projected'
+let standingsSubView='div';    // 'div' | 'wc'
+function standingsSetView(v){
+  standingsView=v;
+  document.getElementById('standingsTab-current').classList.toggle('active', v==='current');
+  document.getElementById('standingsTab-projected').classList.toggle('active', v==='projected');
+  renderStandingsPage();
+}
+function standingsSetSubView(v){
+  standingsSubView=v;
+  document.getElementById('standingsSubtab-div').classList.toggle('active', v==='div');
+  document.getElementById('standingsSubtab-wc').classList.toggle('active', v==='wc');
+  renderStandingsPage();
+}
 function renderStandingsPage(){
   const el=document.getElementById('standingsContent');
-  if(!standingsData.length){
+  const hasAnyData=standingsSheets.curDiv.length||standingsSheets.curWC.length||standingsSheets.projDiv.length||standingsSheets.projWC.length;
+  if(!hasAnyData){
     el.innerHTML='<div class="roster-placeholder">Loading standings...</div>';
     ensureDataLoaded().then(()=>renderStandingsPage()).catch(()=>{
       el.innerHTML='<div class="roster-placeholder">Unable to load standings</div>';
     });
     return;
   }
-  // Group by division using TEAM_DIVISIONS
-  const divOrder=['AL East','AL Central','AL West','NL East','NL Central','NL West'];
-  const byDiv={};
-  divOrder.forEach(d=>byDiv[d]=[]);
-  standingsData.forEach(row=>{
-    const div=TEAM_DIVISIONS[row.team];
-    if(div&&byDiv[div]) byDiv[div].push(row);
+  const sheetKey=(standingsView==='current')
+    ? (standingsSubView==='div'?'curDiv':'curWC')
+    : (standingsSubView==='div'?'projDiv':'projWC');
+  const rows=standingsSheets[sheetKey];
+  // Divisions view groups into the 6 MLB divisions; Wild Card view groups into the 2 leagues.
+  const groupMap=standingsSubView==='div'?TEAM_DIVISIONS:TEAM_LEAGUE;
+  const groupOrder=standingsSubView==='div'
+    ? ['AL East','AL Central','AL West','NL East','NL Central','NL West']
+    : ['AL','NL'];
+  const byGroup={};
+  groupOrder.forEach(g=>byGroup[g]=[]);
+  rows.forEach(row=>{
+    const g=groupMap[row.team];
+    if(g&&byGroup[g]) byGroup[g].push(row);
   });
-  divOrder.forEach(d=>byDiv[d].sort((a,b)=>(b.wins||0)-(a.wins||0)));
-  const postureLbl={buyer:'Buyer',seller:'Seller',either:'Hold'};
-  const postureColor={buyer:'var(--pos)',seller:'var(--neg)',either:'var(--text-muted)'};
+  groupOrder.forEach(g=>byGroup[g].sort((a,b)=>(b.wins||0)-(a.wins||0)));
   let html='';
-  divOrder.forEach(div=>{
-    const rows=byDiv[div];
-    if(!rows.length) return;
-    html+=`<div class="standings-division-header">${div}</div>`;
-    html+=`<table class="standings-table"><thead><tr><th>Team</th><th>W</th><th>L</th><th>Win%</th><th>GB</th><th>Clinched</th><th>Status</th></tr></thead><tbody>`;
-    rows.forEach(row=>{
+  groupOrder.forEach(g=>{
+    const groupRows=byGroup[g];
+    if(!groupRows.length) return;
+    html+=`<div class="standings-division-header">${esc(g)}${standingsSubView==='wc'?' Wild Card':''}</div>`;
+    html+=`<table class="standings-table"><thead><tr><th class="rank-col">#</th><th class="team-col">Team</th><th>W</th><th>L</th><th>Win%</th><th>GB</th><th>Run Diff</th></tr></thead><tbody>`;
+    groupRows.forEach((row,i)=>{
       const winPctStr=row.winPct!==null?row.winPct.toFixed(3).replace(/^0\./,'.'):'-';
       const gbStr=row.gb!==null?(row.gb===0?'—':row.gb):'-';
-      const clinched=row.clinched?`<span class="standings-clinched">${esc(String(row.clinched))}</span>`:'';
-      const posture=teamPosture[row.team]||'either';
-      const statusHtml=`<span style="font-size:11px;color:${postureColor[posture]};font-family:'Inter',sans-serif">${postureLbl[posture]||''}</span>`;
-      html+=`<tr><td onclick="showPage('roster');document.getElementById('rosterTeam').value='${esc(row.team)}';document.getElementById('rosterBackBar').style.display='block';onRosterTeamChange()" style="cursor:pointer">${esc(row.team)}${clinched}</td><td>${row.wins!==null?row.wins:'-'}</td><td>${row.losses!==null?row.losses:'-'}</td><td>${winPctStr}</td><td>${gbStr}</td><td>${row.clinched?esc(String(row.clinched)):'-'}</td><td>${statusHtml}</td></tr>`;
+      const rdStr=row.runDiff!==null?(row.runDiff>0?'+'+row.runDiff:String(row.runDiff)):'-';
+      html+=`<tr><td class="rank-col">${i+1}</td><td class="team-col" onclick="showPage('roster');document.getElementById('rosterTeam').value='${esc(row.team)}';document.getElementById('rosterBackBar').style.display='block';onRosterTeamChange()">${esc(row.team)}</td><td>${row.wins!==null?row.wins:'-'}</td><td>${row.losses!==null?row.losses:'-'}</td><td>${winPctStr}</td><td>${gbStr}</td><td>${rdStr}</td></tr>`;
     });
     html+=`</tbody></table>`;
   });
-  el.innerHTML=html;
+  el.innerHTML=html || '<div class="roster-placeholder">No standings data</div>';
 }
 
 // ===== PLAYERS PAGE (replaces Rankings) =====
+function firstNameKey(name){ return String(name||'').trim().split(/\s+/)[0].toLowerCase(); }
 let playersSortCol='vWAR', playersSortDir=1, playersViewHitters=true;
 function playersFilterChanged(){renderPlayers();}
+// Levels below MLB switch the displayed stat columns over to MiLB stats (fetched lazily,
+// same per-year MiLB sheets the player detail page's Minors toggle already uses).
+const PLAYERS_MILB_LEVELS=['aaa','aa','aplus','a','rk'];
 function renderPlayers(){
   const levelF=document.getElementById('playersLevel').value;
   const posF=document.getElementById('playersPos').value;
   const searchF=document.getElementById('playersSearch').value.trim().toLowerCase();
+  const showMiLB=PLAYERS_MILB_LEVELS.includes(levelF);
+  if(showMiLB && !Object.keys(miLBHitters).length && !Object.keys(miLBPitchers).length){
+    document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading minor league stats…</td></tr>';
+    loadMiLBStats().then(()=>renderPlayers());
+    return;
+  }
   // Determine if viewing hitters or pitchers based on pos filter
   if(posF==='pitcher'||posF==='SP'||posF==='RP') playersViewHitters=false;
-  else if(posF==='hitter'||['C','1B','2B','3B','SS','OF','DH'].includes(posF)) playersViewHitters=true;
+  else if(posF==='hitter'||['C','1B','2B','3B','SS','OF','LF','CF','RF','DH'].includes(posF)) playersViewHitters=true;
   let pl=[...allPlayers];
   // Name search
   if(searchF) pl=pl.filter(x=>x.name.toLowerCase().includes(searchF));
@@ -1913,10 +1752,29 @@ function renderPlayers(){
     if(!posF) return (p.vWARHit||0)+(p.vWARPitch||0);
     return isHitter?p.vWARHit:p.vWARPitch;
   };
-  // Sort
+  // MiLB stat lookups, only consulted when showMiLB is true — otherwise the MLB-sourced
+  // fields already on the player object (populated at load time) are used unchanged.
+  const milbStatFor=p=>isHitter?computeMiLBHitterStats(miLBHitters[p.playerID]):computeMiLBPitcherStats(miLBPitchers[p.playerID]);
+  const milbSwitchFields=isHitter?['pa','h','hr','avg26','obp','slg','vWAR']:['ip','k','era','fip','sv','k9','vWAR'];
+  const getDisplayStat=(p,field)=>{
+    if(showMiLB && milbSwitchFields.includes(field)){
+      const ms=milbStatFor(p);
+      if(!ms) return null;
+      const key=field==='avg26'?'avg':field;
+      return ms[key]!==undefined?ms[key]:null;
+    }
+    return field==='vWAR'?effVWAR(p):p[field];
+  };
+  // Sort — the Player column sorts alphabetically by first name; other text columns (Pos)
+  // sort alphabetically too; numeric columns sort by value (dir=1 shows the best/highest first).
   pl.sort((a,b)=>{
-    const av=playersSortCol==='vWAR'?effVWAR(a):a[playersSortCol];
-    const bv=playersSortCol==='vWAR'?effVWAR(b):b[playersSortCol];
+    if(playersSortCol==='name'){
+      const an=firstNameKey(a.name), bn=firstNameKey(b.name);
+      return playersSortDir*an.localeCompare(bn);
+    }
+    const av=getDisplayStat(a,playersSortCol);
+    const bv=getDisplayStat(b,playersSortCol);
+    if(typeof av==='string'||typeof bv==='string') return playersSortDir*String(av||'').localeCompare(String(bv||''));
     return playersSortDir*((bv||0)-(av||0));
   });
   // For Players tab we show 2026 stat line from allPlayers (PLAYERS tab stats)
@@ -1928,6 +1786,8 @@ function renderPlayers(){
   const thSort={};thSort['2026']='val2026';thSort['Avg']='avgVal';thSort['vWAR']='vWAR';
   thSort['HR']='hr';thSort['ERA']='era';thSort['K']='k';thSort['IP']='ip';
   thSort['OBP']='obp';thSort['SLG']='slg';thSort['AVG']='avg26';
+  thSort['Player']='name';thSort['Pos']='pos';thSort['PA']='pa';thSort['H']='h';
+  thSort['S']='sv';thSort['K/9']='k9';
   let thead='<tr>';
   cols.forEach(c=>{
     const sc=thSort[c]||null;
@@ -1945,19 +1805,19 @@ function renderPlayers(){
     const inj=playerHasInjury(p)?'<span style="color:#D72229">✚</span>':'';
     const teamB=`<span class="team-pill">${p.team}</span>`;
     const nameCell=`<td class="player-col">${miniJerseySvg(p.team)}${esc(p.name)}${inj}${teamB}</td>`;
-    const vWARDisp=fmtF(effVWAR(p));
+    const vWARDisp=fmtF(getDisplayStat(p,'vWAR'));
     let cells;
     if(isHitter){
       cells=[
         `<td class="rank-col">${idx+1}</td>`,
         nameCell,
         `<td>${esc(p.pos||'—')}</td>`,
-        `<td>${fmtI(p.pa)}</td>`,
-        `<td>${fmtI(p.h)}</td>`,
-        `<td>${fmtI(p.hr)}</td>`,
-        `<td>${fmt3(p.avg26)}</td>`,
-        `<td>${fmt3(p.obp)}</td>`,
-        `<td>${fmt3(p.slg)}</td>`,
+        `<td>${fmtI(getDisplayStat(p,'pa'))}</td>`,
+        `<td>${fmtI(getDisplayStat(p,'h'))}</td>`,
+        `<td>${fmtI(getDisplayStat(p,'hr'))}</td>`,
+        `<td>${fmt3(getDisplayStat(p,'avg26'))}</td>`,
+        `<td>${fmt3(getDisplayStat(p,'obp'))}</td>`,
+        `<td>${fmt3(getDisplayStat(p,'slg'))}</td>`,
         `<td>${vWARDisp}</td>`,
         `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
         `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
@@ -1967,12 +1827,12 @@ function renderPlayers(){
         `<td class="rank-col">${idx+1}</td>`,
         nameCell,
         `<td>${esc(p.pos||'—')}</td>`,
-        `<td>${fmtF(p.ip)}</td>`,
-        `<td>${fmtI(p.k)}</td>`,
-        `<td>${fmt2(p.era)}</td>`,
-        `<td>${fmt2(p.fip)}</td>`,
-        `<td>${fmtI(p.sv)}</td>`,
-        `<td>${fmtF(p.k9)}</td>`,
+        `<td>${fmtF(getDisplayStat(p,'ip'))}</td>`,
+        `<td>${fmtI(getDisplayStat(p,'k'))}</td>`,
+        `<td>${fmt2(getDisplayStat(p,'era'))}</td>`,
+        `<td>${fmt2(getDisplayStat(p,'fip'))}</td>`,
+        `<td>${fmtI(getDisplayStat(p,'sv'))}</td>`,
+        `<td>${fmtF(getDisplayStat(p,'k9'))}</td>`,
         `<td>${vWARDisp}</td>`,
         `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
         `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
@@ -2104,7 +1964,7 @@ function computeMiLBHitterStats(r){
   const slg=(!isNaN(preSlg)&&preSlg)?preSlg:(ab>0?tb/ab:null);
   return {
     pa:numOrNull(r['plateAppearances']), h:numOrNull(r['hits']), hr:numOrNull(r['homeRuns']),
-    rbi:numOrNull(colVal(r,'rbi',25)), avg,
+    rbi:numOrNull(colVal(r,'rbi',25)), avg, obp, slg,
     ops:(obp!=null&&slg!=null)?obp+slg:null,
     sb:numOrNull(colVal(r,'stolenBases',19)),
     vWAR:numOrNull(r['vWAR'])
@@ -2754,7 +2614,9 @@ function finderPosChosen(pos){
   // 'ANY' is the "best available" sentinel — internally treated the same as no
   // position selected (null), which the v6 buyer generator reads as "scan every
   // upgradeable depth slot." Only the truly-unset placeholder ('') skips Generate.
-  finderState.position=(pos && pos!=='ANY') ? pos : null;
+  // finderPosBucket collapses LF/CF/RF to 'OF' — the buyer generator's depth slots are only
+  // tracked at the 9-bucket level, so a corner-outfield pick targets the same OF slot as OF.
+  finderState.position=(pos && pos!=='ANY') ? finderPosBucket(pos) : null;
   finderState.targetPlayers=[]; // choosing a position cancels any direct player search
   document.getElementById('finderTargetPlayerSearch').value='';
   document.getElementById('finderTargetPlayerSelected').innerHTML='';
@@ -4199,12 +4061,12 @@ async function showPM(name,team,pos){
   const levelLabel=p.level==='mlb'?'MLB':getPlayerDetailLevel(p);
   const ageLabel=p.age!=null&&!isNaN(p.age)?Math.floor(p.age):'—';
   document.getElementById('pmMeta').textContent=`${ageLabel} | ${p.pos||'—'} | ${p.team} | ${levelLabel}`;
-  // Status: gray text when healthy, red "+ IL" when injured (never both)
+  // Status: only ever shows an IL designation — any other raw status (Active, RM, etc.) is blank.
   const statusEl=document.getElementById('pmStatus');
   if(playerHasInjury(p)){
     statusEl.innerHTML=`<span class="pm-status-injury">✚ ${esc(injuredLabel(p.injuredRaw))}</span>`;
   } else {
-    statusEl.textContent=p.aaRaw||'—';
+    statusEl.textContent='';
   }
   document.getElementById('playerModal').classList.add('open');
   const isPitcher=['SP','RP'].includes(finderFirstPos(p.pos));
@@ -4266,176 +4128,6 @@ function openShareModal(){
 }
 function closeShare(){document.getElementById('shareModal').classList.remove('open');}
 function closeShareOut(e){if(e.target.id==='shareModal')closeShare();}
-
-// ===== TRADE BREAKDOWN MODAL (Trade Tracker page) =====
-async function openTradeBreakdown(tradeNumber, sourceSheet){
-  document.getElementById('tradeBreakdownModal').classList.add('open');
-  document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Loading…</div>';
-  let trades;
-  try { trades=await ensureTradesLoaded(); }
-  catch(e){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Unable to load trade: '+esc(e.message)+'</div>'; return; }
-  const trade=trades.find(t=>t.tradeNumber===tradeNumber && t.sourceSheet===sourceSheet);
-  if(!trade){ document.getElementById('tbdBody').innerHTML='<div class="roster-placeholder">Trade not found</div>'; return; }
-  let liveOk=true;
-  try { await ensureDataLoaded(); } catch(e){ liveOk=false; }
-  renderTradeBreakdown(trade, liveOk);
-}
-function closeTradeBreakdown(){document.getElementById('tradeBreakdownModal').classList.remove('open');}
-function closeTradeBreakdownOut(e){if(e.target.id==='tradeBreakdownModal')closeTradeBreakdown();}
-function tbSideTotals(sides, getVal){
-  const totals=sides.map(s=>s.players.reduce((sum,p)=>{const v=getVal(p);return sum+(v!=null&&!isNaN(v)?v:0);},0));
-  const grand=totals.reduce((a,b)=>a+b,0);
-  const pcts=grand>0?totals.map(t=>(t/grand)*100):null;
-  return {totals,grand,pcts};
-}
-// The side actually receiving the larger share "wins" that comparison — the bar's red highlight
-// and callout bubble follow whichever side that is, not a fixed left/right position. A 40-60%
-// max share is treated as a wash (no highlighted winner), matching the fair-trade band used
-// elsewhere in the app (inFairBand()).
-function tbSideWinner(sides, getVal){
-  const {grand,pcts}=tbSideTotals(sides,getVal);
-  if(grand<=0||!pcts) return null;
-  const maxPct=Math.max(...pcts);
-  if(maxPct>=40 && maxPct<=60) return null;
-  const idx=pcts.indexOf(maxPct);
-  return {idx, team:sides[idx].receivingTeam, pct:maxPct};
-}
-function tbBarSeg(left,width,color,radius){
-  return `<div class="tb-bar-seg" style="left:${left}%;width:${width}%;background:${color};border-radius:${radius}"></div>`;
-}
-function tbBarHtml(sides, getVal){
-  const {grand,pcts}=tbSideTotals(sides,getVal);
-  if(grand<=0) return '<div style="font-size:10px;color:var(--text-muted)">No data</div>';
-  const maxPct=Math.max(...pcts);
-  const leaders=pcts.filter(p=>Math.abs(p-maxPct)<0.001).length;
-  const winnerIdx=leaders===1?pcts.indexOf(maxPct):-1;
-
-  // For the standard 2-side trade, the color joint sits exactly where the bubble does: the
-  // winner's share mirrored around the 50% midpoint (toward their own edge). That makes red —
-  // always the winner's color — the shorter of the two segments, anchored at the winner's own
-  // side and growing only with their margin, instead of drawing their raw (larger) value share
-  // as width, which put the boundary closer to the loser's edge than to the winner's.
-  if(sides.length===2 && winnerIdx>=0){
-    const winnerOnRight=winnerIdx===1;
-    const position=50+(pcts[winnerIdx]-50)*(winnerOnRight?1:-1);
-    const winColor='var(--accent)', loseColor='var(--bar2)';
-    const segs=winnerOnRight
-      ? tbBarSeg(0,position,loseColor,'4px 0 0 4px')+tbBarSeg(position,100-position,winColor,'0 4px 4px 0')
-      : tbBarSeg(0,position,winColor,'4px 0 0 4px')+tbBarSeg(position,100-position,loseColor,'0 4px 4px 0');
-    const bubble=`<div class="tb-bar-bubble" style="left:${position}%">${Math.round(pcts[winnerIdx])}%</div>`;
-    return `<div class="tb-bar-track">${segs}${bubble}</div>`;
-  }
-
-  // Fallback for an exact tie or a 3+ side trade (rare) — plain proportional segments, no single
-  // joint to anchor a bubble to.
-  let acc=0;
-  const segs=pcts.map((pct,i)=>{
-    const left=acc; acc+=pct;
-    const radius=i===0?'4px 0 0 4px':(i===pcts.length-1?'0 4px 4px 0':'0');
-    const color=i===winnerIdx?'var(--accent)':'var(--bar2)';
-    return tbBarSeg(left,pct,color,radius);
-  }).join('');
-  return `<div class="tb-bar-track">${segs}</div>`;
-}
-function tbEmptyBarHtml(label){
-  return `<div class="tb-bar-track tb-bar-track-empty"><div class="tb-bar-empty-label">${esc(label)}</div></div>`;
-}
-function tbBlockHtml(dateLabel, sides, unavailable, valueLabel){
-  const val26Html=unavailable ? tbEmptyBarHtml('No Data Available') : tbBarHtml(sides,p=>p.val2026);
-  const avgHtml=unavailable ? tbEmptyBarHtml('Check Back Soon') : tbBarHtml(sides,p=>p.avgVal);
-  return `<div class="tb-block">
-    <div class="tb-block-date">${esc(dateLabel)}</div>
-    <div class="share-bars">
-      <div><div class="share-bar-lbl">${esc(valueLabel)} VALUE</div>${val26Html}</div>
-      <div><div class="share-bar-lbl">AVG VALUE</div>${avgHtml}</div>
-    </div>
-  </div>`;
-}
-// Comp picks/cash aren't real roster players and never open the popup. A real player only gets
-// the tappable treatment if we can resolve their CURRENT team — showPM() looks players up by
-// name+team against the live allPlayers merge, so a stale/traded-off-system team wouldn't match.
-function tbPlayerNameHtml(p){
-  if(!p.asset && p.playerID){
-    const live=allPlayers.find(x=>x.playerID===p.playerID);
-    if(live) return `<span class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(live.name)}','${esc(live.team)}','${esc(live.pos||'')}')">${esc(p.playerName)}</span>`;
-  }
-  return `<div class="share-player-name">${esc(p.playerName)}</div>`;
-}
-// A player later moved again in some other trade (either sheet) — a plain informational
-// link to that later trade's own breakdown. Does not fold its return package into this
-// trade's totals; the bars/values here stay exactly as computed elsewhere.
-function findLaterTrade(playerID, currentDate, currentSourceSheet, currentTradeNumber, allTrades){
-  if(!playerID || !currentDate) return null;
-  const later=allTrades.filter(t=>{
-    if(t.sourceSheet===currentSourceSheet && t.tradeNumber===currentTradeNumber) return false;
-    if(!t.date || t.date<=currentDate) return false;
-    return t.players.some(p=>p.playerID===playerID && p.tradingTeam);
-  }).sort((a,b)=>a.date-b.date);
-  return later.length ? later[0] : null;
-}
-function tbLaterTradeNoteHtml(p, trade){
-  if(!p.playerID) return ''; // comp picks/cash were never "traded again"
-  const laterTrade=findLaterTrade(p.playerID, trade.date, trade.sourceSheet, trade.tradeNumber, tradesData||[]);
-  if(!laterTrade) return '';
-  return `<div style="font-size:10px;color:var(--accent);cursor:pointer;margin-top:2px" onclick="openTradeBreakdown('${esc(laterTrade.tradeNumber)}','${esc(laterTrade.sourceSheet)}')">Later traded ${esc(fmtDate(laterTrade.date))} →</div>`;
-}
-function tbSideStatsHtml(sides, trade){
-  // Cash considerations don't carry a meaningful Avg Value — same display rule trade sim's own
-  // share-player line uses for isCash entries.
-  const playerLine=(p)=>{
-    const laterNote=trade ? tbLaterTradeNoteHtml(p, trade) : '';
-    if(p.asset==='cash') return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div>${laterNote}</div>`;
-    return `<div class="share-player">${tbPlayerNameHtml(p)}<div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div>${laterNote}</div>`;
-  };
-  return `<div class="tb-grid">${sides.map(s=>`<div><div class="share-side-label">${esc(s.receivingTeam||'—')} RECEIVES</div>${s.players.map(playerLine).join('')}</div>`).join('')}</div>`;
-}
-function tbVerdictBox(cls,headline,detail){
-  return `<div class="${cls}" style="margin-top:14px"><div class="verdict-box-text"><div class="verdict-headline">${headline}</div><div class="verdict-detail">${detail}</div></div></div>`;
-}
-function renderTradeBreakdown(trade, liveOk){
-  const sides=groupTradeSides(trade);
-
-  // liveTradeAssetValue() searches the full 30-team merged roster (allPlayers) for real players.
-  // "unavailable" (grey-out, whole block replaced with a placeholder) is reserved for when the
-  // live data never loaded at all — a single player who's out of affiliated baseball is a known,
-  // real outcome (val2026/avgVal of 0), not a data gap, so it must not blank out the rest of the
-  // trade's current-value bars/verdict. Comp picks always resolve (fixed value); an unspecified
-  // cash amount already resolves to a zero-ish contribution the same way.
-  let currentSides=sides;
-  const unavailable=!liveOk;
-  // Real players (not comp picks/cash) who don't resolve on any of the 30 current rosters are
-  // genuinely out of affiliated baseball — called out by name in a note, and counted as 0
-  // (not null) so they still contribute to — rather than block — the rest of the totals.
-  const outOfLeagueNames=[];
-  if(liveOk){
-    currentSides=sides.map(s=>({
-      receivingTeam:s.receivingTeam,
-      players:s.players.map(p=>{
-        const live=liveTradeAssetValue(p);
-        // liveTradeAssetValue() always resolves comp picks/cash (fixed/computed value), so a
-        // miss here only ever means a real player who's out of affiliated baseball.
-        if(!live) outOfLeagueNames.push(p.playerName);
-        return {...p, val2026:live?live.val2026:0, avgVal:live?live.avgVal:0};
-      })
-    }));
-  }
-
-  // Historical (non-2026) trades still label their at-trade block with the year it actually
-  // happened; the live/current block is always "2026" since that's the present state of the
-  // data regardless of which sheet the trade came from.
-  const atTradeLabel=trade.seasonYear===TT_CURRENT_YEAR ? '2026' : String(trade.seasonYear);
-  const outOfLeagueNote=outOfLeagueNames.length
-    ? `<div style="margin-top:10px;font-size:11px;color:var(--text-muted)">${outOfLeagueNames.map(esc).join(', ')} ${outOfLeagueNames.length===1?'is':'are'} no longer in affiliated baseball.</div>`
-    : '';
-
-  document.getElementById('tbdBody').innerHTML=tbSideStatsHtml(sides, trade)
-    + tbBlockHtml(fmtDate(trade.date), sides, false, atTradeLabel)
-    + `<div style="margin-top:14px">${tbSideStatsHtml(currentSides)}</div>`
-    + tbBlockHtml(fmtDate(new Date()), currentSides, unavailable, '2026')
-    + tbVerdictHtml(sides, currentSides, unavailable)
-    + tbSmartVerdictHtml(currentSides, unavailable)
-    + outOfLeagueNote;
-}
 
 // ===== SCORE MODAL =====
 function openScoreModal(){document.getElementById('scoreModal').classList.add('open');}
@@ -6000,256 +5692,6 @@ function vsGenerateSellerManualOffers() {
   return offers;
 }
 
-/* ============================== 8. TRACKER VERDICT (magnitude-aware) ============================== */
-
-/* Per-player movement since the deal. Pairs at-trade rows with current rows by index
-   (currentSides is built as a map over the same arrays, so order is stable). */
-function vsTbDeltas(atTradeSides, currentSides) {
-  const sides = [];
-  for (let i = 0; i < atTradeSides.length; i++) {
-    const atS = atTradeSides[i], curS = currentSides[i];
-    const movers = [];
-    for (let j = 0; j < atS.players.length; j++) {
-      const a = atS.players[j], c = curS.players[j];
-      if (a.asset) continue;                                   // cash/comp: fixed by definition
-      if (c.val2026 == null && c.avgVal == null) continue;     // no live data for this player
-      const d26 = (c.val2026 != null && a.val2026 != null) ? c.val2026 - a.val2026 : null;
-      const dAvg = (c.avgVal != null && a.avgVal != null) ? c.avgVal - a.avgVal : null;
-      movers.push({ name: a.playerName, d26, dAvg,
-        mag: Math.max(Math.abs(d26 || 0), Math.abs(dAvg || 0)) });
-    }
-    movers.sort((x, y) => y.mag - x.mag);
-    sides.push({ receivingTeam: atS.receivingTeam, movers });
-  }
-  return sides;
-}
-
-/* Side ledger: total Avg value received at the time vs what those same assets are
-   worth now (Avg is the right retrospective clock — it captures realized future). */
-function vsTbLedger(atTradeSides, currentSides) {
-  return atTradeSides.map((atS, i) => {
-    const then = atS.players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
-    const now = currentSides[i].players.reduce((s, p) => s + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
-    const pct = then > 0 ? Math.round(((now - then) / then) * 100) : null;
-    return { team: atS.receivingTeam, then, now, pct };
-  });
-}
-
-function vsTbSection(title, body) {
-  return `<div style="margin-bottom:9px"><div style="font-weight:500;color:var(--text-primary);font-size:11px;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:3px">${title}</div><div>${body}</div></div>`;
-}
-
-function vsTbArrow(d) {
-  if (d == null || isNaN(d)) return '';
-  const v = Math.round(d * 100) / 100;
-  if (v > 0.05) return `<span>▲ +${v.toFixed(2)}</span>`;
-  if (v < -0.05) return `▼ ${v.toFixed(2)}`;
-  return `— ${v.toFixed(2)}`;
-}
-
-/* Raw share helper: returns per-side percentage share for a metric, or null. */
-function vsTbShares(sides, getVal) {
-  const { grand, pcts } = tbSideTotals(sides, getVal);
-  return grand > 0 && pcts ? pcts : null;
-}
-
-/* Aligned deadline shape, detected from raw shares: one side holds a decisive
-   long-term (Avg) premium (>=58%) while NOT also holding a decisive 2026 edge
-   (<=55%, i.e. inside the fair band). Covers both the strict two-winner case and the rental-premium case
-   where 2026 sits inside the fair band. Returns {avgIdx, avgPct, nowIdx, nowPct}
-   or null. */
-function vsTbAlignedShape(sides) {
-  const s26 = vsTbShares(sides, p => p.val2026);
-  const sAvg = vsTbShares(sides, p => p.avgVal);
-  if (!s26 || !sAvg || sides.length !== 2) return null;
-  for (let i = 0; i < 2; i++) {
-    if (sAvg[i] >= 58 && s26[i] <= 55) {
-      const o = 1 - i;
-      return { avgIdx: i, avgPct: sAvg[i], avgTeam: sides[i].receivingTeam,
-               nowIdx: o, nowPct: s26[o], nowTeam: sides[o].receivingTeam };
-    }
-  }
-  return null;
-}
-
-/* Overall winner on a "both clocks" read: the side whose AVERAGE share across the
-   two metrics clears 56%. Returns {idx, team, pct} or null (fair). */
-function vsTbOverallWinner(sides) {
-  const s26 = vsTbShares(sides, p => p.val2026);
-  const sAvg = vsTbShares(sides, p => p.avgVal);
-  if (!s26 && !sAvg) return null;
-  const n = sides.length;
-  let best = null;
-  for (let i = 0; i < n; i++) {
-    const parts = [];
-    if (s26) parts.push(s26[i]);
-    if (sAvg) parts.push(sAvg[i]);
-    const avg = parts.reduce((a, b) => a + b, 0) / parts.length;
-    if (!best || avg > best.pct) best = { idx: i, team: sides[i].receivingTeam, pct: avg };
-  }
-  return best && best.pct >= 56 ? best : null;
-}
-
-// Self-contained tracker verdict: short depth-swap voice for sub-2-value trades,
-// otherwise the full three-section retrospective (At The Time / What's Moved /
-// Where It Stands).
-function tbVerdictHtml(atTradeSides, currentSides, unavailable) {
-  const sideAvg = (s) => s.players.reduce((sum, p) => sum + (p.avgVal != null && !isNaN(p.avgVal) ? p.avgVal : 0), 0);
-  const side26 = (s) => s.players.reduce((sum, p) => sum + (p.val2026 != null && !isNaN(p.val2026) ? p.val2026 : 0), 0);
-  const isDepth = atTradeSides.every(s => sideAvg(s) < 2 && side26(s) < 2);
-
-  /* ---- Depth swap voice ---- */
-  if (isDepth) {
-    let body = 'A depth swap — nobody in this deal was moving the needle when it happened, and nobody expected them to. This is two front offices tidying the 40-man.';
-    if (!unavailable) {
-      const cur = (typeof vsTbShares === 'function') ? vsTbShares(currentSides, p => p.avgVal) : null;
-      if (cur && currentSides.length === 2) {
-        const i = cur[0] >= cur[1] ? 0 : 1;
-        if (cur[i] >= 62) body += ` Since then it's leaned <span>${esc(currentSides[i].receivingTeam)}</span>'s way (${Math.round(cur[i])}% of what's left) — which in a deal this size means somebody's pro scouting department found a useful player in the bargain bin. Tip of the cap, nothing more.`;
-        else body += ' Neither side has found a diamond in it yet.';
-      }
-      const ledger = (typeof vsTbLedger === 'function') ? vsTbLedger(atTradeSides, currentSides) : null;
-      if (ledger) body += '<br>' + ledger.map(l => `<span>${esc(l.team)}</span>: ${l.then.toFixed(2)} then, ${l.now.toFixed(2)} now`).join('<br>');
-    }
-    return tbVerdictBox('verdict-box v-neutral', 'Depth swap — low stakes, then and now', vsTbSection('The Read', body));
-  }
-
-  /* ---- Real trades: three-section retrospective ---- */
-  const alignedAt = vsTbAlignedShape(atTradeSides);
-  const atOverall = vsTbOverallWinner(atTradeSides);
-
-  /* Section 1: AT THE TIME */
-  let atBody, atGradeHint = 'fair';
-  if (alignedAt) {
-    atBody = `This was a proper deadline deal the day it was signed off: <span>${esc(alignedAt.nowTeam)}</span> bought the season (${Math.round(alignedAt.nowPct)}% of the now), <span>${esc(alignedAt.avgTeam)}</span> bought the future (${Math.round(alignedAt.avgPct)}% of the later). Nobody "won" at the podium — both GMs got exactly the currency they walked in asking for. The scoreboard was always going to be written later.`;
-  } else if (!atOverall) {
-    atBody = `Dead even on the day — comparable production and comparable future moving both directions. The kind of trade two evenly-matched front offices shake hands on and defend to their owners identically.`;
-  } else {
-    atBody = `<span>${esc(atOverall.team)}</span> walked away from the table ahead — ${Math.round(atOverall.pct)}% of the combined value on day one, on both clocks. Around the league, this one got graded in their favor before the ink dried.`;
-    atGradeHint = 'warn';
-  }
-
-  if (unavailable) {
-    const headline = atGradeHint === 'fair' ? 'Looked even on the day' : `${esc(atOverall.team)} looked like the winner on the day`;
-    return tbVerdictBox('verdict-box ' + (atGradeHint === 'fair' ? 'v-neutral' : 'v-warn'), headline,
-      vsTbSection('At The Time', atBody) +
-      vsTbSection('Where It Stands', 'The retrospective half has to wait — live numbers aren’t in yet for everyone in the deal. Check back once they’re playing.'));
-  }
-
-  /* Section 2: WHAT'S MOVED */
-  const deltas = vsTbDeltas(atTradeSides, currentSides);
-  const moveLines = [];
-  for (const side of deltas) {
-    const top = side.movers.filter(m => m.mag >= 0.15).slice(0, 3);
-    if (!top.length) continue;
-    moveLines.push(`<span>${esc(side.receivingTeam)}</span> side: ` + top.map(m => {
-      const bits = [];
-      if (m.dAvg != null) bits.push(`${vsTbArrow(m.dAvg)} Avg`);
-      if (m.d26 != null) bits.push(`${vsTbArrow(m.d26)} 2026`);
-      return `<span>${esc(m.name)}</span> (${bits.join(', ')})`;
-    }).join(' · '));
-  }
-  const allMovers = deltas.flatMap(s => s.movers.map(m => ({ ...m, team: s.receivingTeam })));
-  allMovers.sort((x, y) => y.mag - x.mag);
-  const swing = allMovers.length && allMovers[0].mag >= 0.5 ? allMovers[0] : null;
-  const moveBody = moveLines.length
-    ? moveLines.join('<br>') + (swing ? `<br>The whole verdict turns on one name: <span>${esc(swing.name)}</span> has ${((swing.dAvg ?? swing.d26) >= 0 ? 'become a different player since the deal — for the better' : 'gone backwards since the deal')}. Everything else is noise next to that.` : '')
-    : 'Nothing’s moved. Every player in this deal is worth about what he was on trade day — the deal is still exactly what both teams thought they were making.';
-
-  /* Section 3: WHERE IT STANDS */
-  const alignedCur = vsTbAlignedShape(currentSides);
-  const curOverall = vsTbOverallWinner(currentSides);
-  const ledger = vsTbLedger(atTradeSides, currentSides);
-  const ledgerLine = ledger.map(l =>
-    `<span>${esc(l.team)}</span>: took in ${l.then.toFixed(2)} on trade day, holding ${l.now.toFixed(2)} today${l.pct != null ? ` (${l.pct >= 0 ? '+' : ''}${l.pct}%)` : ''}`).join('<br>');
-
-  let cls = 'verdict-box v-fair', headline, standsBody;
-  const flipDriver = swing ? ` The swing piece is <span>${esc(swing.name)}</span> — that’s the name that changed the story.` : '';
-
-  if (alignedAt) {
-    const avgSide = ledger[alignedAt.avgIdx];
-    const nowSide = ledger[alignedAt.nowIdx];
-    const avgBetPaying = (avgSide.pct != null && avgSide.pct >= 5);
-    const avgBetFading = (avgSide.pct != null && avgSide.pct <= -5);
-    if (avgBetPaying) {
-      cls = 'verdict-box v-warn';
-      headline = `${esc(avgSide.team)}'s bet is the one cashing`;
-      standsBody = `Both sides bought what they wanted — but <span>${esc(avgSide.team)}</span>'s futures have appreciated ${avgSide.pct >= 0 ? '+' : ''}${avgSide.pct}% while <span>${esc(nowSide.team)}</span>'s win-now piece is worth exactly what a win-now piece is: the season it was bought for. If <span>${esc(nowSide.team)}</span> got their October, they'd do it again. If they didn't, this is the receipt.${flipDriver}`;
-    } else if (avgBetFading) {
-      cls = 'verdict-box v-warn';
-      headline = `${esc(nowSide.team)}'s win-now side is aging better`;
-      standsBody = `The prospect haul has bled value since the deal (${avgSide.pct}%) — and that’s the eternal risk of prospect currency: some of it never cashes. <span>${esc(nowSide.team)}</span> took the sure thing and the sure thing is looking smarter by the month.${flipDriver}`;
-    } else {
-      headline = 'Both bets are still live';
-      standsBody = `Neither currency has moved enough to call it. This one’s still being decided between the lines — check back after the kids get their at-bats.`;
-    }
-  } else if (!atOverall && !curOverall) {
-    headline = 'Fair trade, then and now';
-    standsBody = 'Even on the day, even today, on both clocks. Two front offices did honest business and nobody needs to apologize.';
-  } else if (atOverall && curOverall && atOverall.idx === curOverall.idx) {
-    cls = 'verdict-box v-warn';
-    headline = `${esc(atOverall.team)} has owned this trade from day one`;
-    standsBody = `They were ahead when it was signed (${Math.round(atOverall.pct)}%) and they’re ahead now (${Math.round(curOverall.pct)}%). Some trades get relitigated for years — this one was over at the press conference.`;
-  } else if (atOverall && curOverall && atOverall.idx !== curOverall.idx) {
-    cls = 'verdict-box v-warn';
-    headline = 'This trade has flipped';
-    standsBody = `<span>${esc(atOverall.team)}</span> got the headlines on trade day (${Math.round(atOverall.pct)}%), but baseball had other plans — <span>${esc(curOverall.team)}</span> holds ${Math.round(curOverall.pct)}% of what’s left, and the day-one grades aged badly.${flipDriver}`;
-  } else if (!atOverall && curOverall) {
-    cls = 'verdict-box v-warn';
-    headline = `${esc(curOverall.team)} has pulled ahead`;
-    standsBody = `Even money on the day; not anymore. <span>${esc(curOverall.team)}</span> has quietly banked the edge (${Math.round(curOverall.pct)}%) since.${flipDriver}`;
-  } else {
-    headline = 'The gap has closed';
-    standsBody = `<span>${esc(atOverall.team)}</span> looked like the clear winner at the time (${Math.round(atOverall.pct)}%), but the sides have played their way back to even. Day-one grades are written in pencil for a reason.`;
-  }
-
-  const detail =
-    vsTbSection('At The Time', atBody) +
-    vsTbSection('What’s Moved', moveBody) +
-    vsTbSection('Where It Stands', standsBody + '<br>' + ledgerLine);
-
-  return tbVerdictBox(cls, headline, detail);
-}
-
-// Convert a trade record's side (comp picks / cash / real players, with refreshed
-// live val2026/avgVal) into full player objects the smart verdict engine understands.
-// Comp/cash entries mirror the exact shape addCash()/getCompPicksForTeam() already use
-// elsewhere so vsGenerateSmartVerdict's isComp/isCash checks work the same way. Real
-// players are looked up fresh from allPlayers (not the thin val2026/avgVal snapshot)
-// since the engine needs pos/level/isProspect/age/valByYear/etc. A player who no longer
-// resolves (traded off-system) is simply omitted from this list.
-function tbBuildVsListFromTradeSide(players, team){
-  const list=[];
-  for(const p of players){
-    if(p.asset==='compA'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.7,avgVal:1.7,ctrlYears:null,perfVal:null,isComp:true}); continue; }
-    if(p.asset==='compB'){ list.push({name:p.playerName,team,pos:'PICK',age:null,val2026:1.3,avgVal:1.3,ctrlYears:null,perfVal:null,isComp:true}); continue; }
-    if(p.asset==='cash'){ list.push({name:p.playerName,team,pos:'CASH',age:null,val2026:p.val2026,avgVal:null,ctrlYears:null,perfVal:null,isCash:true}); continue; }
-    const live=allPlayers.find(x=>x.playerID===p.playerID);
-    if(live) list.push(live);
-  }
-  return list;
-}
-// Full methodology verdict (same engine as Submit Trade / Trade Finder) applied to a
-// historical trade's CURRENT rosters. Only runs for a clean 2-side trade with fully
-// resolved live data — the "at the time" comparison above already covers what the deal
-// looked like on the day it happened, which the engine can't reconstruct (it needs live
-// roster context: positions, control years, prospect status).
-function tbSmartVerdictHtml(currentSides, unavailable){
-  if(unavailable || currentSides.length!==2) return '';
-  const teamA=currentSides[1].receivingTeam, teamB=currentSides[0].receivingTeam;
-  if(!teamA || !teamB) return '';
-  const listA=tbBuildVsListFromTradeSide(currentSides[0].players, teamA);
-  const listB=tbBuildVsListFromTradeSide(currentSides[1].players, teamB);
-  if(!listA.length || !listB.length) return '';
-  try{
-    const result=vsGenerateSmartVerdict(listA, listB, teamA, teamB);
-    const cls='verdict-box '+(result.grade==='fair'?'v-fair':result.grade==='warn'?'v-warn':'v-neutral');
-    return `<div style="margin-top:14px"><div style="font-size:11px;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">Today's Full Trade Analysis</div>${tbVerdictBox(cls, result.headline, result.html)}</div>`;
-  } catch(e){
-    console.error('Trade Tracker smart verdict error:', e);
-    return '';
-  }
-}
 </script>
 </body>
 </html>
