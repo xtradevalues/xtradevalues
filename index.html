@@ -387,19 +387,25 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
    to scroll past under those columns anyway. */
 .players-table-wrap{overflow-x:hidden;overflow-y:auto;flex:1}
 .table-hscroll{overflow-x:auto;overflow-y:hidden}
-/* .table-hscroll being a horizontal scroll container also makes it the position:sticky
-   reference for its descendants (including the header's th{top:0}), not the real vertical
-   scroller (.players-table-wrap) -- so the header can't use position:sticky to stay put on
-   scroll here. Keeping top:0 on th anyway (harmless, just inert) since JS drives the actual
-   vertical stick via a transform synced to .players-table-wrap's scroll position instead —
-   see the scroll listeners set up alongside populateDDs() below. */
 .players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y}
-/* position+z-index here (not just on the th children) because the JS-driven header pin
-   applies a transform to <thead> to hold it in place during scroll, and a transformed
-   element establishes its own stacking context -- without an explicit z-index of its own,
-   <thead> has no guaranteed paint order against <tbody>'s rows and can end up rendering
-   *behind* the very rows scrolling underneath it instead of masking them. */
-.players-table thead{position:relative;z-index:4}
+/* The header lives in its own table, separate from the body's, specifically so it can use
+   real position:sticky here -- .table-hscroll (needed as the horizontal scroll container
+   for the columns) is itself a scroll container, and any scroll container becomes the
+   sticky reference for its descendants, so a header sharing a table with the body would
+   stick to .table-hscroll (which never moves vertically) instead of the real vertical
+   scroller. A JS-driven approximation (translate the header by the scroll offset on every
+   'scroll' event) was tried first and visibly failed on a real device: native momentum
+   scrolling runs on the compositor and doesn't reliably fire 'scroll' events at a matching
+   rate, so the faked header lagged and even briefly rendered mid-list. Real sticky has no
+   such problem since the browser positions it as part of compositing, not JS.
+   overflow-x:hidden (not auto) still makes this a scroll container -- for position:sticky
+   reference purposes for its own rank-col/player-col header cells, and to accept a
+   programmatic .scrollLeft assignment -- without giving it a user-visible scrollbar or
+   letting it be touch-scrolled directly. Its horizontal position is kept in lockstep with
+   the body purely by mirroring scrollLeft (see the scroll listener set up alongside
+   populateDDs() below); every column width is copied from the body's actual rendered
+   widths after each render so the two tables' columns land in exactly the same place. */
+.table-header-wrap{position:sticky;top:0;z-index:4;overflow-x:hidden;background:var(--bg-mid)}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
@@ -876,9 +882,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     </div>
   </div>
   <div class="players-table-wrap" id="playersTableWrap">
+    <div class="table-header-wrap">
+      <table class="players-table"><thead id="playersTableHead"></thead></table>
+    </div>
     <div class="table-hscroll">
       <table class="players-table" id="playersTable">
-        <thead id="playersTableHead"></thead>
         <tbody id="playersBody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
       </table>
     </div>
@@ -893,9 +901,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
     </select>
   </div>
   <div class="players-table-wrap" id="prospectsTableWrap">
+    <div class="table-header-wrap">
+      <table class="players-table"><thead id="prospectsTableHead"></thead></table>
+    </div>
     <div class="table-hscroll">
       <table class="players-table" id="prospectsTable">
-        <thead id="prospectsTableHead"></thead>
         <tbody id="prospectsBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
       </table>
     </div>
@@ -1986,6 +1996,7 @@ function renderPlayers(){
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
   document.getElementById('playersBody').innerHTML=body||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">No players found</td></tr>';
+  vsSyncHeaderWidths('playersTableWrap');
 }
 function playersSetSort(col,el){
   if(playersSortCol===col) playersSortDir*=-1; else{playersSortCol=col;playersSortDir=1;}
@@ -2034,6 +2045,7 @@ async function renderProspects(){
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
   tbody.innerHTML=body||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
+  vsSyncHeaderWidths('prospectsTableWrap');
 }
 
 // ===== PLAYER PAGE =====
@@ -3927,7 +3939,7 @@ function renderList(side){
         <div class="player-row-stats">
           <div class="stat-float"><div class="stat-val">${fmt(p.val2026)}</div><div class="stat-lbl">2026</div></div>
           <div class="stat-float"><div class="stat-val">${fmt(p.avgVal)}</div><div class="stat-lbl">Avg</div></div>
-          <div class="stat-float"><div class="stat-val">${vsCtrlThruLabel(p)||'—'}</div><div class="stat-lbl">Ctrl Thru</div></div>
+          <div class="stat-float"><div class="stat-val">${vsCtrlThruLabel(p).replace('thru ','')||'—'}</div><div class="stat-lbl">Ctrl Thru</div></div>
         </div>
       </div>
       <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
@@ -4330,7 +4342,7 @@ function loadRoster(){
       const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
       const dc=dotClass(p.status);
       const inj=playerHasInjury(p)?'<span style="color:#D72229" title="'+injuredLabel(p.injuredRaw)+'">✚</span>':'';
-      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p)||'—'}</td></tr>`;
+      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p).replace('thru ','')||'—'}</td></tr>`;
     }).join('');
     return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><div class="table-hscroll"><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
@@ -4361,23 +4373,39 @@ document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
 
 // ===== STICKY TABLE HEADER (Players/Prospects) =====
-// The header's own position:sticky;top:0 is inert here: it's inside .table-hscroll (needed
-// as a horizontal scroll container for the columns), and any element that's a scroll
-// container becomes the sticky reference for its descendants — so the header sticks to
-// .table-hscroll instead of the real vertical scroller, which does nothing since
-// .table-hscroll itself never moves vertically. Driving it by hand instead: translate the
-// header down by exactly however far the wrap has scrolled, keeping it visually pinned at
-// the top while the real tbody rows scroll underneath it. Horizontal position needs no
-// equivalent handling — the header and body already share the same .table-hscroll, so
-// native horizontal scrolling already keeps them in lockstep.
-function vsPinTableHeader(wrapId){
+// The header lives in its own separate table (see .table-header-wrap's CSS comment for
+// why) so it can use real position:sticky for the vertical pin — no JS involved there at
+// all, so it can't lag behind real touch scrolling the way a transform driven by 'scroll'
+// events did. All that's left for JS to do is keep it horizontally aligned with the body:
+// mirror .table-hscroll's scrollLeft onto the header wrap (a plain property copy, not a
+// style/layout change, so it's cheap and fine to run on every scroll event even if some
+// get coalesced during a fast fling — worst case the header is momentarily a few columns
+// off during the swipe itself, not for a full second after, and it snaps true the instant
+// scrolling settles).
+function vsSyncHeaderScroll(wrapId){
   const wrap=document.getElementById(wrapId);
-  const thead=wrap&&wrap.querySelector('thead');
-  if(!wrap||!thead) return;
-  wrap.addEventListener('scroll',()=>{ thead.style.transform=`translateY(${wrap.scrollTop}px)`; }, {passive:true});
+  const headerWrap=wrap&&wrap.querySelector('.table-header-wrap');
+  const bodyScroll=wrap&&wrap.querySelector('.table-hscroll');
+  if(!headerWrap||!bodyScroll) return;
+  bodyScroll.addEventListener('scroll',()=>{ headerWrap.scrollLeft=bodyScroll.scrollLeft; }, {passive:true});
 }
-vsPinTableHeader('playersTableWrap');
-vsPinTableHeader('prospectsTableWrap');
+vsSyncHeaderScroll('playersTableWrap');
+vsSyncHeaderScroll('prospectsTableWrap');
+// Column widths are set by natural table auto-layout on the body table, but the header now
+// lives in a second, separate table — so its columns need their widths copied over
+// explicitly after every render, or the two tables' columns won't land in the same place.
+function vsSyncHeaderWidths(wrapId){
+  const wrap=document.getElementById(wrapId);
+  const headRow=wrap&&wrap.querySelector('.table-header-wrap tr');
+  const bodyRow=wrap&&wrap.querySelector('.table-hscroll tbody tr');
+  if(!headRow||!bodyRow) return;
+  const headCells=headRow.children, bodyCells=bodyRow.children;
+  if(headCells.length!==bodyCells.length) return;
+  for(let i=0;i<headCells.length;i++){
+    const w=bodyCells[i].getBoundingClientRect().width;
+    if(w>0) headCells[i].style.cssText+=`;width:${w}px;min-width:${w}px;max-width:${w}px`;
+  }
+}
 
 /* =====================================================================================
    VALUE SAVANT ENGINE (consolidated)
@@ -5605,12 +5633,14 @@ function vsBuild6(targets, buyerTeam, pool, mode, shape) {
   const thin = sellerTeam ? vsSellerThinBuckets(sellerTeam).slice(0, 2) : [];
   const fitBonus = (p) => thin.includes(finderPosBucket(p.pos)) ? 1 : 0;
   const rankOf = (p) => vsMlbRankNum(p);
+  const closenessOf = (c) => Math.abs(c.reduce((s, p) => s + (p.val2026 || 0), 0) - t26);
 
   let src = [...pool];
   if (shape === 'quantity') {
     src = src.filter(p => { const r = rankOf(p); return r == null || r > 50; }); // no top-50s
   }
-  // Closeness ordering with a soft fit nudge (fit breaks ties, never gates).
+  // Closeness ordering with a soft fit nudge (fit breaks ties, never gates) -- only to
+  // narrow 18 candidates down from a potentially much larger pool, not to pick a winner.
   src = src.sort((a, b) => {
     const da = Math.abs((a.val2026 || 0) - t26), db = Math.abs((b.val2026 || 0) - t26);
     if (Math.abs(da - db) > 0.3) return da - db;
@@ -5625,20 +5655,42 @@ function vsBuild6(targets, buyerTeam, pool, mode, shape) {
     if (shape === 'quantity' && top100Count(c) > 1) return false;  // one fringe guy max
     return true;
   };
+  // Every valid combo in a tier is an equally fair trade by the gates above -- closeness
+  // is just a preference, not a quality signal. Picking the single closest one every time
+  // (the old behavior) meant the finder fixated on whichever 1-2 prospects happened to be
+  // closest-valued across many different offers. Instead: gather every valid combo in the
+  // tier, keep the closest few, and pick randomly among those -- still favors good value
+  // matches, but stops hammering the same names on every proposal.
+  const pickFromTopValid = (combos) => {
+    const valid = combos.filter(ok);
+    if (!valid.length) return null;
+    valid.sort((a, b) => closenessOf(a) - closenessOf(b));
+    const top = valid.slice(0, 5);
+    return top[Math.floor(Math.random() * top.length)];
+  };
 
   if (shape !== 'quantity') {
-    for (const a of src) if (ok([a])) return [a];
-    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++)
-      if (ok([src[i], src[j]])) return [src[i], src[j]];
+    const solo = pickFromTopValid(src.map(a => [a]));
+    if (solo) return solo;
+    const pairs = [];
+    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) pairs.push([src[i], src[j]]);
+    const pair = pickFromTopValid(pairs);
+    if (pair) return pair;
   }
-  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++)
-    if (ok([src[i], src[j], src[k]])) return [src[i], src[j], src[k]];
-  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++)
-    if (ok([src[i], src[j], src[k], src[m]])) return [src[i], src[j], src[k], src[m]];
+  const triples = [];
+  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) triples.push([src[i], src[j], src[k]]);
+  const triple = pickFromTopValid(triples);
+  if (triple) return triple;
+  const quads = [];
+  for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++) quads.push([src[i], src[j], src[k], src[m]]);
+  const quad = pickFromTopValid(quads);
+  if (quad) return quad;
   // 5-piece: the blockbuster shape — unlocked only for premium targets.
   if (t26 >= 8) {
-    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++) for (let n = m + 1; n < src.length; n++)
-      if (ok([src[i], src[j], src[k], src[m], src[n]])) return [src[i], src[j], src[k], src[m], src[n]];
+    const quints = [];
+    for (let i = 0; i < src.length; i++) for (let j = i + 1; j < src.length; j++) for (let k = j + 1; k < src.length; k++) for (let m = k + 1; m < src.length; m++) for (let n = m + 1; n < src.length; n++) quints.push([src[i], src[j], src[k], src[m], src[n]]);
+    const quint = pickFromTopValid(quints);
+    if (quint) return quint;
   }
   return null;
 }
