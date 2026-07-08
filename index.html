@@ -2029,7 +2029,7 @@ function renderPlayers(){
         `<td class="${sc('avgVal')}" style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
       ];
     }
-    return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
+    return `<tr onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
   document.getElementById('playersBody').innerHTML=body||'<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">No players found</td></tr>';
   vsSyncHeaderWidths('playersTableWrap');
@@ -2078,7 +2078,7 @@ async function renderProspects(){
       `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
       `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
     ];
-    return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
+    return `<tr onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
   }).join('');
   tbody.innerHTML=body||'<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">No prospects found</td></tr>';
   vsSyncHeaderWidths('prospectsTableWrap');
@@ -2835,7 +2835,7 @@ function finderTargetPlayerSearchInput(){
     drop.classList.add('open');
     return;
   }
-  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderTargetPlayerChosen('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}</div></div><div class="drop-item-val">${fmt(p.val2026)}</div></div>`).join('');
+  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderTargetPlayerChosen('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}</div></div><div class="drop-item-val">${fmt(p.val2026)}</div></div>`).join('');
   drop.classList.add('open');
 }
 
@@ -2845,7 +2845,7 @@ function finderRenderTargetPlayersSelected(){
   if(!list.length){ el.innerHTML=''; return; }
   el.innerHTML=list.map(p=>{
     const warn=finderAvailabilityWarningHtml(p);
-    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveTargetPlayer('${escJs(p.name)}','${escJs(p.pos||'')}')">✕</button></div>`;
   }).join('');
 }
 
@@ -2918,7 +2918,7 @@ function finderUntouchableSearchInput(){
     drop.classList.add('open');
     return;
   }
-  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderUntouchableChosen('${esc(p.name)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}</div></div><div class="drop-item-val">${fmt(p.val2026)}</div></div>`).join('');
+  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderUntouchableChosen('${escJs(p.name)}','${escJs(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}</div></div><div class="drop-item-val">${fmt(p.val2026)}</div></div>`).join('');
   drop.classList.add('open');
 }
 
@@ -2986,7 +2986,7 @@ function finderPlayerSearchInput(){
     const allTeamPlayers=allPlayers.filter(p=>p.team===team && !finderIsInjured(p) && !alreadyPicked.has(p.name))
       .sort((a,b)=>(b.val2026||0)-(a.val2026||0));
     if(!allTeamPlayers.length){ drop.classList.remove('open'); return; }
-    drop.innerHTML=allTeamPlayers.slice(0,50).map(p=>`<div class="drop-item" onclick="finderPlayerChosen('${esc(p.name)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · 26: ${fmt(p.val2026)}</div></div></div>`).join('');
+    drop.innerHTML=allTeamPlayers.slice(0,50).map(p=>`<div class="drop-item" onclick="finderPlayerChosen('${escJs(p.name)}','${escJs(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · 26: ${fmt(p.val2026)}</div></div></div>`).join('');
     drop.classList.add('open');
     return;
   }
@@ -2999,7 +2999,7 @@ function finderPlayerSearchInput(){
     drop.classList.add('open');
     return;
   }
-  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderPlayerChosen('${esc(p.name)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · 26: ${fmt(p.val2026)}</div></div></div>`).join('');
+  drop.innerHTML=matches.map(p=>`<div class="drop-item" onclick="finderPlayerChosen('${escJs(p.name)}','${escJs(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · 26: ${fmt(p.val2026)}</div></div></div>`).join('');
   drop.classList.add('open');
 }
 
@@ -3010,7 +3010,7 @@ function finderRenderSellPlayersSelected(){
   const note=list.length>1?'<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Offers may include any one of these, or combinations of them.</div>':'';
   el.innerHTML=note+list.map(p=>{
     const warn=finderAvailabilityWarningHtml(p);
-    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveSellPlayer('${esc(p.name)}','${esc(p.pos||'')}')">✕</button></div>`;
+    return `<div class="finder-player-card" style="margin-bottom:6px"><div><div class="finder-player-card-name">${p.name}</div><div class="finder-player-card-meta">${p.pos||'?'} · ${p.team} · Avg ${fmt(p.avgVal)} · Ctrl ${vsCtrlThruLabel(p)||'—'}</div>${warn}</div><button class="remove-btn" onclick="finderRemoveSellPlayer('${escJs(p.name)}','${escJs(p.pos||'')}')">✕</button></div>`;
   }).join('');
 }
 
@@ -3618,7 +3618,7 @@ async function generateOffers(){
 function finderPlayerLine(p){
   if(p.isCash) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span></div></div>`;
   if(p.isComp) return `<div class="share-player"><div class="share-player-name">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span></div></div>`;
-  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span> <span class="stat-pair">Ctrl: <b>${vsCtrlThruLabel(p)||'—'}</b></span></div></div>`;
+  return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span> <span class="stat-pair">Ctrl: <b>${vsCtrlThruLabel(p)||'—'}</b></span></div></div>`;
 }
 
 function finderBuildBarsHtml(giveList, getList){
@@ -3828,7 +3828,7 @@ function onSearch(side){
     const already=(side==='A'?selectedA:selectedB).map(x=>x.name);
     const avail=picks.filter(p=>!already.includes(p.name));
     if(!avail.length){drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No comp picks available</div></div>';drop.classList.add('open');return;}
-    drop.innerHTML=avail.map(p=>`<div class="drop-item" onclick="addCompPick('${side}','${esc(p.name)}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.team}</div></div><div class="drop-item-val">${p.val2026.toFixed(2)}</div></div>`).join('');
+    drop.innerHTML=avail.map(p=>`<div class="drop-item" onclick="addCompPick('${side}','${escJs(p.name)}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.team}</div></div><div class="drop-item-val">${p.val2026.toFixed(2)}</div></div>`).join('');
     drop.classList.add('open');
     return;
   }
@@ -3849,7 +3849,7 @@ function onSearch(side){
   if(!matches.length){drop.innerHTML='<div class="drop-item"><div class="drop-item-name" style="color:var(--text-muted)">No players found</div></div>';drop.classList.add('open');return;}
   drop.innerHTML=matches.map(p=>{
     const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age)+'yo':'';
-    return `<div class="drop-item" onclick="addPlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}${age?' · '+age:''}</div></div><div class="drop-item-val">${p.val2026!==null?p.val2026.toFixed(2):'—'}</div></div>`;
+    return `<div class="drop-item" onclick="addPlayer('${side}','${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')"><div><div class="drop-item-name">${p.name}</div><div class="drop-item-meta">${p.pos||'?'} · ${p.team}${age?' · '+age:''}</div></div><div class="drop-item-val">${p.val2026!==null?p.val2026.toFixed(2):'—'}</div></div>`;
   }).join('');
   drop.classList.add('open');
 }
@@ -3910,6 +3910,14 @@ function addCompPick(side,name){
   closeDrop(side); renderList(side); updateTotals();
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
+// For interpolating a value into a single-quoted JS string literal that itself sits inside
+// an HTML event-handler attribute (e.g. onclick="fn('${escJs(name)}')") — esc() alone isn't
+// enough there. HTML entity-decoding happens before the attribute is compiled as JS, so an
+// apostrophe escaped as &#39; decodes right back to a raw ' and still breaks the string
+// (this is exactly what silently broke clicking any player named e.g. "O'Neill" — the
+// onclick attribute became invalid JS and the browser did nothing). Escaping the backslash
+// and quote for JS first means the decoded source has a real \' escape sequence instead.
+function escJs(s){return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function closeDrop(side){document.getElementById('drop'+side).classList.remove('open');}
 function addPlayer(side,name,team,pos){
   const p=team ? allPlayers.find(x=>x.name===name && x.team===team && (!pos || x.pos===pos)) : allPlayers.find(x=>x.name===name);
@@ -3942,7 +3950,7 @@ function renderList(side){
             <div class="stat-float"><div class="stat-val">${fmt(p.val2026)}</div><div class="stat-lbl">2026</div></div>
           </div>
         </div>
-        <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
+        <button class="remove-btn" onclick="removePlayer('${side}','${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">✕</button>
       </div>`;
     }
     if(p.isComp){
@@ -3956,7 +3964,7 @@ function renderList(side){
             <div class="stat-float"><div class="stat-val">${fmt(p.avgVal)}</div><div class="stat-lbl">Avg</div></div>
           </div>
         </div>
-        <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
+        <button class="remove-btn" onclick="removePlayer('${side}','${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">✕</button>
       </div>`;
     }
     const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age)+'yo':'';
@@ -3964,7 +3972,7 @@ function renderList(side){
     const injIcon=playerHasInjury(p)?'<span style="color:#D72229;font-size:10px;font-weight:600" title="'+injuredLabel(p.injuredRaw)+'"> ✚</span>':'';
     jerseyPlayers.push(p);
     return `<div class="player-row">
-      <div class="player-row-left" onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">
+      <div class="player-row-left" onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">
         <div class="player-row-head">
           <div class="player-row-jersey"></div>
           <div class="player-row-headtext">
@@ -3978,7 +3986,7 @@ function renderList(side){
           <div class="stat-float"><div class="stat-val">${vsCtrlThruLabel(p).replace('thru ','')||'—'}</div><div class="stat-lbl">Ctrl Thru</div></div>
         </div>
       </div>
-      <button class="remove-btn" onclick="removePlayer('${side}','${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')">✕</button>
+      <button class="remove-btn" onclick="removePlayer('${side}','${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">✕</button>
     </div>`;
   }).join('');
   const jerseyEls=el.querySelectorAll('.player-row-jersey');
@@ -4378,7 +4386,7 @@ function loadRoster(){
       const age=p.age!==null&&!isNaN(p.age)?Math.floor(p.age):'—';
       const dc=dotClass(p.status);
       const inj=playerHasInjury(p)?'<span style="color:#D72229" title="'+injuredLabel(p.injuredRaw)+'">✚</span>':'';
-      return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p).replace('thru ','')||'—'}</td></tr>`;
+      return `<tr><td onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p).replace('thru ','')||'—'}</td></tr>`;
     }).join('');
     return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><div class="table-hscroll"><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
