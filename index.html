@@ -835,6 +835,10 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
         <option value="RF" class="of-split-opt">RF</option>
         <option value="DH">DH</option>
       </select>
+      <select id="playersQualified" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
+        <option value="qualified" selected>Qualified</option>
+        <option value="all">All</option>
+      </select>
     </div>
   </div>
   <div class="players-table-wrap" id="playersTableWrap" style="overflow-y:auto">
@@ -1174,10 +1178,10 @@ function showPage(p) {
   const dm=document.getElementById('dmenu-'+p); if(dm) dm.classList.add('active');
   closeMenu();
   if(p==='players'){
-    if(allPlayers.length){ renderPlayers(); }
+    if(allPlayers.length){ playersFilterChanged(); }
     else {
       document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading player data…</td></tr>';
-      ensureDataLoaded().then(()=>renderPlayers()).catch(e=>{
+      ensureDataLoaded().then(()=>playersFilterChanged()).catch(e=>{
         document.getElementById('playersBody').innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--red-dark)">'+esc(e.message)+'</td></tr>';
       });
     }
@@ -1365,6 +1369,7 @@ async function loadData() {
           rbi: null, w: null, l: null, sb: null,
           vWARHit: null, vWARPitch: null,
           fgUrl: null,
+          qualified: false,
         };
 
         allPlayers.push(p);
@@ -1401,6 +1406,8 @@ async function loadData() {
         p.avg26 = (p.h !== null && ab > 0) ? p.h / ab : null;
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARHit = vw; }
+        // col AI: "yes"/"no" qualified flag
+        p.qualified = String(colVal(row, 'Qualified', 34) ?? '').trim().toLowerCase() === 'yes';
       }
     }
 
@@ -1419,6 +1426,8 @@ async function loadData() {
         p.l    = numOrNull(colVal(row,'L',5));
         const vw = parseFloat(row['vWAR']);
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARPitch = vw; }
+        // col AB: "yes"/"no" qualified flag
+        p.qualified = String(colVal(row, 'Qualified', 27) ?? '').trim().toLowerCase() === 'yes';
       }
     }
 
@@ -1765,7 +1774,17 @@ function abbrevName(name){
   return firstInitial+' '+last;
 }
 let playersSortCol='vWAR', playersSortDir=1, playersViewHitters=true;
-function playersFilterChanged(){renderPlayers();}
+function playersFilterChanged(){
+  const levelEl=document.getElementById('playersLevel');
+  const qualEl=document.getElementById('playersQualified');
+  // Qualified filter only makes sense at the MLB level.
+  if(levelEl.value==='mlb'){
+    qualEl.style.display='';
+  } else {
+    qualEl.style.display='none';
+  }
+  renderPlayers();
+}
 // Level changed: show/hide the Prospects split dropdown, and consolidate LF/CF/RF into OF
 // on the position dropdown whenever MiLB is the selected level.
 function playersLevelChanged(){
@@ -1777,7 +1796,7 @@ function playersLevelChanged(){
   const hideSplitPos=(levelF==='minors');
   posSel.querySelectorAll('.of-split-opt').forEach(o=>o.hidden=hideSplitPos);
   if(hideSplitPos && ['LF','CF','RF'].includes(posSel.value)) posSel.value='OF';
-  renderPlayers();
+  playersFilterChanged();
 }
 function renderPlayers(){
   const teamF=document.getElementById('playersTeam').value;
@@ -1806,6 +1825,11 @@ function renderPlayers(){
   if(levelF==='mlb') pl=pl.filter(x=>x.level==='mlb');
   else if(levelF==='minors') pl=pl.filter(x=>x.level==='minors');
   else if(levelF==='prospects') pl=pl.filter(x=>x.isProspect);
+  // Qualified filter — MLB level only.
+  const qualEl=document.getElementById('playersQualified');
+  if(levelF==='mlb' && qualEl && qualEl.value==='qualified'){
+    pl=pl.filter(x=>x.qualified===true);
+  }
   // Position filter — Ohtani (pos:"TWP") belongs on both the Hitters and Pitchers views
   if(posF==='hitter') pl=pl.filter(x=>!['SP','RP'].includes(finderFirstPos(x.pos)));
   else if(posF==='pitcher') pl=pl.filter(x=>['SP','RP'].includes(finderFirstPos(x.pos))||x.name==='Shohei Ohtani');
@@ -4298,6 +4322,59 @@ populateDDs();
 document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
 
+// ===== AXIS-LOCKED TABLE SCROLLING =====
+// The Players/Prospects table wraps scroll both x (columns) and y (rows) on the same
+// element, so a touch drag with no dominant-axis lock can bleed a vertical swipe into
+// horizontal drift. Lock the gesture to whichever axis its first ~8px of movement reads
+// as closer to, restoring both axes once the gesture ends.
+function vsLockScrollAxis(el) {
+  if (!el || el.dataset.vsAxisLocked) return;
+  el.dataset.vsAxisLocked = '1';
+
+  let startX = 0, startY = 0, locked = null, decided = false;
+
+  el.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    locked = null;
+    decided = false;
+  }, { passive: true });
+
+  el.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+
+    if (!decided) {
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 8) return;   // wait for enough movement to read intent reliably
+      decided = true;
+      // Bias toward vertical: a swipe within ~35° of vertical locks to vertical.
+      // (tan(35°) ≈ 0.70 — if |dx| < 0.70*|dy|, treat it as a vertical scroll.)
+      const angleFromVertical = Math.abs(dx) / Math.max(1, Math.abs(dy));
+      locked = angleFromVertical < 0.70 ? 'vertical' : 'horizontal';
+      if (locked === 'vertical') {
+        el.style.overflowX = 'hidden';
+      } else {
+        el.style.overflowY = 'hidden';
+      }
+    }
+  }, { passive: true });
+
+  const release = () => {
+    // Restore both axes once the gesture ends.
+    el.style.overflowX = '';
+    el.style.overflowY = '';
+    locked = null;
+    decided = false;
+  };
+  el.addEventListener('touchend', release, { passive: true });
+  el.addEventListener('touchcancel', release, { passive: true });
+}
+vsLockScrollAxis(document.getElementById('playersTableWrap'));
+vsLockScrollAxis(document.getElementById('prospectsTableWrap'));
+
 /* =====================================================================================
    VALUE SAVANT ENGINE (consolidated)
    =====================================================================================
@@ -5485,6 +5562,9 @@ function vsPool6(team, target) {
     if (!((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5)) return false;
     const mlbN = vsMlbRankNum(p);
     if (mlbN != null && mlbN <= 100 && !starTarget) return false;
+    // No RP prospects/minor leaguers move buyer → seller. Reliever projection is
+    // the least reliable in the sport — a rebuild isn't advanced by an unproven arm.
+    if (finderPosBucket(p.pos) === 'RP') return false;
     return true;
   });
 }
