@@ -220,7 +220,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .roster-table td:first-child{text-align:left;color:var(--text-primary);font-weight:500;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:160px;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:0;z-index:1;background:var(--bg-card)}
 .roster-table tbody tr:nth-child(even) td:first-child{background:color-mix(in srgb, var(--bg), white 1.8%)}
 .roster-table td.pos-col{text-align:center;font-size:11px;color:var(--text-muted)}
-.roster-table th:first-child,.roster-table td:first-child{touch-action:pan-y}
+.roster-table th:first-child,.roster-table td:first-child{touch-action:pan-y;will-change:transform}
 .val-pos{color:var(--pos)!important}
 .val-neg{color:var(--neg)!important}
 .roster-placeholder{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px}
@@ -387,7 +387,19 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
    to scroll past under those columns anyway. */
 .players-table-wrap{overflow-x:hidden;overflow-y:auto;flex:1}
 .table-hscroll{overflow-x:auto;overflow-y:hidden}
-.players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y}
+.players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y;will-change:transform}
+/* player-col's sticky `left` used to be hardcoded to 40px, matching rank-col's nominal
+   width -- but the table uses auto-layout (needed since stat columns vary a lot in
+   content width), so rank-col's *actual* rendered width can end up considerably wider
+   than that hint whenever the table has extra space to distribute (e.g. to satisfy its
+   own min-width). Whenever that happened, player-col's sticky box started before rank-
+   col's real right edge, leaving a strip of the (non-sticky) Pos column visible in the
+   gap between them during horizontal scroll. Fixed by driving player-col's `left` from
+   the --rank-col-w custom property instead of a guessed constant, set from rank-col's
+   real measured width after every render (see vsSyncHeaderWidths) -- so it's exact no
+   matter what auto-layout decides. will-change:transform promotes both sticky columns to
+   their own compositor layers as a second line of defense against any remaining sub-pixel
+   rounding during the scroll itself. */
 /* The header lives in its own table, separate from the body's, specifically so it can use
    real position:sticky here -- .table-hscroll (needed as the horizontal scroll container
    for the columns) is itself a scroll container, and any scroll container becomes the
@@ -409,13 +421,13 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
-.players-table th.player-col{text-align:left;min-width:112px;left:40px;z-index:3}
+.players-table th.player-col{text-align:left;min-width:112px;left:var(--rank-col-w,40px);z-index:3}
 .players-table th.sort-active{color:var(--accent);background:var(--bg-mid);box-shadow:inset 0 0 0 999px var(--accent-soft),inset 0 -2px 0 var(--accent)}
 .players-table tbody tr{background:var(--bg-card)}
 .players-table tbody tr:nth-child(even){background:var(--row-alt)}
 .players-table td{padding:12px 10px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .players-table td.rank-col{text-align:center;color:var(--text-muted);padding-left:6px;padding-right:6px;position:sticky;left:0;z-index:1;background:var(--bg-card)}
-.players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:40px;z-index:1;background:var(--bg-card)}
+.players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:var(--rank-col-w,40px);z-index:1;background:var(--bg-card)}
 .players-table td.player-col:hover{color:var(--accent)}
 .players-table tbody tr:nth-child(even) td.rank-col,.players-table tbody tr:nth-child(even) td.player-col{background:color-mix(in srgb, var(--bg), white 1.8%)}
 .mini-jersey{display:inline-block;vertical-align:middle;margin-right:6px;flex-shrink:0}
@@ -3104,7 +3116,7 @@ function finderIsSellerAvailable(player){
     }
     return true; // not the team's best at the position, always tradeable
   }
-  return true; // non-prospect minor leaguer - generally fine
+  return player.age===null || player.age<=25; // non-prospect minor leaguer - no org filler over 25
 }
 
 // Determine if the chosen "untouchable" prospect (Buyer path, set by the user for this group of trades) matches
@@ -3134,7 +3146,7 @@ function finderIsBuyerProspectEligible(prospect, userTeam){
 function finderIsBuyerMinorsEligible(player, userTeam){
   if(player.isProspect || player.level!=='minors') return false;
   if(finderFirstPos(player.pos)==='RP') return false; // no RP minors
-  if(player.age===null || player.age>27) return false; // must be 27 or younger
+  if(player.age===null || player.age>25) return false; // no org-filler over 25
   if(player.ctrlYears===null || player.ctrlYears<4) return false; // must have at least 4 control years
   if(!player.val2026 || player.val2026<=1) return false; // must have val2026 > 1
   if(!player.avgVal || player.avgVal<=1) return false; // must have avgVal > 1
@@ -4405,6 +4417,12 @@ function vsSyncHeaderWidths(wrapId){
     const w=bodyCells[i].getBoundingClientRect().width;
     if(w>0) headCells[i].style.cssText+=`;width:${w}px;min-width:${w}px;max-width:${w}px`;
   }
+  // rank-col (column 0) is always the leftmost — player-col's sticky `left` reads this
+  // custom property so it lands exactly at rank-col's real edge regardless of what
+  // auto-layout decided, instead of guessing at a fixed pixel value (see the CSS comment
+  // on .players-table td.player-col for what went wrong when it was hardcoded).
+  const rankW=bodyCells[0].getBoundingClientRect().width;
+  if(rankW>0) wrap.style.setProperty('--rank-col-w', rankW+'px');
 }
 
 /* =====================================================================================
@@ -5594,6 +5612,9 @@ function vsPool6(team, target) {
     if (!((p.avgVal || 0) >= 0.5 || (p.val2026 || 0) >= 0.5)) return false;
     const mlbN = vsMlbRankNum(p);
     if (mlbN != null && mlbN <= 100 && !starTarget) return false;
+    // No org-filler minor leaguers over 25 move buyer → seller — a non-prospect at that
+    // age is organizational depth, not a piece either side is trading real value for.
+    if (!p.isProspect && p.age != null && p.age > 25) return false;
     // No RP prospects/minor leaguers move buyer → seller. Reliever projection is
     // the least reliable in the sport — a rebuild isn't advanced by an unproven arm.
     if (finderPosBucket(p.pos) === 'RP') return false;
