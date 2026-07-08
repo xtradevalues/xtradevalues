@@ -4324,21 +4324,22 @@ document.getElementById('mainContent').style.display='flex';
 
 // ===== AXIS-LOCKED TABLE SCROLLING =====
 // The Players/Prospects table wraps scroll both x (columns) and y (rows) on the same
-// element, so a touch drag with no dominant-axis lock can bleed a vertical swipe into
-// horizontal drift. Lock the gesture to whichever axis its first ~8px of movement reads
-// as closer to, restoring both axes once the gesture ends.
+// element. Columns are locked by default the instant a touch begins — no ambiguity
+// window where both axes are natively scrollable — and only unlock for a gesture
+// that reads as clearly, predominantly horizontal. Everything else (straight vertical
+// or diagonal) stays vertical-only. Both axes restore once the gesture ends.
 function vsLockScrollAxis(el) {
   if (!el || el.dataset.vsAxisLocked) return;
   el.dataset.vsAxisLocked = '1';
 
-  let startX = 0, startY = 0, locked = null, decided = false;
+  let startX = 0, startY = 0, decided = false;
 
   el.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    locked = null;
     decided = false;
+    el.style.overflowX = 'hidden';   // locked until proven otherwise
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
@@ -4350,23 +4351,23 @@ function vsLockScrollAxis(el) {
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist < 8) return;   // wait for enough movement to read intent reliably
       decided = true;
-      // Bias toward vertical: a swipe within ~35° of vertical locks to vertical.
-      // (tan(35°) ≈ 0.70 — if |dx| < 0.70*|dy|, treat it as a vertical scroll.)
-      const angleFromVertical = Math.abs(dx) / Math.max(1, Math.abs(dy));
-      locked = angleFromVertical < 0.70 ? 'vertical' : 'horizontal';
-      if (locked === 'vertical') {
-        el.style.overflowX = 'hidden';
-      } else {
+      // Only unlock horizontal for a swipe that's clearly, predominantly horizontal
+      // (more than 2x the movement on x than y). Everything else — including
+      // diagonals — stays locked to vertical.
+      if (Math.abs(dx) > Math.abs(dy) * 2) {
+        el.style.overflowX = 'auto';
         el.style.overflowY = 'hidden';
       }
     }
   }, { passive: true });
 
   const release = () => {
-    // Restore both axes once the gesture ends.
-    el.style.overflowX = '';
-    el.style.overflowY = '';
-    locked = null;
+    // Restore both axes to their resting state once the gesture ends. Both wraps only
+    // get overflow-y:auto from an inline style attribute (no CSS class backs it up), so
+    // this must set 'auto' explicitly rather than clearing to '' — clearing would strip
+    // that inline declaration for good and leave the wrap permanently unscrollable.
+    el.style.overflowX = 'auto';
+    el.style.overflowY = 'auto';
     decided = false;
   };
   el.addEventListener('touchend', release, { passive: true });
