@@ -379,6 +379,12 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
    to scroll past under those columns anyway. */
 .players-table-wrap{overflow-x:hidden;overflow-y:auto;flex:1}
 .table-hscroll{overflow-x:auto;overflow-y:hidden}
+/* .table-hscroll being a horizontal scroll container also makes it the position:sticky
+   reference for its descendants (including the header's th{top:0}), not the real vertical
+   scroller (.players-table-wrap) -- so the header can't use position:sticky to stay put on
+   scroll here. Keeping top:0 on th anyway (harmless, just inert) since JS drives the actual
+   vertical stick via a transform synced to .players-table-wrap's scroll position instead —
+   see the scroll listeners set up alongside populateDDs() below. */
 .players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
@@ -4339,6 +4345,25 @@ document.addEventListener('click',e=>{if(!e.target.closest('.dropdown-wrap')){cl
 populateDDs();
 document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
+
+// ===== STICKY TABLE HEADER (Players/Prospects) =====
+// The header's own position:sticky;top:0 is inert here: it's inside .table-hscroll (needed
+// as a horizontal scroll container for the columns), and any element that's a scroll
+// container becomes the sticky reference for its descendants — so the header sticks to
+// .table-hscroll instead of the real vertical scroller, which does nothing since
+// .table-hscroll itself never moves vertically. Driving it by hand instead: translate the
+// header down by exactly however far the wrap has scrolled, keeping it visually pinned at
+// the top while the real tbody rows scroll underneath it. Horizontal position needs no
+// equivalent handling — the header and body already share the same .table-hscroll, so
+// native horizontal scrolling already keeps them in lockstep.
+function vsPinTableHeader(wrapId){
+  const wrap=document.getElementById(wrapId);
+  const thead=wrap&&wrap.querySelector('thead');
+  if(!wrap||!thead) return;
+  wrap.addEventListener('scroll',()=>{ thead.style.transform=`translateY(${wrap.scrollTop}px)`; }, {passive:true});
+}
+vsPinTableHeader('playersTableWrap');
+vsPinTableHeader('prospectsTableWrap');
 
 /* =====================================================================================
    VALUE SAVANT ENGINE (consolidated)
