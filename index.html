@@ -4330,10 +4330,15 @@ document.getElementById('mainContent').style.display='flex';
 //      you lift your finger, which reads as laggy next to native vertical scrolling. So
 //      both axes stay real native `overflow` scrolling, never JS-driven.
 //   2. Toggling `overflow` to lock/unlock an axis is a known WebKit trap: changing
-//      overflow on a scrolled element resets its scroll position to 0. Worked around by
-//      saving scrollTop/scrollLeft and restoring them synchronously, in the same tick,
-//      immediately after every toggle — the browser only paints once per frame, so the
-//      reset never becomes visible.
+//      overflow on a scrolled element resets its scroll position to 0 — reproduces only
+//      on real WebKit/Safari, never in Chromium, which is why this took a few rounds to
+//      actually nail down in testing. Worked around by saving scrollTop/scrollLeft,
+//      changing overflow, forcing a synchronous layout flush (`el.offsetHeight`), and only
+//      then restoring the saved offsets — restoring immediately after the style write
+//      without that forced flush isn't reliable, since the browser can flush layout a
+//      moment later against stale geometry and clamp the restored value right back to 0.
+//      Also only ever done on a genuine mode transition, never redundantly, since every
+//      write is another chance to trip it.
 //   3. The axis is decided from the gesture's *total* movement from touch-start,
 //      re-evaluated on every touchmove rather than frozen after one early reading — a
 //      swipe that starts with a noisy diagonal pixel or two and then goes straight down
@@ -4356,15 +4361,26 @@ function vsLockScrollAxis(el) {
   if (!el || el.dataset.vsAxisLocked) return;
   el.dataset.vsAxisLocked = '1';
 
-  let startX = 0, startY = 0, horizontal = false, allowHorizontal = true;
+  let startX = 0, startY = 0, allowHorizontal = true, mode = null;
 
   const setOverflow = (x, y) => {
     const st = el.scrollTop, sl = el.scrollLeft;
     el.style.overflowX = x;
     el.style.overflowY = y;
+    void el.offsetHeight;   // force a synchronous layout flush under the new overflow
+                            // value before restoring — writing scrollTop/scrollLeft
+                            // right after the style change alone isn't reliable on real
+                            // WebKit, since the browser can clamp/discard that write when
+                            // it flushes layout a moment later against stale geometry.
     el.scrollTop = st;
     el.scrollLeft = sl;
   };
+  // Only ever touch `overflow` on a genuine mode transition, never redundantly — every
+  // write is a chance to trip the WebKit quirk above, so the fewer of them the better.
+  // `mode` starts null so the very first touchstart still establishes the real locked
+  // state on the element (whose CSS default is unrestricted in both directions).
+  const toVertical = () => { if (mode !== 'vertical') { mode = 'vertical'; setOverflow('hidden', 'auto'); } };
+  const toHorizontal = () => { if (mode !== 'horizontal') { mode = 'horizontal'; setOverflow('auto', 'hidden'); } };
 
   const stickyBoundary = () => {
     const sticky = el.querySelector('.player-col');
@@ -4375,9 +4391,8 @@ function vsLockScrollAxis(el) {
     if (e.touches.length !== 1) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    horizontal = false;
     allowHorizontal = startX > stickyBoundary();
-    setOverflow('hidden', 'auto');   // locked to vertical until proven otherwise
+    toVertical();   // every new gesture defaults to vertical-locked; a no-op if already there
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
@@ -4386,13 +4401,8 @@ function vsLockScrollAxis(el) {
     const dy = Math.abs(e.touches[0].clientY - startY);
     if (dx * dx + dy * dy < 64) return;   // wait for ~8px before reading intent
 
-    if (!horizontal && dx > dy * 2.5) {
-      horizontal = true;
-      setOverflow('auto', 'hidden');
-    } else if (horizontal && dx < dy) {
-      horizontal = false;
-      setOverflow('hidden', 'auto');
-    }
+    if (mode !== 'horizontal' && dx > dy * 2.5) toHorizontal();
+    else if (mode === 'horizontal' && dx < dy) toVertical();
   }, { passive: true });
 }
 vsLockScrollAxis(document.getElementById('playersTableWrap'));
