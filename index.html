@@ -364,8 +364,22 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .standings-table tbody tr:nth-child(even) td:nth-child(-n+2){background:color-mix(in srgb, var(--bg-mid), white 1.8%)}
 .standings-division-header{padding:9px 14px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
 
-/* PLAYERS TAB (replaces Rankings) — shared by the Prospects table too */
-.players-table-wrap{overflow-x:auto;flex:1}
+/* PLAYERS TAB (replaces Rankings) — shared by the Prospects table too.
+   Axis-locked scrolling, done with nested scroll containers instead of JS: an earlier
+   approach toggled `overflow` at runtime to lock/unlock an axis per touch gesture, which
+   hit a WebKit bug where changing overflow on a scrolled element resets its position —
+   and every workaround attempted (sync restore, forced layout flush) still failed on
+   real Safari despite testing clean in Chromium, since the bug is WebKit-only and never
+   reproduces there. Sidestepped entirely by never touching `overflow` after load: the
+   outer wrap (.players-table-wrap) is permanently vertical-only, a new inner
+   (.table-hscroll) is permanently horizontal-only, and the browser's native scroll
+   chaining routes each axis of a diagonal gesture to whichever ancestor can handle it —
+   zero JS, zero risk of the reset bug. touch-action:pan-y on the sticky rank/name cells
+   additionally makes a touch starting there always vertical-only, since there's nothing
+   to scroll past under those columns anyway. */
+.players-table-wrap{overflow-x:hidden;overflow-y:auto;flex:1}
+.table-hscroll{overflow-x:auto;overflow-y:hidden}
+.players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
@@ -841,11 +855,13 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
       </select>
     </div>
   </div>
-  <div class="players-table-wrap" id="playersTableWrap" style="overflow-y:auto">
-    <table class="players-table" id="playersTable">
-      <thead id="playersTableHead"></thead>
-      <tbody id="playersBody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
-    </table>
+  <div class="players-table-wrap" id="playersTableWrap">
+    <div class="table-hscroll">
+      <table class="players-table" id="playersTable">
+        <thead id="playersTableHead"></thead>
+        <tbody id="playersBody"><tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -856,11 +872,13 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
       <option value="__top100">MLB Top 100</option>
     </select>
   </div>
-  <div class="players-table-wrap" id="prospectsTableWrap" style="overflow-y:auto">
-    <table class="players-table" id="prospectsTable">
-      <thead id="prospectsTableHead"></thead>
-      <tbody id="prospectsBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
-    </table>
+  <div class="players-table-wrap" id="prospectsTableWrap">
+    <div class="table-hscroll">
+      <table class="players-table" id="prospectsTable">
+        <thead id="prospectsTableHead"></thead>
+        <tbody id="prospectsBody"><tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-muted)">Loading...</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -4321,92 +4339,6 @@ document.addEventListener('click',e=>{if(!e.target.closest('.dropdown-wrap')){cl
 populateDDs();
 document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
-
-// ===== AXIS-LOCKED TABLE SCROLLING =====
-// The Players/Prospects table wraps scroll both x (columns) and y (rows). Failure modes
-// learned the hard way, each with its own fix:
-//   1. A manual, hand-rolled scroll (driving scrollLeft by hand in JS instead of letting
-//      the browser scroll natively) has no momentum/inertia — it stops dead the instant
-//      you lift your finger, which reads as laggy next to native vertical scrolling. So
-//      both axes stay real native `overflow` scrolling, never JS-driven.
-//   2. Toggling `overflow` to lock/unlock an axis is a known WebKit trap: changing
-//      overflow on a scrolled element resets its scroll position to 0 — reproduces only
-//      on real WebKit/Safari, never in Chromium, which is why this took a few rounds to
-//      actually nail down in testing. Worked around by saving scrollTop/scrollLeft,
-//      changing overflow, forcing a synchronous layout flush (`el.offsetHeight`), and only
-//      then restoring the saved offsets — restoring immediately after the style write
-//      without that forced flush isn't reliable, since the browser can flush layout a
-//      moment later against stale geometry and clamp the restored value right back to 0.
-//      Also only ever done on a genuine mode transition, never redundantly, since every
-//      write is another chance to trip it.
-//   3. The axis is decided from the gesture's *total* movement from touch-start,
-//      re-evaluated on every touchmove rather than frozen after one early reading — a
-//      swipe that starts with a noisy diagonal pixel or two and then goes straight down
-//      must not stay locked into dragging sideways for the rest of that gesture. A small
-//      hysteresis gap (2.5x to commit horizontal, must fall under 1x to give it back)
-//      keeps it from flapping near the boundary.
-//   4. Native momentum/fling continues *after* touchend using velocity the OS already
-//      captured — so unlocking both axes immediately on release let a fast vertical fling
-//      leak a bit of sideways drift during its coast-down. Fixed by never resetting
-//      overflow on touchend/touchcancel at all: whichever axis was active when the finger
-//      lifts is the only one that should carry momentum, and the other stays locked
-//      through it. The next touchstart re-locks to vertical as the default regardless of
-//      how the previous gesture ended.
-//   5. A touch starting over the sticky rank/name columns (left edge) is never a
-//      horizontal scroll — there's nothing there to scroll past. Only a touch starting
-//      over the stat columns (right of the sticky region) can ever unlock horizontal
-//      movement at all, which also cuts off a lot of the residual drift above at the
-//      source since most vertical scrolling naturally starts from the name column.
-function vsLockScrollAxis(el) {
-  if (!el || el.dataset.vsAxisLocked) return;
-  el.dataset.vsAxisLocked = '1';
-
-  let startX = 0, startY = 0, allowHorizontal = true, mode = null;
-
-  const setOverflow = (x, y) => {
-    const st = el.scrollTop, sl = el.scrollLeft;
-    el.style.overflowX = x;
-    el.style.overflowY = y;
-    void el.offsetHeight;   // force a synchronous layout flush under the new overflow
-                            // value before restoring — writing scrollTop/scrollLeft
-                            // right after the style change alone isn't reliable on real
-                            // WebKit, since the browser can clamp/discard that write when
-                            // it flushes layout a moment later against stale geometry.
-    el.scrollTop = st;
-    el.scrollLeft = sl;
-  };
-  // Only ever touch `overflow` on a genuine mode transition, never redundantly — every
-  // write is a chance to trip the WebKit quirk above, so the fewer of them the better.
-  // `mode` starts null so the very first touchstart still establishes the real locked
-  // state on the element (whose CSS default is unrestricted in both directions).
-  const toVertical = () => { if (mode !== 'vertical') { mode = 'vertical'; setOverflow('hidden', 'auto'); } };
-  const toHorizontal = () => { if (mode !== 'horizontal') { mode = 'horizontal'; setOverflow('auto', 'hidden'); } };
-
-  const stickyBoundary = () => {
-    const sticky = el.querySelector('.player-col');
-    return sticky ? sticky.getBoundingClientRect().right : el.getBoundingClientRect().left + 152;
-  };
-
-  el.addEventListener('touchstart', (e) => {
-    if (e.touches.length !== 1) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    allowHorizontal = startX > stickyBoundary();
-    toVertical();   // every new gesture defaults to vertical-locked; a no-op if already there
-  }, { passive: true });
-
-  el.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 1 || !allowHorizontal) return;
-    const dx = Math.abs(e.touches[0].clientX - startX);
-    const dy = Math.abs(e.touches[0].clientY - startY);
-    if (dx * dx + dy * dy < 64) return;   // wait for ~8px before reading intent
-
-    if (mode !== 'horizontal' && dx > dy * 2.5) toHorizontal();
-    else if (mode === 'horizontal' && dx < dy) toVertical();
-  }, { passive: true });
-}
-vsLockScrollAxis(document.getElementById('playersTableWrap'));
-vsLockScrollAxis(document.getElementById('prospectsTableWrap'));
 
 /* =====================================================================================
    VALUE SAVANT ENGINE (consolidated)
