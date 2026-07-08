@@ -386,6 +386,12 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
    vertical stick via a transform synced to .players-table-wrap's scroll position instead —
    see the scroll listeners set up alongside populateDDs() below. */
 .players-table th.rank-col,.players-table td.rank-col,.players-table th.player-col,.players-table td.player-col{touch-action:pan-y}
+/* position+z-index here (not just on the th children) because the JS-driven header pin
+   applies a transform to <thead> to hold it in place during scroll, and a transformed
+   element establishes its own stacking context -- without an explicit z-index of its own,
+   <thead> has no guaranteed paint order against <tbody>'s rows and can end up rendering
+   *behind* the very rows scrolling underneath it instead of masking them. */
+.players-table thead{position:relative;z-index:4}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
