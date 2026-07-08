@@ -3621,10 +3621,17 @@ function finderPlayerLine(p){
   return `<div class="share-player"><div class="share-player-name" style="cursor:pointer;text-decoration:underline;text-decoration-color:var(--border)" onclick="showPM('${escJs(p.name)}','${escJs(p.team)}','${escJs(p.pos||'')}')">${p.name}</div><div class="share-player-stats"><span class="stat-pair">26: <b>${fmt(p.val2026)}</b></span> <span class="stat-pair">Avg: <b>${fmt(p.avgVal)}</b></span> <span class="stat-pair">Ctrl: <b>${vsCtrlThruLabel(p)||'—'}</b></span></div></div>`;
 }
 
+function vsNetShareA(vA26, vB26, avgA, avgB) {
+  const p26 = (vA26 + vB26) > 0 ? (vA26 / (vA26 + vB26)) * 100 : 50;
+  const pAv = (avgA + avgB) > 0 ? (avgA / (avgA + avgB)) * 100 : 50;
+  return (p26 + pAv) / 2;
+}
+
 function finderBuildBarsHtml(giveList, getList){
   const giveV26=sumF(giveList,'val2026'), getV26=sumF(getList,'val2026');
   const giveAvg=sumF(giveList,'avgVal'), getAvg=sumF(getList,'avgVal');
-  return [['2026 Value',giveV26,getV26],['Avg Value',giveAvg,getAvg]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
+  const netA=vsNetShareA(giveV26,getV26,giveAvg,getAvg);
+  return [['2026 Value',giveV26,getV26],['Avg Value',giveAvg,getAvg],['Balance',netA,100-netA]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
 }
 
 // finderBuildVerdictHtml + vsFinderWhySection are defined at the end of the script
@@ -4325,9 +4332,10 @@ function openShareModal(){
   const avgA=sumF(selectedA,'avgVal'),avgB=sumF(selectedB,'avgVal');
   vsPatchedShareVerdictFlow(v26A,v26B,avgA,avgB);
 
-  // Share bars - red highlights the side RECEIVING more value, with % bubble. Only 2026 and Avg now.
+  // Share bars - red highlights the side RECEIVING more value, with % bubble. 2026, Avg, and Balance.
   if(selectedA.length&&selectedB.length){
-    document.getElementById('shareBars').innerHTML=[['2026 Value',v26A,v26B],['Avg Value',avgA,avgB]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
+    const netA=vsNetShareA(v26A,v26B,avgA,avgB);
+    document.getElementById('shareBars').innerHTML=[['2026 Value',v26A,v26B],['Avg Value',avgA,avgB],['Balance',netA,100-netA]].map(([lbl,vA,vB])=>sharePctBarHtml(lbl,vA,vB)).join('');
   } else {
     document.getElementById('shareBars').innerHTML='';
   }
@@ -4995,9 +5003,17 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
   /* ---- Value math (dual clock) ---- */
   const p26 = (v26A + v26B) > 0 ? Math.round(v26A / (v26A + v26B) * 100) : 50;
   const pAv = (avgA + avgB) > 0 ? Math.round(avgA / (avgA + avgB) * 100) : 50;
+
+  /* ---- Net-share (average of both clocks' given-value share) drives the headline ---- */
+  const netA = (p26 + pAv) / 2;                 // Team A's average given-share, both clocks
+  const aWins = netA < 50;                      // gave less overall = won overall
+  const winner = aWins ? teamA : teamB;
+  const winnerNet = aWins ? (100 - netA) : netA; // winner's degree of favor, 50-100 scale
+
   sections.push(S('Value Math',
     `On this season alone: <span>${teamA}</span> puts in ${v26A.toFixed(2)} (${p26}% of the deal) to <span>${teamB}</span>'s ${v26B.toFixed(2)}. Long haul: ${avgA.toFixed(2)} (${pAv}%) against ${avgB.toFixed(2)}.<br>` +
-    `When the two clocks disagree, that's not a red flag — that's a deadline trade doing what deadline trades do. One side bought October, the other bought 2028.`));
+    `When the two clocks disagree, that's not a red flag — that's a deadline trade doing what deadline trades do. One side bought October, the other bought 2028.<br>` +
+    `Combined across both clocks: <span>${winner}</span> comes out ${Math.round(winnerNet)}% favored — ${winnerNet <= 55 ? 'that\'s inside the fair zone' : winnerNet <= 60 ? 'a lean, but still fair' : 'a real edge'}.`));
 
   /* ---- Age & peak ---- */
   try {
@@ -5017,14 +5033,17 @@ function vsGenerateSmartVerdict(listA, listB, teamA, teamB) {
     if (comp && mag === 'real') sections.push(S('Historical Comparable — ' + comp.comp.title, comp.comp.text));
   } catch (e) { /* optional */ }
 
-  /* ---- Headline ---- */
-  const fair26 = p26 >= 45 && p26 <= 55;
+  /* ---- Headline (net-share: average of both clocks' given-value share) ---- */
   let grade, headline;
-  if (fair26) { grade = 'fair'; headline = mag === 'minor' ? '✓ Fair minor move' : '✓ Fair Trade'; }
-  else {
-    const win = p26 > 55 ? teamB : teamA;
+  if (winnerNet <= 55) {
+    grade = 'fair';
+    headline = mag === 'minor' ? '✓ Fair minor move' : '✓ Fair Trade';
+  } else if (winnerNet <= 60) {
+    grade = 'fair';
+    headline = `✓ Fair — Leans ${winner}`;
+  } else {
     grade = mag === 'minor' ? 'neutral' : 'warn';
-    headline = mag === 'minor' ? `Leans ${win}` : `${win} wins this trade`;
+    headline = mag === 'minor' ? `Edge: ${winner}` : `${winner} wins this trade`;
   }
   return { grade, headline, html: sections.join('') };
 }
