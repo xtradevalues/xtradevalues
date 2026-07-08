@@ -423,6 +423,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
 .players-table th.player-col{text-align:left;min-width:112px;left:var(--rank-col-w,40px);z-index:3}
 .players-table th.sort-active{color:var(--accent);background:var(--bg-mid);box-shadow:inset 0 0 0 999px var(--accent-soft),inset 0 -2px 0 var(--accent)}
+/* Same idea as the header's sort-active treatment, toned down for repeating down a whole
+   column of rows: a soft tint rather than the header's bold wash + underline, so it reads
+   as "this column" at a glance without fighting the existing percentile text colors
+   (val2026/avgVal) or the alternating row backgrounds it needs to sit on top of. */
+.players-table td.sort-active{background:var(--accent-soft)}
 .players-table tbody tr{background:var(--bg-card)}
 .players-table tbody tr:nth-child(even){background:var(--row-alt)}
 .players-table td{padding:12px 10px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -430,6 +435,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .players-table td.player-col{text-align:left;color:var(--text-primary);font-weight:600;font-size:13px;cursor:pointer;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:var(--rank-col-w,40px);z-index:1;background:var(--bg-card)}
 .players-table td.player-col:hover{color:var(--accent)}
 .players-table tbody tr:nth-child(even) td.rank-col,.players-table tbody tr:nth-child(even) td.player-col{background:color-mix(in srgb, var(--bg), white 1.8%)}
+/* player-col's own background rules above are more specific by source order than plain
+   td.sort-active, so sorting by Player would otherwise show no highlight on its column —
+   these explicitly out-rank them (extra .sort-active class = higher specificity). */
+.players-table td.player-col.sort-active,
+.players-table tbody tr:nth-child(even) td.player-col.sort-active{background:var(--accent-soft)}
 .mini-jersey{display:inline-block;vertical-align:middle;margin-right:6px;flex-shrink:0}
 
 /* PLAYER PAGE */
@@ -1969,40 +1979,43 @@ function renderPlayers(){
   const fmt3=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(3).replace(/^0\./,'.'):'-';
   const fmtI=v=>v!==null&&!isNaN(v)?Math.round(v):'-';
   const fmtF=v=>v!==null&&!isNaN(v)?parseFloat(v).toFixed(1):'-';
+  // Highlights whichever column is currently sorted, matching the header's treatment —
+  // 'sc' appended into a cell's class list, blank for every other column.
+  const sc=f=>f===playersSortCol?' sort-active':'';
   const body=pl.slice(0,500).map((p,idx)=>{
     const inj=playerHasInjury(p)?'<span style="color:#D72229">✚</span>':'';
-    const nameCell=`<td class="player-col">${miniJerseySvg(p.team)}${esc(abbrevName(p.name))}${prospectPillHtml(p)}${inj}</td>`;
+    const nameCell=`<td class="player-col${sc('name')}">${miniJerseySvg(p.team)}${esc(abbrevName(p.name))}${prospectPillHtml(p)}${inj}</td>`;
     const vWARDisp=fmtF(getDisplayStat(p,'vWAR'));
     let cells;
     if(isHitter){
       cells=[
         `<td class="rank-col">${idx+1}</td>`,
         nameCell,
-        `<td>${esc(p.pos||'—')}</td>`,
-        `<td>${fmtI(getDisplayStat(p,'pa'))}</td>`,
-        `<td>${fmtI(getDisplayStat(p,'h'))}</td>`,
-        `<td>${fmtI(getDisplayStat(p,'hr'))}</td>`,
-        `<td>${fmt3(getDisplayStat(p,'avg26'))}</td>`,
-        `<td>${fmt3(getDisplayStat(p,'obp'))}</td>`,
-        `<td>${fmt3(getDisplayStat(p,'slg'))}</td>`,
-        `<td>${vWARDisp}</td>`,
-        `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
-        `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
+        `<td class="${sc('pos')}">${esc(p.pos||'—')}</td>`,
+        `<td class="${sc('pa')}">${fmtI(getDisplayStat(p,'pa'))}</td>`,
+        `<td class="${sc('h')}">${fmtI(getDisplayStat(p,'h'))}</td>`,
+        `<td class="${sc('hr')}">${fmtI(getDisplayStat(p,'hr'))}</td>`,
+        `<td class="${sc('avg26')}">${fmt3(getDisplayStat(p,'avg26'))}</td>`,
+        `<td class="${sc('obp')}">${fmt3(getDisplayStat(p,'obp'))}</td>`,
+        `<td class="${sc('slg')}">${fmt3(getDisplayStat(p,'slg'))}</td>`,
+        `<td class="${sc('vWAR')}">${vWARDisp}</td>`,
+        `<td class="${sc('val2026')}" style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
+        `<td class="${sc('avgVal')}" style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
       ];
     } else {
       cells=[
         `<td class="rank-col">${idx+1}</td>`,
         nameCell,
-        `<td>${esc(p.pos||'—')}</td>`,
-        `<td>${fmtF(getDisplayStat(p,'ip'))}</td>`,
-        `<td>${fmtI(getDisplayStat(p,'k'))}</td>`,
-        `<td>${fmt2(getDisplayStat(p,'era'))}</td>`,
+        `<td class="${sc('pos')}">${esc(p.pos||'—')}</td>`,
+        `<td class="${sc('ip')}">${fmtF(getDisplayStat(p,'ip'))}</td>`,
+        `<td class="${sc('k')}">${fmtI(getDisplayStat(p,'k'))}</td>`,
+        `<td class="${sc('era')}">${fmt2(getDisplayStat(p,'era'))}</td>`,
         `<td>${fmt2(getDisplayStat(p,'fip'))}</td>`,
-        `<td>${fmtI(getDisplayStat(p,'sv'))}</td>`,
-        `<td>${fmtF(getDisplayStat(p,'k9'))}</td>`,
-        `<td>${vWARDisp}</td>`,
-        `<td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
-        `<td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
+        `<td class="${sc('sv')}">${fmtI(getDisplayStat(p,'sv'))}</td>`,
+        `<td class="${sc('k9')}">${fmtF(getDisplayStat(p,'k9'))}</td>`,
+        `<td class="${sc('vWAR')}">${vWARDisp}</td>`,
+        `<td class="${sc('val2026')}" style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td>`,
+        `<td class="${sc('avgVal')}" style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td>`,
       ];
     }
     return `<tr onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer">${cells.join('')}</tr>`;
