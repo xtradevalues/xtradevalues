@@ -205,14 +205,22 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .roster-controls{padding:12px 14px;border-bottom:1px solid var(--border-light);background:var(--bg-mid);display:flex;gap:8px}
 .roster-controls select{flex:1;margin-bottom:0}
 .roster-subgroup-header{padding:9px 12px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
+/* Same axis-locked-scroll treatment as the Players/Prospects tables: .table-hscroll (see
+   its own comment above) wraps each roster-table so columns scroll horizontally without
+   ever fighting a vertical swipe, and the Player column freezes in place the same way
+   rank/player do there. Roster's per-position subgroups are short enough that the sticky-
+   header-via-transform piece wasn't worth porting too -- there's rarely enough length to
+   scroll a header out of view within a single subgroup. */
 .roster-table{width:100%;border-collapse:collapse}
 .roster-table th{padding:9px 8px;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg);white-space:nowrap;text-align:right;position:sticky;top:0;z-index:1}
-.roster-table th:first-child{text-align:left}
+.roster-table th:first-child{text-align:left;position:sticky;left:0;z-index:2;background:var(--bg)}
 .roster-table th.pos-col{text-align:center}
 .roster-table tbody tr:nth-child(even){background:var(--row-alt)}
 .roster-table td{padding:10px 8px;font-size:12px;border-bottom:1px solid var(--border-light);text-align:right;color:var(--text-secondary);white-space:nowrap;font-weight:400;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.roster-table td:first-child{text-align:left;color:var(--text-primary);font-weight:500;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:160px;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif}
+.roster-table td:first-child{text-align:left;color:var(--text-primary);font-weight:500;overflow:hidden;text-overflow:ellipsis;cursor:pointer;max-width:160px;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;position:sticky;left:0;z-index:1;background:var(--bg-card)}
+.roster-table tbody tr:nth-child(even) td:first-child{background:color-mix(in srgb, var(--bg), white 1.8%)}
 .roster-table td.pos-col{text-align:center;font-size:11px;color:var(--text-muted)}
+.roster-table th:first-child,.roster-table td:first-child{touch-action:pan-y}
 .val-pos{color:var(--pos)!important}
 .val-neg{color:var(--neg)!important}
 .roster-placeholder{text-align:center;padding:40px 20px;color:var(--text-muted);font-size:13px}
@@ -823,7 +831,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
       <option value="utility">Utility / DH</option>
     </select>
   </div>
-  <div id="rosterContent" style="flex:1;overflow-y:auto"><div class="roster-placeholder">Select a team to view their roster</div></div>
+  <div id="rosterContent" style="flex:1;overflow-y:auto;overflow-x:hidden"><div class="roster-placeholder">Select a team to view their roster</div></div>
 </div>
 
 <!-- PLAYERS PAGE -->
@@ -4324,7 +4332,7 @@ function loadRoster(){
       const inj=playerHasInjury(p)?'<span style="color:#D72229" title="'+injuredLabel(p.injuredRaw)+'">✚</span>':'';
       return `<tr><td onclick="showPM('${esc(p.name)}','${esc(p.team)}','${esc(p.pos||'')}')" style="cursor:pointer"><span class="sdot ${dc}"></span>${abbr(p.name)}${prospectPillHtml(p)}${inj}</td><td class="pos-col">${p.pos||'—'}</td><td style="text-align:right;color:var(--text-muted)">${age}</td><td style="color:${pctColor(p.val2026,'val2026')}">${fmt(p.val2026)}</td><td style="color:${pctColor(p.avgVal,'avgVal')}">${fmt(p.avgVal)}</td><td style="text-align:right;color:var(--text-muted)">${vsCtrlThruLabel(p)||'—'}</td></tr>`;
     }).join('');
-    return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    return `<div><div class="roster-subgroup-header">${lbl} (${list.length})</div><div class="table-hscroll"><table class="roster-table"><thead><tr><th>Player</th><th class="pos-col">Pos</th><th>Age</th><th>2026</th><th>Avg</th><th>Ctrl Thru</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
   if(pf){c.innerHTML=sg(pl,SUBLBLS[pf]);return;}
   const byP={};SUBGRPS.forEach(s=>byP[s]=[]);
