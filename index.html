@@ -365,7 +365,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .standings-division-header{padding:9px 14px;background:var(--bg-card);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
 
 /* PLAYERS TAB (replaces Rankings) — shared by the Prospects table too */
-.players-table-wrap{overflow-x:auto;flex:1;touch-action:pan-y}
+.players-table-wrap{overflow-x:auto;flex:1}
 .players-table{width:100%;border-collapse:separate;border-spacing:0;min-width:480px}
 .players-table th{padding:12px 10px;text-align:right;font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:var(--bg-mid);white-space:nowrap;cursor:pointer;position:sticky;top:0;z-index:2;transition:background 0.15s,color 0.15s}
 .players-table th.rank-col{text-align:center;width:40px;min-width:40px;max-width:40px;padding-left:6px;padding-right:6px;left:0;z-index:3}
@@ -4323,49 +4323,66 @@ document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
 
 // ===== AXIS-LOCKED TABLE SCROLLING =====
-// The Players/Prospects table wraps scroll both x (columns) and y (rows). Toggling the
-// `overflow` CSS property to lock/unlock an axis (the previous approach here) is a known
-// WebKit trap: changing overflow on a scrolled element resets its scroll position to 0 —
-// that's what was throwing the page back to the top on a sideways swipe after scrolling
-// down. Fixed by never touching overflow at all: `touch-action:pan-y` on the wrap (see
-// .players-table-wrap) tells the browser to only ever pan vertically for touch input, so
-// vertical scroll stays 100% native (momentum, position, everything) and columns are
-// locked by default with zero JS involved. Horizontal movement is then driven by hand via
-// scrollLeft, and only once a gesture reads as clearly, predominantly horizontal — plain
-// vertical and diagonal swipes never touch scrollLeft.
+// The Players/Prospects table wraps scroll both x (columns) and y (rows). Two failure
+// modes to avoid here, both learned the hard way:
+//   1. A manual, hand-rolled scroll (driving scrollLeft by hand in JS instead of letting
+//      the browser scroll natively) has no momentum/inertia — it stops dead the instant
+//      you lift your finger, which reads as laggy next to native vertical scrolling.
+//      So both axes need to stay real native `overflow` scrolling, not JS-driven.
+//   2. Toggling `overflow` to lock/unlock an axis is a known WebKit trap: changing
+//      overflow on a scrolled element resets its scroll position to 0. Worked around by
+//      saving scrollTop/scrollLeft and restoring them synchronously, in the same tick,
+//      immediately after every toggle — the browser only paints once per frame, so the
+//      reset never becomes visible.
+// The axis itself is decided from the gesture's *total* movement from touch-start,
+// re-evaluated on every touchmove rather than frozen after one early reading — a swipe
+// that starts with a noisy diagonal pixel or two and then goes straight down must not
+// stay locked into dragging sideways for the rest of that gesture. A small hysteresis gap
+// (2.5x to commit horizontal, must fall under 1x to give it back) stops it from flapping
+// back and forth (and re-toggling overflow) near the boundary.
 function vsLockScrollAxis(el) {
   if (!el || el.dataset.vsAxisLocked) return;
   el.dataset.vsAxisLocked = '1';
 
-  let startX = 0, startY = 0, lastX = 0, decided = false, horizontal = false;
+  let startX = 0, startY = 0, horizontal = false;
+
+  const setOverflow = (x, y) => {
+    const st = el.scrollTop, sl = el.scrollLeft;
+    el.style.overflowX = x;
+    el.style.overflowY = y;
+    el.scrollTop = st;
+    el.scrollLeft = sl;
+  };
 
   el.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) return;
-    startX = lastX = e.touches[0].clientX;
+    startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
-    decided = false;
     horizontal = false;
+    setOverflow('hidden', 'auto');   // locked to vertical until proven otherwise
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
     if (e.touches.length !== 1) return;
-    const x = e.touches[0].clientX, y = e.touches[0].clientY;
-    const dx = x - startX, dy = y - startY;
+    const dx = Math.abs(e.touches[0].clientX - startX);
+    const dy = Math.abs(e.touches[0].clientY - startY);
+    if (dx * dx + dy * dy < 64) return;   // wait for ~8px before reading intent
 
-    if (!decided) {
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 8) return;   // wait for enough movement to read intent reliably
-      decided = true;
-      // Only drive horizontal scroll for a swipe that's clearly, predominantly
-      // horizontal (more than 2x the movement on x than y). Everything else —
-      // including diagonals — stays vertical-only (touch-action:pan-y handles it).
-      horizontal = Math.abs(dx) > Math.abs(dy) * 2;
+    if (!horizontal && dx > dy * 2.5) {
+      horizontal = true;
+      setOverflow('auto', 'hidden');
+    } else if (horizontal && dx < dy) {
+      horizontal = false;
+      setOverflow('hidden', 'auto');
     }
-    if (horizontal) {
-      el.scrollLeft -= (x - lastX);
-    }
-    lastX = x;
   }, { passive: true });
+
+  const release = () => {
+    horizontal = false;
+    setOverflow('auto', 'auto');
+  };
+  el.addEventListener('touchend', release, { passive: true });
+  el.addEventListener('touchcancel', release, { passive: true });
 }
 vsLockScrollAxis(document.getElementById('playersTableWrap'));
 vsLockScrollAxis(document.getElementById('prospectsTableWrap'));
