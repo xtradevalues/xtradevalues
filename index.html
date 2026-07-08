@@ -898,8 +898,8 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
         <option value="DH">DH</option>
       </select>
       <select id="playersQualified" onchange="playersFilterChanged()" style="flex:1;min-width:80px;margin-bottom:0">
-        <option value="qualified" selected>Qualified</option>
-        <option value="all">All</option>
+        <option value="qualified">Qualified</option>
+        <option value="all" selected>All</option>
       </select>
     </div>
   </div>
@@ -1440,6 +1440,7 @@ async function loadData() {
           vWARHit: null, vWARPitch: null,
           fgUrl: null,
           qualified: false,
+          mlbStats2026: false,
         };
 
         allPlayers.push(p);
@@ -1478,6 +1479,10 @@ async function loadData() {
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARHit = vw; }
         // col AI: "yes"/"no" qualified flag
         p.qualified = String(colVal(row, 'Qualified', 34) ?? '').trim().toLowerCase() === 'yes';
+        // Has a real MLB Hitters 2026 row -- regardless of current team-sheet level, so a
+        // player who has since been sent down still shows up under the Players tab's MLB
+        // filter with the stats he actually accrued at the MLB level this season.
+        p.mlbStats2026 = true;
       }
     }
 
@@ -1498,6 +1503,8 @@ async function loadData() {
         if (!isNaN(vw)) { p.vWAR = vw; p.vWARPitch = vw; }
         // col AB: "yes"/"no" qualified flag
         p.qualified = String(colVal(row, 'Qualified', 27) ?? '').trim().toLowerCase() === 'yes';
+        // Has a real MLB Pitchers 2026 row -- see the matching comment in the hitters loop.
+        p.mlbStats2026 = true;
       }
     }
 
@@ -1890,10 +1897,14 @@ function renderPlayers(){
   if(teamF) pl=pl.filter(x=>x.team===teamF);
   // Name search
   if(searchF) pl=pl.filter(x=>x.name.toLowerCase().includes(searchF));
-  // Level filter — MLB/MiLB(minors) match the player's actual level; Prospects matches any
-  // ranked player regardless of level (the split dropdown decides which stat line is shown).
-  if(levelF==='mlb') pl=pl.filter(x=>x.level==='mlb');
-  else if(levelF==='minors') pl=pl.filter(x=>x.level==='minors');
+  // Level filter — MLB matches anyone with a real row on MLB Hitters/Pitchers 2026 this
+  // season, MiLB matches anyone with a row on 26 pHitters/pPitchers, regardless of the
+  // player's CURRENT team-sheet level in either case — a player sent down mid-season still
+  // shows up under MLB with the stats he actually accrued there, and vice versa. Prospects
+  // matches any ranked player regardless of level (the split dropdown decides which stat
+  // line is shown) — unchanged.
+  if(levelF==='mlb') pl=pl.filter(x=>x.mlbStats2026===true);
+  else if(levelF==='minors') pl=pl.filter(x=>!!(miLBHitters[x.playerID]||miLBPitchers[x.playerID]));
   else if(levelF==='prospects') pl=pl.filter(x=>x.isProspect);
   // Qualified filter — MLB level only.
   const qualEl=document.getElementById('playersQualified');
