@@ -4323,28 +4323,40 @@ document.getElementById('loadingScreen').style.display='none';
 document.getElementById('mainContent').style.display='flex';
 
 // ===== AXIS-LOCKED TABLE SCROLLING =====
-// The Players/Prospects table wraps scroll both x (columns) and y (rows). Two failure
-// modes to avoid here, both learned the hard way:
+// The Players/Prospects table wraps scroll both x (columns) and y (rows). Failure modes
+// learned the hard way, each with its own fix:
 //   1. A manual, hand-rolled scroll (driving scrollLeft by hand in JS instead of letting
 //      the browser scroll natively) has no momentum/inertia — it stops dead the instant
-//      you lift your finger, which reads as laggy next to native vertical scrolling.
-//      So both axes need to stay real native `overflow` scrolling, not JS-driven.
+//      you lift your finger, which reads as laggy next to native vertical scrolling. So
+//      both axes stay real native `overflow` scrolling, never JS-driven.
 //   2. Toggling `overflow` to lock/unlock an axis is a known WebKit trap: changing
 //      overflow on a scrolled element resets its scroll position to 0. Worked around by
 //      saving scrollTop/scrollLeft and restoring them synchronously, in the same tick,
 //      immediately after every toggle — the browser only paints once per frame, so the
 //      reset never becomes visible.
-// The axis itself is decided from the gesture's *total* movement from touch-start,
-// re-evaluated on every touchmove rather than frozen after one early reading — a swipe
-// that starts with a noisy diagonal pixel or two and then goes straight down must not
-// stay locked into dragging sideways for the rest of that gesture. A small hysteresis gap
-// (2.5x to commit horizontal, must fall under 1x to give it back) stops it from flapping
-// back and forth (and re-toggling overflow) near the boundary.
+//   3. The axis is decided from the gesture's *total* movement from touch-start,
+//      re-evaluated on every touchmove rather than frozen after one early reading — a
+//      swipe that starts with a noisy diagonal pixel or two and then goes straight down
+//      must not stay locked into dragging sideways for the rest of that gesture. A small
+//      hysteresis gap (2.5x to commit horizontal, must fall under 1x to give it back)
+//      keeps it from flapping near the boundary.
+//   4. Native momentum/fling continues *after* touchend using velocity the OS already
+//      captured — so unlocking both axes immediately on release let a fast vertical fling
+//      leak a bit of sideways drift during its coast-down. Fixed by never resetting
+//      overflow on touchend/touchcancel at all: whichever axis was active when the finger
+//      lifts is the only one that should carry momentum, and the other stays locked
+//      through it. The next touchstart re-locks to vertical as the default regardless of
+//      how the previous gesture ended.
+//   5. A touch starting over the sticky rank/name columns (left edge) is never a
+//      horizontal scroll — there's nothing there to scroll past. Only a touch starting
+//      over the stat columns (right of the sticky region) can ever unlock horizontal
+//      movement at all, which also cuts off a lot of the residual drift above at the
+//      source since most vertical scrolling naturally starts from the name column.
 function vsLockScrollAxis(el) {
   if (!el || el.dataset.vsAxisLocked) return;
   el.dataset.vsAxisLocked = '1';
 
-  let startX = 0, startY = 0, horizontal = false;
+  let startX = 0, startY = 0, horizontal = false, allowHorizontal = true;
 
   const setOverflow = (x, y) => {
     const st = el.scrollTop, sl = el.scrollLeft;
@@ -4354,16 +4366,22 @@ function vsLockScrollAxis(el) {
     el.scrollLeft = sl;
   };
 
+  const stickyBoundary = () => {
+    const sticky = el.querySelector('.player-col');
+    return sticky ? sticky.getBoundingClientRect().right : el.getBoundingClientRect().left + 152;
+  };
+
   el.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) return;
     startX = e.touches[0].clientX;
     startY = e.touches[0].clientY;
     horizontal = false;
+    allowHorizontal = startX > stickyBoundary();
     setOverflow('hidden', 'auto');   // locked to vertical until proven otherwise
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
-    if (e.touches.length !== 1) return;
+    if (e.touches.length !== 1 || !allowHorizontal) return;
     const dx = Math.abs(e.touches[0].clientX - startX);
     const dy = Math.abs(e.touches[0].clientY - startY);
     if (dx * dx + dy * dy < 64) return;   // wait for ~8px before reading intent
@@ -4376,13 +4394,6 @@ function vsLockScrollAxis(el) {
       setOverflow('hidden', 'auto');
     }
   }, { passive: true });
-
-  const release = () => {
-    horizontal = false;
-    setOverflow('auto', 'auto');
-  };
-  el.addEventListener('touchend', release, { passive: true });
-  el.addEventListener('touchcancel', release, { passive: true });
 }
 vsLockScrollAxis(document.getElementById('playersTableWrap'));
 vsLockScrollAxis(document.getElementById('prospectsTableWrap'));
