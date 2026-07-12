@@ -6592,7 +6592,7 @@ function scoresPitchStyle(call){
   if(c.indexOf('strike')>=0) return {fill:'#ffffff', text:'#111111'};
   return {fill:'#9a9a9a', text:'#111111'};
 }
-function scoresZoneSvg(atBat){
+function scoresZoneSvg(atBat, hugLeft){
   // Canvas (W x H) is sized so the zone box itself fills 2/3 of it on each axis — just
   // enough margin around the box to show an outside pitch without it floating in a sea
   // of dead transparent canvas. The CSS .scores-zone-svg width/height (and margin-bottom)
@@ -6601,10 +6601,18 @@ function scoresZoneSvg(atBat){
   const W=170, H=213;
   const XMIN=-1.27, XMAX=1.27, YMIN=0.3, YMAX=5.0;
   const zHalfW = 0.85;
-  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
-  const toX = x => clamp(((x-XMIN)/(XMAX-XMIN))*W, 9, W-9);
-  const toY = y => clamp(H - ((y-YMIN)/(YMAX-YMIN))*H, 9, H-9);
-  const rectX = toX(-zHalfW), rectW = toX(zHalfW)-toX(-zHalfW);
+  const toXBase = x => ((x-XMIN)/(XMAX-XMIN))*W;
+  const toY = y => Math.max(9, Math.min(H-9, H - ((y-YMIN)/(YMAX-YMIN))*H));
+  // Centering the box left ~28px of dead canvas on BOTH sides — including the side facing
+  // the silhouette, which is what actually made the whole panel read as "far from him."
+  // Instead push the box almost flush against whichever edge faces the silhouette (a small
+  // inwardMargin so the outline doesn't literally touch it), leaving the rest of the
+  // canvas's margin on the outward side for an outside pitch to still have room to plot.
+  const baseRectX = toXBase(-zHalfW), rectW = toXBase(zHalfW) - baseRectX;
+  const inwardMargin = 4;
+  const shift = hugLeft ? -(baseRectX - inwardMargin) : (baseRectX - inwardMargin);
+  const toX = x => Math.max(4, Math.min(W-4, toXBase(x) + shift));
+  const rectX = baseRectX + shift;
   // The box itself is fixed at 30%-65% of the batter's height (not each pitch's real
   // strikeZoneTop/Bottom) — pitch DOTS still use the real px/pz feet coordinates below,
   // so it reads as one consistent box next to the batter instead of shifting pitch to
@@ -6631,7 +6639,6 @@ function scoresZoneLegend(){
 function scoresStrikezoneHtml(g){
   const atBat = g.currentAtBat || null;
   const title = atBat ? (scoresEsc(atBat.batter||'—') + (atBat.batterSide? ' ('+scoresEsc(atBat.batterSide)+')' : '')) : 'No at-bat in progress';
-  const zoneSvg = scoresZoneSvg(atBat);
   const countHtml = (g.balls!=null && g.strikes!=null) ? '<div class="scores-count-line"><span>'+g.balls+'-'+g.strikes+'</span> count</div>' : '';
   const silhouetteDiv = '<div class="scores-silhouette" id="scoresSilhouetteHost"></div>';
   // View is from behind the plate (the umpire's POV), looking out at the pitcher — not
@@ -6640,7 +6647,12 @@ function scoresStrikezoneHtml(g){
   // the third-base side (screen-left) with the zone to his right. The unmirrored artwork
   // is already a lefty facing left, so it keeps that pose with the zone on his left;
   // right-handed (see scoresSilhouetteMarkup) gets mirrored to face right, zone on his right.
-  const row = atBat && atBat.batterSide === 'R'
+  const isRighty = atBat && atBat.batterSide === 'R';
+  // hugLeft tells scoresZoneSvg() which edge of ITS OWN canvas faces the silhouette, so
+  // the box can push flush against that edge instead of sitting dead-centered with equal
+  // (and very visible) empty canvas on both sides.
+  const zoneSvg = scoresZoneSvg(atBat, isRighty);
+  const row = isRighty
     ? silhouetteDiv + zoneSvg
     : zoneSvg + silhouetteDiv;
   return '<div class="scores-strikezone">'
