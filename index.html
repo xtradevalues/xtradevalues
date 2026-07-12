@@ -598,11 +598,11 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .scores-silhouette{width:70px;flex-shrink:0;opacity:0.92}
 .scores-silhouette svg{width:100%;height:auto;display:block}
 .scores-zone-svg{flex-shrink:0}
-.scores-zone-pitch-num{font-size:8px;font-weight:600;fill:#000;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none}
+.scores-zone-pitch-num{font-size:8px;font-weight:600;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none}
 .scores-count-line{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:var(--text-secondary)}
 .scores-count-line span{color:var(--text-primary);font-weight:600}
 .scores-zone-legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:9px;color:var(--text-muted);letter-spacing:0.02em}
-.scores-zone-legend-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.scores-zone-legend-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:4px;vertical-align:middle;border:1px solid rgba(255,255,255,0.35)}
 
 .scores-matchup{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
 .scores-matchup-title{font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px}
@@ -613,10 +613,14 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 
 .scores-feed{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .scores-feed-group-header{padding:9px 14px;background:var(--bg-mid);border-bottom:1px solid var(--border-light);font-size:10px;font-weight:500;letter-spacing:0.04em;text-transform:uppercase;color:var(--accent)}
-.scores-play{padding:11px 14px;border-bottom:1px solid var(--border-light)}
+.scores-play{padding:11px 14px;border-bottom:1px solid var(--border-light);display:flex;gap:10px;align-items:flex-start}
 .scores-play:last-child{border-bottom:none}
+.scores-play-jersey{width:26px;height:31px;flex:none;margin-top:1px}
+.scores-play-jersey svg{display:block;width:100%;height:100%}
+.scores-play-body{flex:1;min-width:0}
 .scores-play-desc{font-size:12px;color:var(--text-secondary);line-height:1.5}
-.scores-play-desc span{color:var(--text-primary);font-weight:500}
+.scores-play-desc .scores-play-batter{color:var(--text-primary);font-weight:500;cursor:pointer}
+.scores-play-desc .scores-play-batter:hover{color:var(--accent);text-decoration:underline}
 .scores-play-hit{margin-top:4px;font-size:10px;color:var(--text-muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 .scores-feed-empty{padding:24px;text-align:center;color:var(--text-muted);font-size:12px}
 
@@ -6332,7 +6336,12 @@ function scoresReadAccentColor(){
 function scoresLoadSilhouette(){
   if(scoresSilhouetteSvgRaw!==null) return Promise.resolve(scoresSilhouetteSvgRaw);
   return fetch('./batter_silhouette.svg').then(r=>r.ok?r.text():'').then(txt=>{
-    scoresSilhouetteSvgRaw = txt || '';
+    // Strip the XML declaration / DOCTYPE preamble some SVG exports include — those
+    // aren't valid content for innerHTML and, worse, behave inconsistently when this
+    // markup gets inserted more than once (e.g. across snapshot re-renders), so trim
+    // down to the actual <svg ...> root before caching.
+    const idx = txt.indexOf('<svg');
+    scoresSilhouetteSvgRaw = idx>=0 ? txt.slice(idx) : (txt || '');
     return scoresSilhouetteSvgRaw;
   }).catch(()=>{ scoresSilhouetteSvgRaw=''; return ''; });
 }
@@ -6341,7 +6350,9 @@ function scoresSilhouetteMarkup(batterSide){
   if(!scoresSilhouetteSvgRaw) return '';
   let svg = scoresSilhouetteSvgRaw.replace('fill="#000000"', 'fill="'+scoresAccentColor+'"');
   if(batterSide === 'L'){
-    svg = svg.replace(/<svg([^>]*)>/, '<svg$1><g transform="scale(-1,1) translate(-277,0)">').replace('</svg>', '</g></svg>');
+    const vb = svg.match(/viewBox="[\d.]+\s+[\d.]+\s+([\d.]+)\s+[\d.]+"/);
+    const w = vb ? vb[1] : '277';
+    svg = svg.replace(/<svg([^>]*)>/, '<svg$1><g transform="scale(-1,1) translate(-'+w+',0)">').replace('</svg>', '</g></svg>');
   }
   return svg;
 }
@@ -6379,6 +6390,12 @@ function scoresOnEnter(){
   scoresReadAccentColor();
   scoresLoadSilhouette();
   scoresEnsureListener();
+  // Fire-and-forget: the roster dataset (allPlayers) is otherwise only loaded when visiting
+  // Trade Sim/Leaders/Prospects. Loading it here too means play-by-play jersey thumbnails and
+  // the tap-to-open player popup work even if Scores is the first tab a visitor lands on.
+  if(typeof ensureDataLoaded==='function'){
+    ensureDataLoaded().then(()=>{ scoresPopulatePlayJerseys(); }).catch(()=>{});
+  }
 }
 window.scoresOnEnter = scoresOnEnter;
 
@@ -6474,6 +6491,7 @@ function scoresRenderDetail(){
     const atBat = g.currentAtBat;
     if(zoneHost && atBat) zoneHost.innerHTML = scoresSilhouetteMarkup(atBat.batterSide);
   });
+  scoresPopulatePlayJerseys();
 }
 
 // ---- Scoreboard ----
@@ -6548,13 +6566,19 @@ function scoresBoxscoreHtml(g){
 }
 
 // ---- Strike zone ----
-function scoresPitchColor(call){
+// Pitch-call color scheme: ball=grey, strike/foul=white, in-play out=black,
+// in-play no-out or in-play run(s)=the site's accent red.
+function scoresPitchStyle(call){
   const c = String(call||'').toLowerCase();
-  if(c.indexOf('foul')>=0) return '#eab308';
-  if(c.indexOf('in play')>=0) return '#6fa3c4';
-  if(c.indexOf('ball')>=0) return '#6FB89A';
-  if(c.indexOf('strike')>=0) return '#ef4444';
-  return '#999999';
+  if(c.indexOf('in play')>=0){
+    if(c.indexOf('no out')>=0 || c.indexOf('run')>=0) return {fill:scoresAccentColor, text:'#fff'};
+    if(c.indexOf('out')>=0) return {fill:'#000000', text:'#fff'};
+    return {fill:scoresAccentColor, text:'#fff'};
+  }
+  if(c.indexOf('foul')>=0) return {fill:'#ffffff', text:'#111111'};
+  if(c.indexOf('ball')>=0) return {fill:'#9a9a9a', text:'#111111'};
+  if(c.indexOf('strike')>=0) return {fill:'#ffffff', text:'#111111'};
+  return {fill:'#9a9a9a', text:'#111111'};
 }
 function scoresZoneSvg(atBat){
   const W=140, H=180;
@@ -6571,9 +6595,9 @@ function scoresZoneSvg(atBat){
   pitches.forEach(p=>{
     if(p.px==null || p.pz==null) return;
     const cx = toX(Number(p.px)), cy = toY(Number(p.pz));
-    const color = scoresPitchColor(p.call);
-    dots += '<circle cx="'+cx+'" cy="'+cy+'" r="9" fill="'+color+'" fill-opacity="0.88" stroke="rgba(0,0,0,0.4)" stroke-width="1"/>'
-      + '<text x="'+cx+'" y="'+(cy+3)+'" text-anchor="middle" class="scores-zone-pitch-num">'+(p.pitchNumber!=null?p.pitchNumber:'')+'</text>';
+    const st = scoresPitchStyle(p.call);
+    dots += '<circle cx="'+cx+'" cy="'+cy+'" r="9" fill="'+st.fill+'" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>'
+      + '<text x="'+cx+'" y="'+(cy+3)+'" text-anchor="middle" class="scores-zone-pitch-num" style="fill:'+st.text+'">'+(p.pitchNumber!=null?p.pitchNumber:'')+'</text>';
   });
   return '<svg class="scores-zone-svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'
     + '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="var(--bg-light)"/>'
@@ -6582,7 +6606,7 @@ function scoresZoneSvg(atBat){
     + '</svg>';
 }
 function scoresZoneLegend(){
-  const items = [['#6FB89A','Ball'],['#ef4444','Strike'],['#eab308','Foul'],['#6fa3c4','In Play']];
+  const items = [['#9a9a9a','Ball'],['#ffffff','Strike'],['#000000','In Play Out'],[scoresAccentColor,'In Play Run(s)']];
   return '<div class="scores-zone-legend">' + items.map(it=>'<span><span class="scores-zone-legend-dot" style="background:'+it[0]+'"></span>'+it[1]+'</span>').join('') + '</div>';
 }
 function scoresStrikezoneHtml(g){
@@ -6624,6 +6648,30 @@ function scoresMatchupHtml(g){
 }
 
 // ---- Play-by-play feed ----
+// Opens the site's existing player popup (showPM, in the main script) by name only — the
+// Firestore play data doesn't carry a team in the site's own abbreviation format, and showPM's
+// team-filtered lookup would just fail silently on a mismatch, so a plain name match (same
+// fallback showPM already supports) is the reliable path here.
+window.scoresOpenPlayerModal = function(name){
+  if(!name) return;
+  if(typeof ensureDataLoaded==='function' && typeof showPM==='function'){
+    ensureDataLoaded().then(()=>{ showPM(name); }).catch(()=>{});
+  }
+};
+// Mirrors the Trade Sim row pattern (renderList → .player-row-jersey placeholders, then
+// mountJerseyCard() per element): render empty containers in the HTML string first, then
+// walk them here once the manifest.json roster (allPlayers) is available.
+function scoresPopulatePlayJerseys(){
+  if(typeof allPlayers==='undefined' || !allPlayers || !allPlayers.length) return;
+  const wrap = document.getElementById('scoresDetailWrap');
+  if(!wrap) return;
+  wrap.querySelectorAll('.scores-play-jersey[data-name]').forEach(el=>{
+    if(el.childElementCount) return;
+    const name = el.getAttribute('data-name');
+    const p = allPlayers.find(x=>x.name===name);
+    if(p && typeof mountJerseyCard==='function') mountJerseyCard(el, p);
+  });
+}
 function scoresPlayHtml(p){
   let hitLine = '';
   if(p.hit){
@@ -6634,7 +6682,13 @@ function scoresPlayHtml(p){
     if(parts.length) hitLine = '<div class="scores-play-hit">'+scoresEsc(parts.join(' · '))+'</div>';
   }
   const desc = p.description || p.event || '';
-  return '<div class="scores-play"><div class="scores-play-desc"><span>'+scoresEsc(p.batter||'')+'</span> '+scoresEsc(desc)+'</div>'+hitLine+'</div>';
+  const batterName = p.batter || '';
+  const jerseyHtml = '<div class="scores-play-jersey"'+(batterName?' data-name="'+scoresEsc(batterName)+'"':'')+'></div>';
+  const nameClick = batterName && typeof escJs==='function' ? ' onclick="scoresOpenPlayerModal(\''+escJs(batterName)+'\')"' : '';
+  return '<div class="scores-play">'
+    + jerseyHtml
+    + '<div class="scores-play-body"><div class="scores-play-desc"><span class="scores-play-batter"'+nameClick+'>'+scoresEsc(batterName)+'</span> '+scoresEsc(desc)+'</div>'+hitLine+'</div>'
+    + '</div>';
 }
 function scoresFeedHtml(g){
   const plays = Array.isArray(g.plays) ? g.plays : [];
