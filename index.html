@@ -595,12 +595,14 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .scores-strikezone{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px}
 .scores-strikezone-title{font-size:12px;font-weight:500;color:var(--text-primary);letter-spacing:0.01em;text-align:center}
 .scores-strikezone-row{display:flex;align-items:flex-end;justify-content:center;gap:8px}
-/* Batter is sized ~2x the zone's height and vertically anchored (via the zone's
-   margin-bottom) so the zone box spans roughly elbow-to-knee on his silhouette —
-   measured off the actual artwork's proportions, not eyeballed. */
-.scores-silhouette{width:173px;height:280px;flex-shrink:0;opacity:0.95}
+/* Batter's BODY (head to feet, not counting the bat sticking up above his head) is
+   sized ~2x the zone's height, and the zone is vertically anchored via margin-bottom
+   so it spans roughly knee-to-chest/elbow on him. Measured directly off the artwork:
+   his head tops out at ~89% of the full viewBox height (the bat tip reaches ~99% —
+   excluded from the "2x" comparison) and his knee sits at ~20%. */
+.scores-silhouette{width:196px;height:317px;flex-shrink:0;opacity:0.95}
 .scores-silhouette svg{width:100%;height:100%;display:block}
-.scores-zone-svg{flex-shrink:0;width:110px;height:141px;margin-bottom:56px}
+.scores-zone-svg{flex-shrink:0;width:110px;height:141px;margin-bottom:63px}
 .scores-zone-pitch-num{font-size:8px;font-weight:600;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none}
 .scores-count-line{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:var(--text-secondary)}
 .scores-count-line span{color:var(--text-primary);font-weight:600}
@@ -636,8 +638,8 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   .scores-matchup{grid-area:matchup}
   .scores-feed{grid-area:feed}
   .scores-board-score{font-size:44px}
-  .scores-silhouette{width:222px;height:360px}
-  .scores-zone-svg{width:140px;height:180px;margin-bottom:72px}
+  .scores-silhouette{width:250px;height:405px}
+  .scores-zone-svg{width:140px;height:180px;margin-bottom:81px}
 }
 </style>
 </head>
@@ -6350,10 +6352,12 @@ function scoresLoadSilhouette(){
   }).catch(()=>{ scoresSilhouetteSvgRaw=''; return ''; });
 }
 
+// The unmirrored artwork is a left-handed batter's stance, facing left. Right-handed
+// batters get the horizontal flip instead (not left-handed — the source art already IS one).
 function scoresSilhouetteMarkup(batterSide){
   if(!scoresSilhouetteSvgRaw) return '';
   let svg = scoresSilhouetteSvgRaw.replace('fill="#000000"', 'fill="'+scoresAccentColor+'"');
-  if(batterSide === 'L'){
+  if(batterSide === 'R'){
     const vb = svg.match(/viewBox="[\d.]+\s+[\d.]+\s+([\d.]+)\s+[\d.]+"/);
     const w = vb ? vb[1] : '277';
     svg = svg.replace(/<svg([^>]*)>/, '<svg$1><g transform="scale(-1,1) translate(-'+w+',0)">').replace('</svg>', '</g></svg>');
@@ -6619,10 +6623,13 @@ function scoresStrikezoneHtml(g){
   const zoneSvg = scoresZoneSvg(atBat);
   const countHtml = (g.balls!=null && g.strikes!=null) ? '<div class="scores-count-line"><span>'+g.balls+'-'+g.strikes+'</span> count</div>' : '';
   const silhouetteDiv = '<div class="scores-silhouette" id="scoresSilhouetteHost"></div>';
-  // The unmirrored artwork faces left; mirroring it for a left-handed batter (see
-  // scoresSilhouetteMarkup) flips him to face right. Swap which side the zone renders on
-  // to match, so the batter always faces toward the zone instead of away from it.
-  const row = atBat && atBat.batterSide === 'L'
+  // View is from behind the plate (the umpire's POV), looking out at the pitcher — not
+  // from the mound looking in. From there a left-handed batter stands on the first-base
+  // side (screen-right) with the plate/zone to his left; a right-handed batter stands on
+  // the third-base side (screen-left) with the zone to his right. The unmirrored artwork
+  // is already a lefty facing left, so it keeps that pose with the zone on his left;
+  // right-handed (see scoresSilhouetteMarkup) gets mirrored to face right, zone on his right.
+  const row = atBat && atBat.batterSide === 'R'
     ? silhouetteDiv + zoneSvg
     : zoneSvg + silhouetteDiv;
   return '<div class="scores-strikezone">'
