@@ -596,13 +596,17 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
 .scores-strikezone-title{font-size:12px;font-weight:500;color:var(--text-primary);letter-spacing:0.01em;text-align:center}
 .scores-strikezone-row{display:flex;align-items:flex-end;justify-content:center;gap:2px}
 /* Batter's BODY (head to feet, not counting the bat sticking up above his head) is
-   sized ~2x the zone's height, and the zone is vertically anchored via margin-bottom
-   so it spans roughly knee-to-chest/elbow on him. Measured directly off the artwork:
-   his head tops out at ~89% of the full viewBox height (the bat tip reaches ~99% —
-   excluded from the "2x" comparison) and his knee sits at ~20%. */
+   sized ~2x the zone's height. Measured directly off the artwork: his head tops out at
+   ~89% of the full viewBox height (the bat tip reaches ~99% — excluded from the "2x"
+   comparison).
+   The zone box itself (drawn as the middle 2/3 of .scores-zone-svg — see scoresZoneSvg())
+   is sized+positioned to land at exactly 30%-65% of .scores-silhouette's own height:
+   zone height = 0.35 * silhouette height; zone canvas height = zone height / (2/3);
+   margin-bottom = 0.30*silhouetteHeight - canvasHeight/6. Width keeps the canvas's own
+   aspect ratio (170:213) so the box doesn't distort. */
 .scores-silhouette{width:196px;height:317px;flex-shrink:0;opacity:0.95}
 .scores-silhouette svg{width:100%;height:100%;display:block}
-.scores-zone-svg{flex-shrink:0;width:110px;height:141px;margin-bottom:63px}
+.scores-zone-svg{flex-shrink:0;width:133px;height:166px;margin-bottom:67px}
 .scores-zone-pitch-num{font-size:8px;font-weight:600;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;pointer-events:none}
 .scores-count-line{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;color:var(--text-secondary)}
 .scores-count-line span{color:var(--text-primary);font-weight:600}
@@ -639,7 +643,7 @@ input[type="text"]::placeholder{color:var(--text-muted);font-size:13px}
   .scores-feed{grid-area:feed}
   .scores-board-score{font-size:44px}
   .scores-silhouette{width:250px;height:405px}
-  .scores-zone-svg{width:140px;height:180px;margin-bottom:81px}
+  .scores-zone-svg{width:170px;height:213px;margin-bottom:86px}
 }
 </style>
 </head>
@@ -6589,18 +6593,23 @@ function scoresPitchStyle(call){
   return {fill:'#9a9a9a', text:'#111111'};
 }
 function scoresZoneSvg(atBat){
-  const W=140, H=180;
-  const XMIN=-2.2, XMAX=2.2, YMIN=0.3, YMAX=5.0;
-  // The zone box is drawn at a fixed 30%-65% band of the canvas height (matching the
-  // silhouette's own body-relative sizing) rather than each pitch's real strikeZoneTop/
-  // Bottom — pitch DOTS still use the real px/pz feet coordinates below, only the box
-  // outline itself is fixed, so it reads as one consistent box next to the batter instead
-  // of shifting slightly pitch to pitch.
+  // Canvas (W x H) is sized so the zone box itself fills 2/3 of it on each axis — just
+  // enough margin around the box to show an outside pitch without it floating in a sea
+  // of dead transparent canvas. The CSS .scores-zone-svg width/height (and margin-bottom)
+  // scale this same box+margin ratio to sit exactly at 30%-65% of the batter's own
+  // displayed height — see the sizing comment above .scores-silhouette in the stylesheet.
+  const W=170, H=213;
+  const XMIN=-1.27, XMAX=1.27, YMIN=0.3, YMAX=5.0;
   const zHalfW = 0.85;
-  const toX = x => ((x-XMIN)/(XMAX-XMIN))*W;
-  const toY = y => H - ((y-YMIN)/(YMAX-YMIN))*H;
+  const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
+  const toX = x => clamp(((x-XMIN)/(XMAX-XMIN))*W, 9, W-9);
+  const toY = y => clamp(H - ((y-YMIN)/(YMAX-YMIN))*H, 9, H-9);
   const rectX = toX(-zHalfW), rectW = toX(zHalfW)-toX(-zHalfW);
-  const rectY = H*(1-0.65), rectH = H*(0.65-0.30);
+  // The box itself is fixed at 30%-65% of the batter's height (not each pitch's real
+  // strikeZoneTop/Bottom) — pitch DOTS still use the real px/pz feet coordinates below,
+  // so it reads as one consistent box next to the batter instead of shifting pitch to
+  // pitch. Positioned here as the middle 2/3 of the canvas (see W/H comment above).
+  const rectY = H*(1/6), rectH = H*(2/3);
   const pitches = (atBat && Array.isArray(atBat.pitches)) ? atBat.pitches : [];
   let dots = '';
   pitches.forEach(p=>{
